@@ -1,0 +1,2 @@
+"""QQ Adventurer plugin package."""
+

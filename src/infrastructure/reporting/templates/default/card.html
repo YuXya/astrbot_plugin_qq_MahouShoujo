@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=900, initial-scale=1.0">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #293241;
+      --muted: #6f6370;
+      --paper: #fff9fb;
+      --pink: #f08aa8;
+      --mint: #6cc5b8;
+      --violet: #8d7ae6;
+      --gold: #d6a84f;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      margin: 0;
+      width: 900px;
+      min-width: 900px;
+      max-width: 900px;
+      overflow-x: hidden;
+    }
+
+    body {
+      min-height: 1180px;
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+      background:
+        radial-gradient(circle at 16% 12%, rgba(240, 138, 168, 0.34), transparent 24%),
+        radial-gradient(circle at 82% 16%, rgba(108, 197, 184, 0.32), transparent 22%),
+        linear-gradient(145deg, #fff0f6 0%, #eefaf7 48%, #f4efff 100%);
+      color: var(--ink);
+      padding: 38px;
+    }
+
+    .card {
+      min-height: 1104px;
+      background: rgba(255, 249, 251, 0.96);
+      border: 3px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 28px 70px rgba(84, 61, 88, 0.18);
+      padding: 40px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 18px;
+      border: 2px dashed rgba(240, 138, 168, 0.38);
+      pointer-events: none;
+    }
+
+    .header {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr 170px;
+      gap: 24px;
+      align-items: center;
+      padding-bottom: 26px;
+      border-bottom: 2px solid rgba(141, 122, 230, 0.18);
+    }
+
+    .eyebrow {
+      font-size: 20px;
+      color: var(--pink);
+      font-weight: 800;
+      letter-spacing: 0;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 52px;
+      line-height: 1.12;
+      letter-spacing: 0;
+      color: var(--violet);
+    }
+
+    .subtitle {
+      margin-top: 14px;
+      font-size: 24px;
+      line-height: 1.42;
+      color: var(--muted);
+    }
+
+    .avatar {
+      width: 164px;
+      height: 164px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 38%, #fff 0 23%, transparent 24%),
+        radial-gradient(circle at 38% 42%, #293241 0 3%, transparent 4%),
+        radial-gradient(circle at 62% 42%, #293241 0 3%, transparent 4%),
+        radial-gradient(circle at 50% 56%, #f08aa8 0 8%, transparent 9%),
+        linear-gradient(160deg, #ffd3df, #c8f1ea);
+      border: 8px solid #fff;
+      box-shadow: 0 14px 32px rgba(141, 122, 230, 0.22);
+      color: #fff;
+      font-size: 42px;
+      font-weight: 900;
+      overflow: hidden;
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .identity {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 28px;
+    }
+
+    .id-item, .section, .stat, .like {
+      border: 1px solid rgba(141, 122, 230, 0.18);
+      background: rgba(255, 255, 255, 0.62);
+    }
+
+    .id-item { padding: 16px 18px; }
+
+    .label {
+      font-size: 17px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .value {
+      font-size: 24px;
+      line-height: 1.25;
+      color: var(--ink);
+      font-weight: 800;
+    }
+
+    .section {
+      margin-top: 20px;
+      padding: 22px 24px;
+    }
+
+    .section-title {
+      font-size: 21px;
+      color: var(--pink);
+      font-weight: 900;
+      margin-bottom: 10px;
+    }
+
+    .section-text {
+      font-size: 25px;
+      line-height: 1.52;
+      color: #2f3445;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      margin-top: 22px;
+    }
+
+    .stat {
+      padding: 14px 18px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      min-height: 64px;
+    }
+
+    .stat-key {
+      font-size: 20px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      color: var(--mint);
+      font-weight: 900;
+    }
+
+    .likes {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .like {
+      padding: 10px 16px;
+      font-size: 21px;
+      color: var(--violet);
+      font-weight: 800;
+    }
+
+    .quote {
+      margin-top: 24px;
+      padding: 22px 24px;
+      background: linear-gradient(135deg, rgba(240, 138, 168, 0.12), rgba(108, 197, 184, 0.13));
+      border-left: 8px solid var(--pink);
+      font-size: 28px;
+      line-height: 1.45;
+      font-weight: 800;
+      color: #483a55;
+    }
+
+    .footer {
+      margin-top: auto;
+      padding-top: 18px;
+      border-top: 1px solid rgba(141, 122, 230, 0.18);
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1.42;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <section class="header">
+      <div>
+        <div class="eyebrow">ISEKAI REINCARNATION CARD</div>
+        <h1>{{ card.title }}</h1>
+        <div class="subtitle">{{ card.subtitle }}</div>
+      </div>
+      <div class="avatar">
+        {% if avatar_url %}
+        <img src="{{ avatar_url }}" alt="{{ card.target_name }}">
+        {% else %}
+        転
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="identity">
+      <div class="id-item">
+        <div class="label">转生对象</div>
+        <div class="value">{{ card.target_name }}</div>
+      </div>
+      <div class="id-item">
+        <div class="label">种族</div>
+        <div class="value">{{ card.race }}</div>
+      </div>
+      <div class="id-item">
+        <div class="label">职阶</div>
+        <div class="value">{{ card.class_name }}</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">外貌</div>
+      <div class="section-text">{{ card.appearance }}</div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">性格</div>
+      <div class="section-text">{{ card.personality }}</div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">固有天赋</div>
+      <div class="section-text">{{ card.talent }}</div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">初醒之地</div>
+      <div class="section-text">{{ card.birth_description }}</div>
+    </section>
+
+    <section class="stats">
+      {% for key, value in stats_items %}
+      <div class="stat">
+        <div class="stat-key">{{ key }}</div>
+        <div class="stat-value">{{ value }}</div>
+      </div>
+      {% endfor %}
+    </section>
+
+    <section class="likes">
+      {% for like in likes %}
+      <div class="like">{{ like }}</div>
+      {% endfor %}
+    </section>
+
+    <section class="quote">{{ card.quote }}</section>
+
+    <footer class="footer">{{ card.footer }}</footer>
+  </main>
+</body>
+</html>

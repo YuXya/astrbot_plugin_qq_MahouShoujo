@@ -1,0 +1,268 @@
+{
+  "llm": {
+    "description": "LLM 设置",
+    "type": "object",
+    "items": {
+      "llm_provider_id": {
+        "type": "string",
+        "description": "LLM Provider ID（用于所有分析任务）",
+        "_special": "select_provider",
+        "default": "",
+        "hint": "选择用于异世界转生人物卡生成的 LLM Provider。留空则使用当前会话的默认 Provider。"
+      },
+      "llm_retries": {
+        "type": "int",
+        "description": "LLM 重试次数",
+        "default": 2,
+        "slider": {
+          "min": 1,
+          "max": 5,
+          "step": 1
+        }
+      },
+      "llm_backoff": {
+        "type": "int",
+        "description": "LLM 重试退避秒数",
+        "default": 2,
+        "slider": {
+          "min": 1,
+          "max": 10,
+          "step": 1
+        }
+      }
+    }
+  },
+  "vision": {
+    "description": "头像视觉转述设置",
+    "type": "object",
+    "items": {
+      "enable_avatar_caption": {
+        "type": "bool",
+        "description": "启用头像图像转述",
+        "default": false,
+        "hint": "开启后会调用下方视觉 Provider 描述发送者 QQ 头像，再把描述交给人物卡 LLM 用于扩写外貌。失败时会自动跳过。"
+      },
+      "vision_provider_id": {
+        "type": "string",
+        "description": "头像转述 Provider ID",
+        "_special": "select_provider",
+        "default": "",
+        "hint": "请选择支持图片输入的视觉模型 Provider，例如 GLM-4.5V。留空则不进行头像转述。"
+      },
+      "avatar_caption_prompt": {
+        "type": "string",
+        "description": "头像转述提示词",
+        "default": "请用中文简短描述这个 QQ 头像中的外貌特征，只描述头像画面，不判断真人身份。",
+        "hint": "该提示词只用于头像图像转述，不用于最终人物卡 JSON 生成。"
+      }
+    }
+  },
+  "adventure": {
+    "description": "异世界转生卡设置",
+    "type": "object",
+    "items": {
+      "max_history_messages": {
+        "type": "int",
+        "description": "读取群历史消息上限",
+        "default": 120,
+        "slider": {
+          "min": 20,
+          "max": 500,
+          "step": 20
+        }
+      },
+      "diary_compress_interval": {
+        "type": "int",
+        "description": "每 N 次冒险触发一次冒险记录压缩",
+        "default": 10,
+        "hint": "普通未压缩冒险记录达到这个数量后，自动调用 AI 压缩更早的记录。填 0 表示关闭压缩。",
+        "slider": {
+          "min": 0,
+          "max": 100,
+          "step": 1
+        }
+      },
+      "diary_compress_count": {
+        "type": "int",
+        "description": "每次压缩 M 条旧冒险记录",
+        "default": 6,
+        "hint": "触发压缩时，把最早的 M 条普通冒险日记压缩成一条范围摘要，例如第 1-6 次冒险。",
+        "slider": {
+          "min": 1,
+          "max": 50,
+          "step": 1
+        }
+      },
+      "cameo_compress_interval": {
+        "type": "int",
+        "description": "每 N 条交互记录触发一次压缩",
+        "default": 10,
+        "hint": "其他人与主角的交互记录达到这个数量后，自动调用 AI 压缩更早的记录。填 0 表示关闭压缩。",
+        "slider": {
+          "min": 0,
+          "max": 100,
+          "step": 1
+        }
+      },
+      "cameo_compress_count": {
+        "type": "int",
+        "description": "每次压缩 M 条旧交互记录",
+        "default": 6,
+        "hint": "触发压缩时，把最早的 M 条交互记录压缩成一条范围摘要。",
+        "slider": {
+          "min": 1,
+          "max": 50,
+          "step": 1
+        }
+      },
+      "debug_mode": {
+        "type": "bool",
+        "description": "调试模式",
+        "default": false,
+        "hint": "开启后会在插件数据目录保存 prompt 与 LLM 原始响应。"
+      },
+      "use_mock_data": {
+        "type": "bool",
+        "description": "使用静态假数据",
+        "default": false,
+        "hint": "用于先验证 HTML 转图片和发图链路；不会调用人物卡 LLM，但仍会按配置尝试头像转述。"
+      }
+    }
+  },
+  "analysis_features": {
+    "description": "分析风格设置",
+    "type": "object",
+    "items": {
+      "keep_original_persona": {
+        "description": "继承会话人设风格",
+        "type": "bool",
+        "default": false,
+        "hint": "【优先级2】开启后将自动尝试识别当前群聊会话（或对话）的人格设定。若该群已设置人设，则人物卡会尽量模拟该人设的口吻进行回复。注意：此开关在“强制使用插件指定人格”关闭时才会生效。"
+      },
+      "use_plugin_specific_persona": {
+        "description": "强制使用插件指定人格",
+        "type": "bool",
+        "default": false,
+        "hint": "【优先级1：核心开关】若开启，将完全忽略当前群聊的人格设定，统一强制使用下方选择的“插件指定人格 ID”进行人物卡生成。"
+      },
+      "plugin_specific_persona_id": {
+        "description": "插件指定人格 ID",
+        "type": "string",
+        "_special": "select_persona",
+        "default": "",
+        "hint": "当“强制使用插件指定人格”开启时，在此处选择系统中已定义的人设。若此处未选择，则仍会尝试识别全局默认人格。"
+      }
+    }
+  },
+  "t2i_rendering": {
+    "description": "图片渲染策略",
+    "type": "object",
+    "hint": "配置 HTML 转图片的渲染参数。第一轮优先质量，第二轮作为回退。",
+    "items": {
+      "t2i_r1_type": {
+        "type": "string",
+        "description": "第一轮：图片格式",
+        "options": ["jpeg", "png"],
+        "default": "png"
+      },
+      "t2i_r1_quality": {
+        "type": "int",
+        "description": "第一轮：图片质量",
+        "default": 100,
+        "slider": {
+          "min": 1,
+          "max": 100,
+          "step": 1
+        }
+      },
+      "t2i_r1_device_scale": {
+        "type": "string",
+        "description": "第一轮：分辨率等级",
+        "options": ["normal", "high", "ultra"],
+        "default": "ultra"
+      },
+      "t2i_r1_timeout": {
+        "type": "int",
+        "description": "第一轮：渲染超时 (ms)",
+        "default": 50000
+      },
+      "t2i_r2_type": {
+        "type": "string",
+        "description": "第二轮：图片格式",
+        "options": ["jpeg", "png"],
+        "default": "jpeg"
+      },
+      "t2i_r2_quality": {
+        "type": "int",
+        "description": "第二轮：图片质量",
+        "default": 80,
+        "slider": {
+          "min": 1,
+          "max": 100,
+          "step": 1
+        }
+      },
+      "t2i_r2_device_scale": {
+        "type": "string",
+        "description": "第二轮：分辨率等级",
+        "options": ["normal", "high", "ultra"],
+        "default": "high"
+      },
+      "t2i_r2_timeout": {
+        "type": "int",
+        "description": "第二轮：渲染超时 (ms)",
+        "default": 100000
+      }
+    }
+  },
+  "web_viewer": {
+    "description": "存档网页查看设置",
+    "type": "object",
+    "items": {
+      "host": {
+        "type": "string",
+        "description": "存档网页监听地址",
+        "default": "0.0.0.0",
+        "hint": "默认监听所有网卡，网页会要求登录。若只想通过本机反代访问，可填 127.0.0.1。"
+      },
+      "port": {
+        "type": "int",
+        "description": "存档网页端口",
+        "default": 8501,
+        "slider": {
+          "min": 1024,
+          "max": 65535,
+          "step": 1
+        }
+      },
+      "public_base_url": {
+        "type": "string",
+        "description": "公网访问地址",
+        "default": "",
+        "hint": "例如 http://你的服务器IP:8501。留空时会回复 http://127.0.0.1:8501。"
+      },
+      "public_path_prefix": {
+        "type": "string",
+        "description": "反代路径前缀",
+        "default": "",
+        "hint": "如果网页挂在子路径下，例如 /Games/AIBot/，这里填 /Games/AIBot；根路径反代则留空。"
+      }
+    }
+  },
+  "performance": {
+    "description": "性能设置",
+    "type": "object",
+    "items": {
+      "max_concurrent_t2i": {
+        "type": "int",
+        "description": "最大 T2I 渲染并发数",
+        "default": 1,
+        "slider": {
+          "min": 1,
+          "max": 3,
+          "step": 1
+        }
+      }
+    }
+  }
+}

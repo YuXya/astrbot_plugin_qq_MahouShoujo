@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=900, initial-scale=1.0">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #27303d;
+      --muted: #6f6a64;
+      --paper: #fffaf0;
+      --line: #d7c7a8;
+      --green: #52796f;
+      --red: #b75d4a;
+      --gold: #bf8f3c;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 900px;
+      min-width: 900px;
+      max-width: 900px;
+      overflow-x: hidden;
+    }
+
+    body {
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+      background:
+        linear-gradient(90deg, rgba(82, 121, 111, 0.08) 1px, transparent 1px),
+        linear-gradient(rgba(191, 143, 60, 0.10) 1px, transparent 1px),
+        linear-gradient(135deg, #f4ead7 0%, #fbf4e5 50%, #edf4ef 100%);
+      background-size: 34px 34px, 34px 34px, auto;
+      color: var(--ink);
+      padding: 36px;
+    }
+
+    .card {
+      min-height: 1060px;
+      background: rgba(255, 250, 240, 0.96);
+      border: 2px solid var(--line);
+      box-shadow: 0 24px 64px rgba(74, 62, 42, 0.18);
+      padding: 38px;
+      position: relative;
+    }
+
+    .header {
+      display: grid;
+      grid-template-columns: 1fr 148px;
+      gap: 24px;
+      align-items: center;
+      border-bottom: 3px double var(--line);
+      padding-bottom: 24px;
+    }
+
+    .eyebrow {
+      font-size: 18px;
+      font-weight: 900;
+      color: var(--green);
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 50px;
+      line-height: 1.14;
+      color: #3c4d46;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 12px;
+      font-size: 23px;
+      line-height: 1.42;
+      color: var(--muted);
+    }
+
+    .avatar {
+      width: 144px;
+      height: 144px;
+      border-radius: 10px;
+      border: 7px solid #fff;
+      background: linear-gradient(135deg, #d8eadf, #f6d8bf);
+      box-shadow: 0 12px 30px rgba(70, 60, 40, 0.18);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      font-size: 34px;
+      font-weight: 900;
+      color: var(--green);
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr 1fr 1fr;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .box {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.52);
+      padding: 14px 16px;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 16px;
+      margin-bottom: 5px;
+      font-weight: 700;
+    }
+
+    .value {
+      font-size: 23px;
+      line-height: 1.28;
+      font-weight: 900;
+      color: var(--ink);
+    }
+
+    .section {
+      margin-top: 20px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.45);
+      padding: 22px 24px;
+    }
+
+    .section-title {
+      color: var(--red);
+      font-size: 21px;
+      font-weight: 900;
+      margin-bottom: 10px;
+    }
+
+    .diary {
+      font-size: 25px;
+      line-height: 1.6;
+      color: #2f3532;
+      white-space: pre-wrap;
+    }
+
+    .text {
+      font-size: 23px;
+      line-height: 1.5;
+      color: #343932;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.58);
+      padding: 12px;
+      text-align: center;
+      min-height: 74px;
+    }
+
+    .stat-key {
+      color: var(--muted);
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .stat-value {
+      color: var(--green);
+      font-size: 28px;
+      font-weight: 900;
+      margin-top: 4px;
+    }
+
+    .changes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .change {
+      border: 1px solid rgba(191, 143, 60, 0.44);
+      background: rgba(255, 246, 220, 0.76);
+      color: #765d28;
+      font-size: 20px;
+      font-weight: 800;
+      padding: 9px 13px;
+    }
+
+    .footer {
+      margin-top: 24px;
+      border-top: 1px solid var(--line);
+      padding-top: 16px;
+      color: var(--muted);
+      font-size: 19px;
+      line-height: 1.42;
+    }
+
+    .state-overview {
+      margin-top: 22px;
+      border: 1px solid var(--line);
+      background: rgba(237, 244, 239, 0.62);
+      padding: 18px 20px;
+    }
+
+    .state-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 9px;
+    }
+
+    .state-item {
+      border: 1px solid rgba(82, 121, 111, 0.28);
+      background: rgba(255, 255, 255, 0.56);
+      padding: 9px 11px;
+      min-height: 58px;
+    }
+
+    .state-key {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
+    .state-value {
+      color: #263f37;
+      font-size: 18px;
+      font-weight: 900;
+      margin-top: 3px;
+      overflow-wrap: anywhere;
+    }
+
+    .progress-panel {
+      margin-top: 22px;
+      border: 1px solid var(--line);
+      background: rgba(237, 244, 239, 0.62);
+      color: var(--ink);
+      padding: 18px 20px 20px;
+    }
+
+    .progress-panel .section-title {
+      color: var(--red);
+      border-bottom: 1px solid rgba(82, 121, 111, 0.20);
+      padding-bottom: 10px;
+      margin-bottom: 16px;
+    }
+
+    .progress-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px 24px;
+    }
+
+    .progress-row {
+      min-width: 0;
+    }
+
+    .progress-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+
+    .progress-name {
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+      min-width: 0;
+      color: #263f37;
+      font-size: 18px;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+
+    .progress-name::before {
+      content: "";
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+      border: 3px solid rgba(82, 121, 111, 0.26);
+      border-top-color: var(--green);
+      border-radius: 50%;
+    }
+
+    .progress-level {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .progress-xp {
+      color: var(--green);
+      font-size: 16px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .progress-xp small {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 7px;
+      overflow: hidden;
+      background: rgba(82, 121, 111, 0.16);
+      border-radius: 999px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: var(--green);
+      box-shadow: 0 0 8px rgba(82, 121, 111, 0.24);
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <section class="header">
+      <div>
+        <div class="eyebrow">ISEKAI ADVENTURE DIARY</div>
+        <h1>{{ card.title }}</h1>
+        <div class="subtitle">{{ card.subtitle }}</div>
+      </div>
+      <div class="avatar">
+        {% if avatar_url %}
+        <img src="{{ avatar_url }}" alt="{{ card.target_name }}">
+        {% else %}
+        旅
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="meta">
+      <div class="box">
+        <div class="label">冒险者</div>
+        <div class="value">{{ card.target_name }}</div>
+      </div>
+      <div class="box">
+        <div class="label">区域</div>
+        <div class="value">{{ card.region }}</div>
+      </div>
+      <div class="box">
+        <div class="label">地点</div>
+        <div class="value">{{ card.location }}</div>
+      </div>
+      <div class="box">
+        <div class="label">等级</div>
+        <div class="value">{{ level_label }}</div>
+        <div class="label">{{ level_exp_percent }}%</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">{{ card.date_label }} / 行动</div>
+      <div class="text">{{ card.action }}</div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">日记</div>
+      <div class="diary">{{ card.diary }}</div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">遭遇</div>
+      <div class="text">{{ card.encounter }}</div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">结算</div>
+      <div class="text">{{ card.result }}</div>
+      <div class="changes">
+        {% for change in changes %}
+        <div class="change">{{ change }}</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="stats">
+      {% for key, value in stats_items %}
+      <div class="stat">
+        <div class="stat-key">{{ key }}</div>
+        <div class="stat-value">{{ value }}</div>
+      </div>
+      {% endfor %}
+    </section>
+
+    <footer class="footer">{{ card.footer }}</footer>
+
+    {% if skill_progress_items %}
+    <section class="progress-panel">
+      <div class="section-title">{{ skill_progress_title }}</div>
+      <div class="progress-list">
+        {% for item in skill_progress_items %}
+        <div class="progress-row">
+          <div class="progress-head">
+            <div class="progress-name">
+              <span>{{ item.label }}</span>
+              <span class="progress-level">{% if item.is_max %}Lv.Max{% else %}Lv.{{ item.level }}{% endif %}</span>
+            </div>
+            <div class="progress-xp">{% if item.is_max %}MAX{% else %}{{ item.value }} <small>/ 100</small>{% endif %}</div>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" style="width: {{ item.percent }}%;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if status_progress_items %}
+    <section class="progress-panel">
+      <div class="section-title">{{ status_progress_title }}</div>
+      <div class="progress-list">
+        {% for item in status_progress_items %}
+        <div class="progress-row">
+          <div class="progress-head">
+            <div class="progress-name">
+              <span>{{ item.label }}</span>
+              <span class="progress-level">{% if item.is_max %}Lv.Max{% else %}Lv.{{ item.level }}{% endif %}</span>
+            </div>
+            <div class="progress-xp">{% if item.is_max %}MAX{% else %}{{ item.value }} <small>/ 100</small>{% endif %}</div>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" style="width: {{ item.percent }}%;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if state_items %}
+    <section class="state-overview">
+      <div class="section-title">当前状态</div>
+      <div class="state-grid">
+        {% for key, value in state_items %}
+        <div class="state-item">
+          <div class="state-key">{{ key }}</div>
+          <div class="state-value">{{ value }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>
