@@ -154,31 +154,6 @@
       color: #2f3445;
     }
 
-    .likes {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-top: 20px;
-    }
-
-    .like {
-      padding: 10px 16px;
-      font-size: 21px;
-      color: var(--violet);
-      font-weight: 800;
-    }
-
-    .quote {
-      margin-top: 24px;
-      padding: 22px 24px;
-      background: linear-gradient(135deg, rgba(240, 138, 168, 0.12), rgba(108, 197, 184, 0.13));
-      border-left: 8px solid var(--pink);
-      font-size: 28px;
-      line-height: 1.45;
-      font-weight: 800;
-      color: #483a55;
-    }
-
     .footer {
       margin-top: auto;
       padding-top: 18px;
@@ -194,8 +169,8 @@
     <section class="header">
       <div>
         <div class="eyebrow">ISEKAI REINCARNATION CARD</div>
-        <h1>{{ card.title }}</h1>
-        <div class="subtitle">{{ card.subtitle }}</div>
+        <h1>魔法少女转生人物卡</h1>
+        <div class="subtitle">{{ card.target_name }} 的转生档案</div>
       </div>
       <div class="avatar">
         転
@@ -204,44 +179,27 @@
 
     <section class="identity">
       <div class="id-item">
-        <div class="label">转生对象</div>
+        <div class="label">姓名</div>
         <div class="value">{{ card.target_name }}</div>
       </div>
       <div class="id-item">
         <div class="label">职阶</div>
         <div class="value">{{ card.class_name }}</div>
       </div>
+      <div class="id-item">
+        <div class="label">核心能力</div>
+        <div class="value">{{ card.talent }}</div>
+      </div>
     </section>
 
+    {% for item in card.info %}
     <section class="section">
-      <div class="section-title">外貌</div>
-      <div class="section-text">{{ card.appearance }}</div>
+      <div class="section-title">{{ item.field }}</div>
+      <div class="section-text">{{ item.description }}</div>
     </section>
+    {% endfor %}
 
-    <section class="section">
-      <div class="section-title">性格</div>
-      <div class="section-text">{{ card.personality }}</div>
-    </section>
-
-    <section class="section">
-      <div class="section-title">固有天赋</div>
-      <div class="section-text">{{ card.talent }}</div>
-    </section>
-
-    <section class="section">
-      <div class="section-title">初醒之地</div>
-      <div class="section-text">{{ card.birth_description }}</div>
-    </section>
-
-    <section class="likes">
-      {% for like in likes %}
-      <div class="like">{{ like }}</div>
-      {% endfor %}
-    </section>
-
-    <section class="quote">{{ card.quote }}</section>
-
-    <footer class="footer">{{ card.footer }}</footer>
+    <footer class="footer">魔法少女转生人物卡，仅供娱乐。</footer>
   </main>
 </body>
 </html>

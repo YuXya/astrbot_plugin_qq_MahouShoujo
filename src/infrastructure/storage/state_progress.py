@@ -6,7 +6,10 @@ from typing import Any
 
 PROGRESS_KEYS = {"经验", "熟练度", "proficiency"}
 LEVEL_KEYS = ("等级", "level", "Lv", "lv")
-HIDDEN_STATE_KEYS = {"schema_version", "group_id", "user_id", "updated_at"}
+HIDDEN_STATE_KEYS = {
+    "schema_version", "group_id", "user_id", "updated_at",
+    "nickname", "avatar_url", "created_at",
+}
 
 
 @dataclass(frozen=True)
@@ -72,21 +75,37 @@ def build_progress_sections(
 
 
 def level_display(state: dict[str, Any]) -> str:
-    return f"{_int_value(state.get('level'), 1)}级"
+    """从 player_data 或主角树中提取等级显示。"""
+    protagonist = state.get("主角", state)
+    level_node = protagonist.get("等级", {}) if isinstance(protagonist, dict) else {}
+    level = level_node.get("等级", state.get("level", 1)) if isinstance(level_node, dict) else state.get("level", 1)
+    return f"{_int_value(level, 1)}级"
 
 
 def level_exp_percent(state: dict[str, Any]) -> int:
-    return _clamp_progress(state.get("level_exp"))
+    """从 player_data 或主角树中提取等级经验百分比。"""
+    protagonist = state.get("主角", state)
+    level_node = protagonist.get("等级", {}) if isinstance(protagonist, dict) else {}
+    exp = level_node.get("经验", state.get("level_exp", 0)) if isinstance(level_node, dict) else state.get("level_exp", 0)
+    return _clamp_progress(exp)
 
 
 def build_state_display_items(state: dict[str, Any], limit: int = 24) -> list[tuple[str, str]]:
     if not isinstance(state, dict):
         return []
     items: list[tuple[str, str]] = []
-    for key, value in state.items():
-        if key in HIDDEN_STATE_KEYS:
-            continue
-        _append_state_item(items, str(key), value)
+    # 优先从主角树读取状态
+    protagonist = state.get("主角", {})
+    if isinstance(protagonist, dict) and protagonist:
+        for key, value in protagonist.items():
+            if key in HIDDEN_STATE_KEYS:
+                continue
+            _append_state_item(items, str(key), value)
+    else:
+        for key, value in state.items():
+            if key in HIDDEN_STATE_KEYS:
+                continue
+            _append_state_item(items, str(key), value)
     return items[:limit]
 
 

@@ -46,14 +46,13 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         self,
         data: dict,
     ) -> AdventureDiaryCard:
-        return self.domain_service.normalize_card(data, {}, {}, "")
+        return self.domain_service.normalize_card(data, {}, "")
 
     async def analyze_diary(
         self,
         *,
         action_text: str,
-        profile: dict,
-        state: dict,
+        player_data: dict,
         logs: list[dict],
         cameo_memories: list[dict] | None = None,
         nearby_players: list[dict] | None = None,
@@ -64,8 +63,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
     ) -> tuple[AdventureDiaryCard | None, TokenUsage, str]:
         prompt = self.build_diary_prompt(
             action_text=action_text,
-            profile=profile,
-            state=state,
+            player_data=player_data,
             logs=logs,
             cameo_memories=cameo_memories,
             nearby_players=nearby_players,
@@ -103,7 +101,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             return None, token_usage, result_text
 
         return (
-            self.domain_service.normalize_card(parsed, profile, state, action_text),
+            self.domain_service.normalize_card(parsed, player_data, action_text),
             token_usage,
             result_text,
         )
@@ -112,8 +110,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         self,
         *,
         action_text: str,
-        profile: dict,
-        state: dict,
+        player_data: dict,
         logs: list[dict],
         cameo_memories: list[dict] | None,
         nearby_players: list[dict] | None,
@@ -121,9 +118,8 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         nickname: str | None,
         current_world_date: str,
     ) -> str:
-        include_birth_fields = self._is_first_adventure(logs)
-        card = self._diary_profile_card(profile, include_birth_fields=include_birth_fields)
-        current_level = self.domain_service.get_current_level(state)
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+        current_level = self.domain_service.get_current_level(protagonist)
         action = action_text.strip() or "玩家没有指定行动，请根据当前状态自由生成一次小冒险。"
         scan_parts = [
             "/魔法少女冒险",
@@ -167,7 +163,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
                     player_level=current_level,
                 ),
                 self.change_book_engine.build_status_prompt_text(
-                    state, player_level=current_level,
+                    protagonist, player_level=current_level,
                 ),
                 self._format_nearby_players(nearby_players),
             ]
@@ -175,18 +171,21 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         cameo_memories_text = self._format_cameo_memories(cameo_memories)
         logs_text = self._format_logs(logs)
 
+        # 从主角树提取 profile card 展示用字段
+        profile_card = self._build_profile_card_for_prompt(protagonist)
+
         return self.editable_manager.render_prompt(
             "adventure_diary_prompt",
             {
-                "target_name": self._card_text(card, "target_name", "无名冒险者"),
-                "class_name": self._card_text(card, "class_name", "新手冒险者"),
-                "appearance": self._card_text(card, "appearance", "转生后的可爱魔法少女外貌"),
-                "personality": self._card_text(card, "personality", "保留转生卡中的性格"),
-                "talent": self._card_text(card, "talent", "尚未觉醒的天赋"),
-                "player_name": nickname or card.get("target_name") or user_id or "unknown",
+                "target_name": self._get_nested(protagonist, ["个人信息", "姓名"], "无名冒险者"),
+                "class_name": self._get_nested(protagonist, ["个人信息", "身份&职业"], "新手冒险者"),
+                "appearance": self._get_nested(protagonist, ["相貌特征", "脸型"], "转生后的可爱魔法少女外貌"),
+                "personality": self._get_nested(protagonist, ["个人信息", "性格特质"], "保留转生卡中的性格"),
+                "talent": self._get_nested(protagonist, ["个人信息", "核心能力"], "尚未觉醒的天赋"),
+                "player_name": nickname or self._get_nested(protagonist, ["个人信息", "姓名"], "") or user_id or "unknown",
                 "current_level": current_level,
-                "profile_card_json": self._json_dump(card),
-                "state_json": self._json_dump(state),
+                "profile_card_json": self._json_dump(profile_card),
+                "state_json": self._json_dump(protagonist),
                 "logs_text": logs_text,
                 "cameo_memories_text": cameo_memories_text,
                 "action": action,
@@ -266,20 +265,25 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         return result_text.strip()
 
     @staticmethod
-    def _diary_profile_card(
-        profile: dict,
-        include_birth_fields: bool = True,
-    ) -> dict:
-        card = profile.get("card", {}) if isinstance(profile, dict) else {}
-        if not isinstance(card, dict):
-            return {}
-        if include_birth_fields:
-            return dict(card)
-        return {
-            key: value
-            for key, value in card.items()
-            if key != "birth_description"
-        }
+    def _build_profile_card_for_prompt(protagonist: dict) -> dict:
+        """从主角树构建 profile_card_json（个人信息 + 相貌 + 身材 + 性器官特征）。"""
+        card = {}
+        for section in ("个人信息", "相貌特征", "身材细节", "性器官特征"):
+            data = protagonist.get(section)
+            if isinstance(data, dict):
+                card[section] = data
+        return card
+
+    @staticmethod
+    def _get_nested(data: dict, keys: list[str], default: str = "") -> str:
+        current = data
+        for key in keys:
+            if not isinstance(current, dict):
+                return default
+            current = current.get(key)
+            if current is None:
+                return default
+        return str(current) if current is not None else default
 
     @staticmethod
     def _is_first_adventure(logs: list[dict]) -> bool:

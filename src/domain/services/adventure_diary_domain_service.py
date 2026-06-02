@@ -10,23 +10,28 @@ class AdventureDiaryDomainService:
     def normalize_card(
         self,
         raw: dict,
-        profile: dict,
-        state: dict,
+        player_data: dict,
         action_text: str,
     ) -> AdventureDiaryCard:
-        card_data = profile.get("card", {}) if isinstance(profile, dict) else {}
+        """规范化冒险日记卡。
+
+        player_data 是完整的 player_data.json 内容（含主角树）。
+        """
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
         update_changes = self.normalize_update_changes(
             raw.get("update", {}).get("changes")
             if isinstance(raw.get("update"), dict)
             else None
         )
         level_change, level_exp_after = self.calculate_level_progression(
-            state,
+            protagonist,
             update_changes,
         )
+        # 从主角树获取默认 target_name
+        default_name = self._get_nested(protagonist, ["个人信息", "姓名"], "神秘冒险者")
         target_name = self._clean_text(
             raw.get("target_name"),
-            card_data.get("target_name") or profile.get("nickname") or "神秘冒险者",
+            default_name,
         )
         action = self._clean_text(raw.get("action"), action_text or "自由冒险")
         return AdventureDiaryCard(
@@ -51,23 +56,23 @@ class AdventureDiaryDomainService:
 
     def calculate_level_progression(
         self,
-        state: dict,
+        protagonist: dict,
         changes: list[dict[str, Any]],
     ) -> tuple[str, int]:
-        start_level = self.get_current_level(state)
+        start_level = self.get_current_level(protagonist)
         level = start_level
-        level_exp = self.get_level_exp(state)
+        level_exp = self.get_level_exp(protagonist)
         level_exp += sum(
             self.change_delta_value(change.get("value"))
             for change in changes
             if change.get("op") == "+" and self.is_level_exp_path(change.get("path"))
         )
         level_exp = max(0, level_exp)
-        while level_exp >= 100 and level < 100:
+        while level_exp >= 100 and level < 7:
             level += 1
             level_exp -= 100
-        if level >= 100:
-            level = 100
+        if level >= 7:
+            level = 7
             level_exp = 0
         return f"Lv.{start_level}->Lv.{level}", level_exp
 
@@ -89,16 +94,24 @@ class AdventureDiaryDomainService:
             return self.clamp_level(fallback)
         return self.clamp_level(int(match.group(1)))
 
-    def get_current_level(self, state: dict) -> int:
+    def get_current_level(self, protagonist: dict) -> int:
+        """从主角树获取当前等级。"""
         try:
-            return self.clamp_level(int(state.get("level", 1) or 1))
+            level_node = protagonist.get("等级", {})
+            if isinstance(level_node, dict):
+                return self.clamp_level(int(level_node.get("等级", 1) or 1))
+            return self.clamp_level(int(protagonist.get("level", 1) or 1))
         except Exception:
             return 1
 
     @staticmethod
-    def get_level_exp(state: dict) -> int:
+    def get_level_exp(protagonist: dict) -> int:
+        """从主角树获取当前等级经验。"""
         try:
-            return max(0, min(int(state.get("level_exp", 0) or 0), 99))
+            level_node = protagonist.get("等级", {})
+            if isinstance(level_node, dict):
+                return max(0, min(int(level_node.get("经验", 0) or 0), 99))
+            return max(0, min(int(protagonist.get("level_exp", 0) or 0), 99))
         except Exception:
             return 0
 
@@ -119,7 +132,7 @@ class AdventureDiaryDomainService:
 
     @classmethod
     def clamp_level(cls, value: int) -> int:
-        return max(1, min(int(value), 100))
+        return max(1, min(int(value), 7))
 
     @staticmethod
     def normalize_reason(raw_reason: object) -> list[str]:
@@ -149,6 +162,17 @@ class AdventureDiaryDomainService:
                 change["value"] = item.get("value")
             changes.append(change)
         return changes[:20]
+
+    @staticmethod
+    def _get_nested(data: dict, keys: list[str], default: str = "") -> str:
+        current = data
+        for key in keys:
+            if not isinstance(current, dict):
+                return default
+            current = current.get(key)
+            if current is None:
+                return default
+        return str(current) if current is not None else default
 
     @staticmethod
     def _clean_text(value: object, default: object) -> str:

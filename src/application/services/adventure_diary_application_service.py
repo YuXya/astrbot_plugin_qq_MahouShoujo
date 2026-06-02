@@ -44,8 +44,7 @@ class AdventureDiaryApplicationService:
             world_day_offset = self.save_repository.get_current_world_day_offset(group_id)
             current_world_date = self.save_repository.format_world_date(world_day_offset)
             save_data = self.save_repository.load_player_save(group_id, user_id) or save_data
-            profile = save_data.get("profile", {})
-            state = save_data.get("state", {})
+            player_data = save_data.get("player_data", {})
             logs = save_data.get("logs", [])
             cameo_memories = save_data.get("cameo_memories", [])
             mentioned_players = self.save_repository.find_mentioned_npcs(
@@ -56,8 +55,7 @@ class AdventureDiaryApplicationService:
             nearby_players = self._merge_nearby_players(mentioned_players)
             analysis = await self.llm_analyzer.analyze_diary(
                 action_text=action_text,
-                profile=profile,
-                state=state,
+                player_data=player_data,
                 logs=logs,
                 cameo_memories=cameo_memories,
                 nearby_players=nearby_players,
@@ -68,7 +66,8 @@ class AdventureDiaryApplicationService:
             )
             card = analysis.card
 
-            current_level = self.domain_service.get_current_level(state)
+            protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+            current_level = self.domain_service.get_current_level(protagonist)
             new_level = self.domain_service.parse_level_after(
                 card.level_change,
                 fallback=current_level,

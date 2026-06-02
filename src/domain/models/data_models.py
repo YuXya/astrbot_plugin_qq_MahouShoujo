@@ -13,36 +13,78 @@ class TokenUsage:
 
 @dataclass
 class ReincarnationCard:
-    title: str
-    subtitle: str
-    target_name: str
-    class_name: str
-    appearance: str
-    personality: str
-    talent: str
-    birth_description: str = ""
-    likes: list[str] = field(default_factory=list)
-    quote: str = ""
-    footer: str = ""
+    """转生人物卡 — 基于 /主角/ 路径树格式。
+
+    LLM 输出 info 数组，每项含 field/path/description。
+    build_protagonist_tree() 将 info 数组转换为嵌套字典存入 player_data.json。
+    属性访问器从树中提取关键值，供文本展示和图片渲染使用。
+    """
+    info: list[dict[str, Any]] = field(default_factory=list)
+
+    # ── 路径树构建 ──────────────────────────────────
+
+    def build_protagonist_tree(self) -> dict[str, Any]:
+        """从 info 数组构建 /主角/ 嵌套字典。"""
+        tree: dict[str, Any] = {}
+        for item in self.info:
+            path = str(item.get("path", "")).strip()
+            description = item.get("description", "")
+            if not path.startswith("/主角/"):
+                continue
+            parts = path.strip("/").split("/")
+            current = tree
+            for part in parts[:-1]:
+                if part not in current or not isinstance(current.get(part), dict):
+                    current[part] = {}
+                current = current[part]
+            current[parts[-1]] = description
+        return tree
+
+    # ── 便捷属性 ──────────────────────────────────
+
+    def _get_path_value(self, path: str, default: str = "") -> str:
+        for item in self.info:
+            if item.get("path") == path:
+                return str(item.get("description", default))
+        return default
+
+    @property
+    def target_name(self) -> str:
+        return self._get_path_value("/主角/个人信息/姓名", "神秘群友")
+
+    @property
+    def class_name(self) -> str:
+        return self._get_path_value("/主角/个人信息/身份&职业", "见习冒险者")
+
+    @property
+    def appearance(self) -> str:
+        return self._get_path_value("/主角/相貌特征/脸型", "")
+
+    @property
+    def personality(self) -> str:
+        return self._get_path_value("/主角/个人信息/性格特质", "")
+
+    @property
+    def talent(self) -> str:
+        return self._get_path_value("/主角/个人信息/核心能力", "")
+
+    @property
+    def likes(self) -> list[str]:
+        for item in self.info:
+            if item.get("field") == "代表色":
+                return [str(item.get("description", "")).strip()]
+        return []
+
+    # ── 文本展示 ──────────────────────────────────
 
     def to_text(self) -> str:
-        likes_text = "、".join(self.likes)
-        parts = [
-            f"{self.title} - {self.subtitle}".strip(" -"),
-            f"转生对象：{self.target_name}",
-            f"职阶：{self.class_name}",
-            f"外貌：{self.appearance}",
-            f"性格：{self.personality}",
-            f"天赋：{self.talent}",
-            f"初醒之地：{self.birth_description}",
-        ]
-        if likes_text:
-            parts.append(f"喜欢：{likes_text}")
-        if self.quote:
-            parts.append(f"台词：{self.quote}")
-        if self.footer:
-            parts.append(self.footer)
-        return "\n".join(part for part in parts if part)
+        parts = []
+        for item in self.info:
+            field_name = str(item.get("field", "")).strip()
+            description = str(item.get("description", "")).strip()
+            if field_name and description:
+                parts.append(f"{field_name}：{description}")
+        return "\n".join(parts)
 
 
 @dataclass

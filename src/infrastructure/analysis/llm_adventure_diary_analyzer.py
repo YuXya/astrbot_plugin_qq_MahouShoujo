@@ -24,8 +24,7 @@ class LLMAdventureDiaryAnalyzer:
         self,
         *,
         action_text: str,
-        profile: dict,
-        state: dict,
+        player_data: dict,
         logs: list[dict],
         cameo_memories: list[dict] | None = None,
         nearby_players: list[dict] | None = None,
@@ -36,8 +35,7 @@ class LLMAdventureDiaryAnalyzer:
     ) -> AdventureDiaryAnalysisResult:
         card, usage, raw_response = await self.analyzer.analyze_diary(
             action_text=action_text,
-            profile=profile,
-            state=state,
+            player_data=player_data,
             logs=logs,
             cameo_memories=cameo_memories,
             nearby_players=nearby_players,

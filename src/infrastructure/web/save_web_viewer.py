@@ -504,7 +504,7 @@ class SaveWebViewer:
         book_hint = (
             "每个条目会在命中后作为技能说明注入 Prompt。min_level 为等级门槛，max_level 为等级上限，不到门槛或超过上限的玩家无法看到该条目。"
             if file_id == "skill_book/default.json"
-            else "条目标题代表可觉醒状态；content 是简单介绍，Lv.1 到 Lv.Max 分别填写当前等级效果。已拥有状态只注入简介和当前等级效果；“总是注入”的已拥有状态每次都会注入，未拥有时会在待觉醒列表附带简单介绍。状态最高 Lv.5；min_level 与 max_level 仍是玩家等级门槛。"
+            else '条目标题代表可觉醒状态；content 是简单介绍，Lv.1 到 Lv.Max 分别填写当前等级效果。已拥有状态只注入简介和当前等级效果；"总是注入"的已拥有状态每次都会注入，未拥有时会在待觉醒列表附带简单介绍。状态最高 Lv.5；min_level 与 max_level 仍是玩家等级门槛。'
             if file_id == "status_book/default.json"
             else "每个条目会在命中后作为世界背景补充注入 Prompt。min_level 为等级门槛，max_level 为等级上限，不到门槛或超过上限的玩家无法看到该条目。"
         )
@@ -749,7 +749,7 @@ class SaveWebViewer:
                             </select>
                           </label>
                         </div>
-                        <label class="block-field">关键词（支持中文逗号、英文逗号或换行分隔；触发方式为“总是注入”时可留空）
+                        <label class="block-field">关键词（支持中文逗号、英文逗号或换行分隔；触发方式为"总是注入"时可留空）
                           <textarea data-field="keys" class="keys-editor" spellcheck="false">${{escapeHtml(normalized.keys.join("\\n"))}}</textarea>
                         </label>
                         <label class="block-field">${{isStatusBook ? "简单介绍" : "设定内容"}}
@@ -1922,18 +1922,15 @@ class SaveWebViewer:
         if detail is None:
             raise web.HTTPNotFound(text="save not found")
 
-        profile = detail.get("profile", {})
-        state = detail.get("state", {})
+        player_data = detail.get("player_data", {})
         logs = detail.get("logs", [])
         cameo_memories = detail.get("cameo_memories", [])
-        card = profile.get("card", {}) if isinstance(profile, dict) else {}
-        title_name = card.get("target_name") or profile.get("nickname") or user_id
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+        title_name = self._get_nested(protagonist, ["个人信息", "姓名"], player_data.get("nickname", "")) or user_id
         summary = self._player_summary_html(
             group_id,
             user_id,
-            profile,
-            state,
-            card,
+            player_data,
             can_edit=True,
         )
         log_cards = self._player_log_cards(group_id, user_id, logs, allow_delete=is_admin)
@@ -1945,10 +1942,10 @@ class SaveWebViewer:
             if is_admin
             else ""
         )
-        progress_overview = self._progress_overview_html(state)
-        state_overview = self._state_overview_html(state)
+        progress_overview = self._progress_overview_html(player_data)
+        state_overview = self._state_overview_html(player_data)
         log_note = (
-            "删除单条记录只会移除 adventure_log.jsonl 中对应一行，不会回滚当前 state。"
+            "删除单条记录只会移除 daily_memory.jsonl 中对应一行，不会回滚当前状态。"
             if is_admin
             else "这里展示该存档最近的冒险记录。"
         )
@@ -1963,7 +1960,7 @@ class SaveWebViewer:
                 user_id,
                 "/player/log/clear",
                 "删除全部冒险记录",
-                "确定删除该玩家的全部冒险记录？当前 state 不会自动回滚。",
+                "确定删除该玩家的全部冒险记录？当前状态不会自动回滚。",
             )
             if is_admin
             else ""
@@ -1985,7 +1982,7 @@ class SaveWebViewer:
                 user_id,
                 "/player/state/reset",
                 "刷新状态",
-                "确定刷新 state.json？等级、物品、技能和状态进度都会恢复为初始值。",
+                "确定重置状态？等级和状态进度都会恢复为初始值。",
             )
             if is_admin
             else ""
@@ -1996,7 +1993,8 @@ class SaveWebViewer:
               <input type="hidden" name="group_id" value="{self._e(group_id)}">
               <input type="hidden" name="user_id" value="{self._e(user_id)}">
               <strong>危险操作</strong>
-              <span>删除该玩家的 profile、state 和 adventure_log。</span>
+              {state_reset_button}
+              <span>删除该玩家的 player_data 和 daily_memory。</span>
               <button class="danger" type="submit">删除玩家存档</button>
             </form>
             """
@@ -2035,19 +2033,9 @@ class SaveWebViewer:
             </section>
             <section class="detail-grid raw-grid">
               <details class="raw-panel">
-                <summary>查看 profile.json</summary>
-                <pre>{self._e_json(profile)}</pre>
+                <summary>查看 player_data.json</summary>
+                <pre>{self._e_json(player_data)}</pre>
               </details>
-              <div class="raw-panel raw-panel-wrapper">
-                <div class="raw-panel-head">
-                  <strong>state.json</strong>
-                  {state_reset_button}
-                </div>
-                <details>
-                  <summary>查看 state.json</summary>
-                  <pre>{self._e_json(state)}</pre>
-                </details>
-              </div>
             </section>
             {state_overview}
             {source_file_panel}
@@ -2069,27 +2057,38 @@ class SaveWebViewer:
             return self._forbidden()
 
         fields = [
-            "title",
-            "subtitle",
-            "target_name",
-            "class_name",
-            "appearance",
-            "personality",
-            "talent",
-            "birth_description",
-            "quote",
-            "footer",
+            "姓名",
+            "性格特质",
+            "代表色",
+            "核心能力",
+            "使魔伙伴种类",
+            "使魔伙伴与主角关系",
+            "年龄",
+            "身份&职业",
+            "魔法少女名",
+            "武装",
+            "变身服",
+            "脸型",
+            "五官",
+            "眼睛颜色",
+            "发型与发色",
+            "特殊记号",
+            "身高",
+            "三围",
+            "体态",
+            "肌肉线条",
+            "体脂率",
+            "皮肤状态",
+            "乳房形状",
+            "乳晕与乳头颜色",
+            "小穴形态",
+            "体毛状况",
+            "天生敏感度",
         ]
         updates: dict[str, Any] = {
             key: str(data.get(key, ""))
             for key in fields
         }
-        likes_text = str(data.get("likes", ""))
-        updates["likes"] = [
-            item.strip()
-            for item in re.split(r"[\n,，、]+", likes_text)
-            if item.strip()
-        ]
 
         try:
             self.repository.update_profile_card(group_id, user_id, updates)
@@ -2158,20 +2157,19 @@ class SaveWebViewer:
         self,
         group_id: str,
         user_id: str,
-        profile: dict[str, Any],
-        state: dict[str, Any],
-        card: dict[str, Any],
+        player_data: dict[str, Any],
         can_edit: bool = False,
     ) -> str:
         avatar_html = "<span>転</span>"
-        likes = card.get("likes") if isinstance(card.get("likes"), list) else []
-        like_items = "".join(
-            f"<span class=\"tag\">{self._e(item)}</span>"
-            for item in likes[:8]
-        )
-        likes_text = "\n".join(str(item) for item in likes)
-        created_at = self._format_time(profile.get("created_at"))
-        updated_at = self._format_time(state.get("updated_at") or profile.get("updated_at"))
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+        created_at = player_data.get("created_at", "")
+        updated_at = player_data.get("updated_at", "")
+
+        # 构建可编辑的人物卡字段
+        profile_sections = self._build_profile_edit_sections(protagonist, can_edit)
+        class_name = self._get_nested(protagonist, ["个人信息", "身份&职业"], "未知职阶")
+        target_name = self._get_nested(protagonist, ["个人信息", "姓名"], player_data.get("nickname", ""))
+
         profile_panel = (
             f"""
               <form class="detail-panel profile-edit-panel" method="post" action="{self._url('/player/profile/save')}">
@@ -2181,30 +2179,14 @@ class SaveWebViewer:
                   <h2>角色档案</h2>
                   <button class="compact-button" type="submit">保存</button>
                 </div>
-                <div class="profile-edit-grid">
-                  {self._profile_edit_field("标题", "title", card.get("title"))}
-                  {self._profile_edit_field("副标题", "subtitle", card.get("subtitle"))}
-                  {self._profile_edit_field("姓名", "target_name", card.get("target_name"))}
-                  {self._profile_edit_field("职业", "class_name", card.get("class_name"))}
-                </div>
-                {self._profile_edit_field("外貌", "appearance", card.get("appearance"), multiline=True)}
-                {self._profile_edit_field("性格", "personality", card.get("personality"), multiline=True)}
-                {self._profile_edit_field("天赋", "talent", card.get("talent"), multiline=True)}
-                {self._profile_edit_field("初醒之地", "birth_description", card.get("birth_description"), multiline=True)}
-                {self._profile_edit_field("喜好", "likes", likes_text, multiline=True)}
-                {self._profile_edit_field("台词", "quote", card.get("quote"), multiline=True)}
-                {self._profile_edit_field("页脚", "footer", card.get("footer"))}
+                {profile_sections}
               </form>
             """
             if can_edit
             else f"""
               <article class="detail-panel">
                 <h2>角色档案</h2>
-                {self._profile_field("外貌", card.get("appearance"))}
-                {self._profile_field("性格", card.get("personality"))}
-                {self._profile_field("天赋", card.get("talent"))}
-                {self._profile_field("初醒之地", card.get("birth_description"))}
-                {self._profile_field("台词", card.get("quote"))}
+                {profile_sections}
               </article>
             """
         )
@@ -2213,12 +2195,11 @@ class SaveWebViewer:
               <div class="avatar-large">{avatar_html}</div>
               <div class="hero-main">
                 <div class="kicker">群 {self._e(group_id)} / 用户 {self._e(user_id)}</div>
-                <h2>{self._e(card.get("title") or "魔法少女转生人物卡")}</h2>
-                <p class="subtitle">{self._e(card.get("subtitle") or "")}</p>
+                <h2>{self._e(target_name)}</h2>
                 <div class="identity-line">
-                  <span>{self._e(level_display(state))}</span>
-                  <span>等级经验 {self._e(level_exp_percent(state))}%</span>
-                  <span>{self._e(card.get("class_name") or "未知职阶")}</span>
+                  <span>{self._e(level_display(player_data))}</span>
+                  <span>等级经验 {self._e(level_exp_percent(player_data))}%</span>
+                  <span>{self._e(class_name)}</span>
                 </div>
               </div>
             </section>
@@ -2226,17 +2207,87 @@ class SaveWebViewer:
               {profile_panel}
               <article class="detail-panel">
                 <h2>当前状态</h2>
-                <div class="tag-row">{like_items}</div>
                 <div class="meta-list">
-                  <div><span>HP</span><strong>{self._e(state.get("hp", 100))}</strong></div>
-                  <div><span>MP</span><strong>{self._e(state.get("mp", 100))}</strong></div>
-                  <div><span>等级经验</span><strong>{self._e(level_exp_percent(state))}%</strong></div>
+                  <div><span>等级经验</span><strong>{self._e(level_exp_percent(player_data))}%</strong></div>
                   <div><span>创建</span><strong>{self._e(created_at)}</strong></div>
                   <div><span>更新</span><strong>{self._e(updated_at)}</strong></div>
                 </div>
               </article>
             </section>
         """
+
+    def _build_profile_edit_sections(
+        self,
+        protagonist: dict[str, Any],
+        can_edit: bool = False,
+    ) -> str:
+        """根据主角树生成可编辑/只读的人物卡字段。"""
+        sections_html = []
+        field_groups = [
+            ("个人信息", [
+                ("姓名", ["个人信息", "姓名"]),
+                ("性格特质", ["个人信息", "性格特质"]),
+                ("代表色", ["个人信息", "代表色"]),
+                ("核心能力", ["个人信息", "核心能力"]),
+                ("使魔伙伴种类", ["个人信息", "使魔伙伴种类"]),
+                ("使魔伙伴与主角关系", ["个人信息", "使魔伙伴与主角关系"]),
+                ("年龄", ["个人信息", "年龄"]),
+                ("身份&职业", ["个人信息", "身份&职业"]),
+                ("魔法少女名", ["个人信息", "魔法少女名"]),
+                ("武装", ["个人信息", "武装"]),
+                ("变身服", ["个人信息", "变身服"]),
+            ]),
+            ("相貌特征", [
+                ("脸型", ["相貌特征", "脸型"]),
+                ("五官", ["相貌特征", "五官"]),
+                ("眼睛颜色", ["相貌特征", "眼睛颜色"]),
+                ("发型与发色", ["相貌特征", "发型与发色"]),
+                ("特殊记号", ["相貌特征", "特殊记号"]),
+            ]),
+            ("身材细节", [
+                ("身高", ["身材细节", "身高"]),
+                ("三围", ["身材细节", "三围"]),
+                ("体态", ["身材细节", "体态"]),
+                ("肌肉线条", ["身材细节", "肌肉线条"]),
+                ("体脂率", ["身材细节", "体脂率"]),
+                ("皮肤状态", ["身材细节", "皮肤状态"]),
+            ]),
+            ("性器官特征", [
+                ("乳房形状", ["性器官特征", "乳房形状"]),
+                ("乳晕与乳头颜色", ["性器官特征", "乳晕与乳头颜色"]),
+                ("小穴形态", ["性器官特征", "小穴形态"]),
+                ("体毛状况", ["性器官特征", "体毛状况"]),
+                ("天生敏感度", ["性器官特征", "天生敏感度"]),
+            ]),
+        ]
+
+        for section_name, fields in field_groups:
+            field_items = []
+            for label, path in fields:
+                value = self._get_nested(protagonist, path, "")
+                if can_edit:
+                    field_items.append(self._profile_edit_field(label, label, value))
+                else:
+                    if value:
+                        field_items.append(self._profile_field(label, value))
+            if field_items:
+                sections_html.append(
+                    f'<div class="section-title">{self._e(section_name)}</div>'
+                    + "".join(field_items)
+                )
+
+        return "\n".join(sections_html)
+
+    @staticmethod
+    def _get_nested(data: dict, keys: list[str], default: str = "") -> str:
+        current = data
+        for key in keys:
+            if not isinstance(current, dict):
+                return default
+            current = current.get(key)
+            if current is None:
+                return default
+        return str(current) if current is not None else default
 
     def _profile_edit_field(
         self,

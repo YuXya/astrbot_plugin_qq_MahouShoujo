@@ -38,7 +38,6 @@ class ReportGenerator(ICardGenerator):
         html_content = self.html_templates.render_template(
             "card.html",
             card=card,
-            likes=card.likes,
         )
         if not html_content:
             return None, None
@@ -88,9 +87,6 @@ class ReportGenerator(ICardGenerator):
             "status_book/default.json",
             "特殊状态",
         )
-        visible_state = dict(card.state_snapshot)
-        for key in ("inventory", "skills", "quests", "物品", "技能", "任务"):
-            visible_state.pop(key, None)
         html_content = self.html_templates.render_template(
             "adventure_diary.html",
             card=card,
@@ -99,7 +95,7 @@ class ReportGenerator(ICardGenerator):
             skill_progress_items=progress_sections.skill_items,
             status_progress_title=status_progress_title,
             status_progress_items=progress_sections.status_items,
-            state_items=build_state_display_items(visible_state, limit=9),
+            state_items=build_state_display_items(card.state_snapshot, limit=9),
             level_label=level_display(card.state_snapshot),
             level_exp_percent=level_exp_percent(card.state_snapshot),
         )

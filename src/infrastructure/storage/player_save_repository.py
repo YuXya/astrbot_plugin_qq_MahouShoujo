@@ -5,7 +5,6 @@ import re
 import shutil
 import time
 from datetime import date, timedelta
-from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
@@ -15,14 +14,37 @@ from ...domain.models.data_models import AdventureDiaryCard, ReincarnationCard
 from ...utils.logger import logger
 from .state_progress import PROGRESS_KEYS
 
+# ── 时间格式工具 ──────────────────────────────────
+
+def _format_date(value: object) -> str:
+    """将毫秒时间戳或字符串转为 '2025年1月1日' 格式；已是该格式则原样返回。"""
+    if not value:
+        return ""
+    text = str(value).strip()
+    if "年" in text:
+        return text
+    try:
+        ts = float(text)
+        if ts > 1e12:
+            ts = ts / 1000
+        from datetime import datetime
+        dt = datetime.fromtimestamp(ts)
+        return f"{dt.year}年{dt.month}月{dt.day}日"
+    except Exception:
+        return text
+
+
+def _now_date_str() -> str:
+    from datetime import datetime
+    dt = datetime.now()
+    return f"{dt.year}年{dt.month}月{dt.day}日"
+
 
 class PlayerSaveRepository:
     SOURCE_FILE_NAMES = {
-        "index.json",
-        "profile.json",
-        "state.json",
-        "adventure_log.jsonl",
+        "player_data.json",
         "cameo_memory.jsonl",
+        "daily_memory.jsonl",
     }
     WORLD_ERA_START = date(2025, 1, 1)
 
@@ -33,6 +55,8 @@ class PlayerSaveRepository:
     ):
         self.root_dir = StarTools.get_data_dir(plugin_name) / "saves"
         self.editable_manager = editable_manager
+
+    # ── 世界时钟 ──────────────────────────────────
 
     @classmethod
     def format_world_date(cls, day_offset: int) -> str:
@@ -68,7 +92,9 @@ class PlayerSaveRepository:
         records: list[tuple[int, Path, int, dict[str, Any]]] = []
         if users_dir.exists():
             for user_dir in sorted(path for path in users_dir.iterdir() if path.is_dir()):
-                log_path = user_dir / "adventure_log.jsonl"
+                log_path = user_dir / "daily_memory.jsonl"
+                if not log_path.exists():
+                    log_path = user_dir / "adventure_log.jsonl"
                 for index, item in enumerate(self._read_recent_logs(log_path, limit=0)):
                     if item.get("type") not in {"adventure_diary", "adventure_summary"}:
                         continue
@@ -120,7 +146,10 @@ class PlayerSaveRepository:
             return
         source_dates: dict[tuple[str, str], tuple[int, str]] = {}
         for user_dir in sorted(path for path in users_dir.iterdir() if path.is_dir()):
-            for item in self._read_recent_logs(user_dir / "adventure_log.jsonl", limit=0):
+            log_path = user_dir / "daily_memory.jsonl"
+            if not log_path.exists():
+                log_path = user_dir / "adventure_log.jsonl"
+            for item in self._read_recent_logs(log_path, limit=0):
                 if item.get("type") != "adventure_diary" or not item.get("world_date"):
                     continue
                 source_dates[(user_dir.name, str(item.get("title") or ""))] = (
@@ -188,56 +217,38 @@ class PlayerSaveRepository:
         tmp_path.write_text(text + ("\n" if text else ""), encoding="utf-8")
         tmp_path.replace(path)
 
+    # ── 转生存档 ──────────────────────────────────
+
     def save_reincarnation(
         self,
         group_id: str,
         user_id: str,
         card: ReincarnationCard,
         nickname: str | None = None,
+        avatar_url: str | None = None,
     ) -> Path:
         user_dir = self.get_user_dir(group_id, user_id)
         user_dir.mkdir(parents=True, exist_ok=True)
 
-        now = self._now_ms()
-        profile = {
-            "schema_version": 1,
+        protagonist_tree = card.build_protagonist_tree()
+
+        # 确保等级节点存在
+        if "等级" not in protagonist_tree.get("主角", {}):
+            protagonist_tree.setdefault("主角", {})["等级"] = {"等级": 1, "经验": 0}
+
+        player_data: dict[str, Any] = {
+            "schema_version": 2,
             "group_id": str(group_id),
             "user_id": str(user_id),
             "nickname": nickname or card.target_name,
-            "created_at": now,
-            "updated_at": now,
-            "card": self._to_jsonable(card),
+            "avatar_url": avatar_url or "",
+            "created_at": _now_date_str(),
+            "updated_at": _now_date_str(),
         }
-        state = {
-            "schema_version": 1,
-            "group_id": str(group_id),
-            "user_id": str(user_id),
-            "updated_at": now,
-            "level": 1,
-            "level_exp": 0,
-            "hp": 100,
-            "mp": 100,
-            "inventory": [],
-            "skills": {},
-            "quests": [],
-            "flags": {},
-        }
+        player_data.update(protagonist_tree)
 
-        profile_path = user_dir / "profile.json"
-        state_path = user_dir / "state.json"
-        self._atomic_write_json(profile_path, profile)
-        if not state_path.exists():
-            self._atomic_write_json(state_path, state)
-        else:
-            self._touch_state_updated_at(state_path, now)
-            state = self._read_json(state_path)
-
-        self._write_player_index(
-            group_id=group_id,
-            user_id=user_id,
-            target_name=card.target_name,
-            updated_at=now,
-        )
+        player_data_path = user_dir / "player_data.json"
+        self._atomic_write_json(player_data_path, player_data)
 
         self.append_log(
             group_id,
@@ -245,12 +256,14 @@ class PlayerSaveRepository:
             {
                 "type": "reincarnation",
                 "message": "完成魔法少女转生",
-                "created_at": now,
-                "title": card.title,
+                "created_at": self._now_ms(),
+                "title": "魔法少女转生人物卡",
                 "target_name": card.target_name,
             },
         )
         return user_dir
+
+    # ── 加载存档 ──────────────────────────────────
 
     def load_player_save(
         self,
@@ -259,63 +272,24 @@ class PlayerSaveRepository:
         log_limit: int = 0,
     ) -> dict[str, Any] | None:
         user_dir = self.get_user_dir(group_id, user_id)
-        profile_path = user_dir / "profile.json"
-        if not profile_path.exists():
+        player_data_path = user_dir / "player_data.json"
+        if not player_data_path.exists():
             return None
-        index_path = user_dir / "index.json"
-        index = self._read_json(index_path)
-        if self._remove_location_state(index):
-            self._atomic_write_json(index_path, index)
 
-        state_path = user_dir / "state.json"
-        profile = self._read_json(profile_path)
-        if self._remove_location_state(profile):
-            self._atomic_write_json(profile_path, profile)
-        state = self._read_json(state_path)
-        if not state:
-            now = self._now_ms()
-            state = {
-                "schema_version": 1,
-                "group_id": str(group_id),
-                "user_id": str(user_id),
-                "updated_at": now,
-                "level": 1,
-                "level_exp": 0,
-                "hp": 100,
-                "mp": 100,
-                "inventory": [],
-                "skills": {},
-                "quests": [],
-                "flags": {},
-            }
-            self._atomic_write_json(state_path, state)
-        else:
-            changed = False
-            if self._remove_economy_state(state):
-                changed = True
-            if self._remove_location_state(state):
-                changed = True
-            if "level" not in state:
-                state["level"] = 1
-                changed = True
-            if "level_exp" not in state:
-                state["level_exp"] = 0
-                changed = True
-            if "skills" not in state or not isinstance(state.get("skills"), dict):
-                state["skills"] = {}
-                changed = True
-            if self._normalize_status_progress_in_state(state):
-                changed = True
-            if changed:
-                self._atomic_write_json(state_path, state)
+        player_data = self._read_json(player_data_path)
+        if not player_data:
+            return None
+
+        self._remove_location_state(player_data)
+        self._remove_economy_state(player_data)
+        self._normalize_status_progress_in_data(player_data)
 
         return {
             "group_id": self._safe_id(group_id),
             "user_id": self._safe_id(user_id),
-            "profile": profile,
-            "state": state,
+            "player_data": player_data,
             "logs": self._read_recent_logs(
-                user_dir / "adventure_log.jsonl",
+                user_dir / "daily_memory.jsonl",
                 limit=log_limit,
             ),
             "cameo_memories": self._read_recent_cameo_memories(
@@ -323,6 +297,8 @@ class PlayerSaveRepository:
                 limit=12,
             ),
         }
+
+    # ── 冒险日记结果保存 ──────────────────────────────────
 
     def save_adventure_result(
         self,
@@ -342,40 +318,31 @@ class PlayerSaveRepository:
         world_date = self.format_world_date(world_day_offset)
         card.date_label = world_date
 
-        state_path = user_dir / "state.json"
-        state = self._read_json(state_path)
-        state.update(
-            {
-                "schema_version": state.get("schema_version", 1),
-                "group_id": str(group_id),
-                "user_id": str(user_id),
-                "updated_at": now,
-                "level": max(1, min(int(new_level), 100)),
-                "level_exp": max(0, min(int(new_level_exp), 99)),
-            }
-        )
-        state.setdefault("hp", 100)
-        state.setdefault("mp", 100)
-        self._remove_economy_state(state)
-        self._remove_location_state(state)
-        state.setdefault("inventory", [])
-        state.setdefault("skills", {})
-        state.setdefault("quests", [])
-        state.setdefault("flags", {})
+        player_data_path = user_dir / "player_data.json"
+        player_data = self._read_json(player_data_path)
+        if not player_data:
+            player_data = self._create_default_player_data(group_id, user_id)
+
+        # 更新等级
+        protagonist = player_data.setdefault("主角", {})
+        level_node = protagonist.setdefault("等级", {"等级": 1, "经验": 0})
+        level_node["等级"] = max(1, min(int(new_level), 7))
+        level_node["经验"] = max(0, min(int(new_level_exp), 99))
+        protagonist["等级"] = level_node
+
+        player_data["updated_at"] = _now_date_str()
+        self._remove_economy_state(player_data)
+        self._remove_location_state(player_data)
+
+        # 应用状态变化
         teammate_names = self._find_teammate_names(group_id, card.target_name)
         teammate_state_changes = self._apply_state_changes(
-            state,
+            player_data,
             card.update_changes,
             teammate_names=teammate_names,
         )
-        card.state_snapshot = self._to_jsonable(state)
-        self._atomic_write_json(state_path, state)
-        self._write_player_index(
-            group_id=group_id,
-            user_id=user_id,
-            target_name=card.target_name,
-            updated_at=now,
-        )
+        card.state_snapshot = dict(player_data)
+        self._atomic_write_json(player_data_path, player_data)
 
         # 应用队友状态变化
         if teammate_state_changes:
@@ -388,7 +355,7 @@ class PlayerSaveRepository:
             if mentioned_names:
                 self._apply_teammate_level_exp(
                     group_id,
-                    max(1, min(int(new_level), 100)),
+                    max(1, min(int(new_level), 7)),
                     level_exp_delta,
                     mentioned_names,
                 )
@@ -415,6 +382,8 @@ class PlayerSaveRepository:
         )
         self.advance_world_clock(group_id, expected_day_offset=world_day_offset)
 
+    # ── 日志压缩 ──────────────────────────────────
+
     def maybe_compress_adventure_logs(
         self,
         group_id: str,
@@ -431,7 +400,10 @@ class PlayerSaveRepository:
             return False
 
         user_dir = self.get_user_dir(group_id, user_id)
-        log_path = user_dir / "adventure_log.jsonl"
+        log_path = user_dir / "daily_memory.jsonl"
+        if not log_path.exists():
+            # 兼容旧文件名
+            log_path = user_dir / "adventure_log.jsonl"
         if not log_path.exists():
             return False
 
@@ -442,7 +414,6 @@ class PlayerSaveRepository:
             return False
 
         parsed: list[dict[str, Any] | None] = []
-        # 同时收集 adventure_diary 和 adventure_summary，均视为可压缩条目
         compressible: list[tuple[int, dict[str, Any]]] = []
         adventure_ordinal = 0
         for index, line in enumerate(raw_lines):
@@ -514,8 +485,10 @@ class PlayerSaveRepository:
         if interval <= 0 or compress_count <= 0 or compress_count >= interval:
             return []
         user_dir = self.get_user_dir(group_id, user_id)
-        logs = self._read_recent_logs(user_dir / "adventure_log.jsonl", limit=0)
-        # adventure_diary 和 adventure_summary 均视为可压缩条目
+        log_path = user_dir / "daily_memory.jsonl"
+        if not log_path.exists():
+            log_path = user_dir / "adventure_log.jsonl"
+        logs = self._read_recent_logs(log_path, limit=0)
         compressible = [
             item
             for item in logs
@@ -629,10 +602,12 @@ class PlayerSaveRepository:
             return []
         return compressible[:compress_count]
 
+    # ── 日志追加 ──────────────────────────────────
+
     def append_log(self, group_id: str, user_id: str, record: dict[str, Any]) -> None:
         user_dir = self.get_user_dir(group_id, user_id)
         user_dir.mkdir(parents=True, exist_ok=True)
-        log_path = user_dir / "adventure_log.jsonl"
+        log_path = user_dir / "daily_memory.jsonl"
         payload = dict(record)
         payload.setdefault("created_at", self._now_ms())
         with log_path.open("a", encoding="utf-8") as file:
@@ -653,6 +628,8 @@ class PlayerSaveRepository:
         with log_path.open("a", encoding="utf-8") as file:
             file.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
+    # ── 目录与列表 ──────────────────────────────────
+
     def get_user_dir(self, group_id: str, user_id: str) -> Path:
         safe_group = self._safe_id(group_id)
         safe_user = self._safe_id(user_id)
@@ -669,29 +646,23 @@ class PlayerSaveRepository:
             if not users_dir.exists():
                 continue
             for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
-                index = self._read_json(user_dir / "index.json")
-                profile: dict[str, Any] = {}
-                state: dict[str, Any] = {}
-                if index:
-                    target_name = index.get("target_name", "")
-                    updated_at = int(index.get("updated_at", 0) or 0)
-                else:
-                    profile = self._read_json(user_dir / "profile.json")
-                    state = self._read_json(user_dir / "state.json")
-                    target_name = profile.get("card", {}).get("target_name", "")
-                    updated_at = max(
-                        int(profile.get("updated_at", 0) or 0),
-                        int(state.get("updated_at", 0) or 0),
-                    )
+                player_data = self._read_json(user_dir / "player_data.json")
+                if not player_data:
+                    continue
+                protagonist = player_data.get("主角", {})
+                target_name = self._get_nested(
+                    protagonist, ["个人信息", "姓名"], player_data.get("nickname", "")
+                )
+                level_node = protagonist.get("等级", {})
+                level = level_node.get("等级", 1) if isinstance(level_node, dict) else 1
                 saves.append(
                     {
                         "group_id": group_dir.name,
                         "user_id": user_dir.name,
-                        "nickname": index.get("target_name", "") if index else profile.get("nickname", ""),
+                        "nickname": player_data.get("nickname", ""),
                         "target_name": target_name,
-                        "class_name": profile.get("card", {}).get("class_name", ""),
-                        "level": state.get("level", 1),
-                        "updated_at": updated_at,
+                        "level": level,
+                        "updated_at": player_data.get("updated_at", ""),
                     }
                 )
         return saves
@@ -699,6 +670,8 @@ class PlayerSaveRepository:
     def list_saves_by_user(self, user_id: str) -> list[dict[str, Any]]:
         safe_user = self._safe_id(user_id)
         return [item for item in self.list_saves() if item.get("user_id") == safe_user]
+
+    # ── NPC 查找 ──────────────────────────────────
 
     def find_mentioned_npcs(
         self,
@@ -720,8 +693,12 @@ class PlayerSaveRepository:
             if user_dir.name == current_user:
                 continue
 
-            index = self._read_json(user_dir / "index.json")
-            target_name = str(index.get("target_name") or "").strip()
+            player_data = self._read_json(user_dir / "player_data.json")
+            target_name = self._get_nested(
+                player_data.get("主角", {}) if isinstance(player_data, dict) else {},
+                ["个人信息", "姓名"],
+                "",
+            )
             if not target_name or target_name not in text:
                 continue
             npc = self._build_npc_package(user_dir, source="mentioned_by_action")
@@ -733,30 +710,32 @@ class PlayerSaveRepository:
         user_dir = self.get_user_dir(group_id, user_id)
         if not user_dir.exists():
             return None
-        state_path = user_dir / "state.json"
-        state = self._read_json(state_path)
-        changed = self._remove_economy_state(state)
-        if self._remove_location_state(state):
-            changed = True
-        if self._normalize_status_progress_in_state(state):
-            changed = True
-        if changed:
-            self._atomic_write_json(state_path, state)
-        profile_path = user_dir / "profile.json"
-        profile = self._read_json(profile_path)
-        if self._remove_location_state(profile):
-            self._atomic_write_json(profile_path, profile)
+
+        player_data_path = user_dir / "player_data.json"
+        player_data = self._read_json(player_data_path)
+        if not player_data:
+            return None
+
+        self._remove_economy_state(player_data)
+        self._remove_location_state(player_data)
+        self._normalize_status_progress_in_data(player_data)
+
+        log_path = user_dir / "daily_memory.jsonl"
+        if not log_path.exists():
+            log_path = user_dir / "adventure_log.jsonl"
+
         return {
             "group_id": self._safe_id(group_id),
             "user_id": self._safe_id(user_id),
-            "profile": profile,
-            "state": state,
-            "logs": self._read_recent_logs(user_dir / "adventure_log.jsonl", limit=80),
+            "player_data": player_data,
+            "logs": self._read_recent_logs(log_path, limit=80),
             "cameo_memories": self._read_recent_cameo_memories(
                 user_dir / "cameo_memory.jsonl",
                 limit=80,
             ),
         }
+
+    # ── 人物卡更新 ──────────────────────────────────
 
     def update_profile_card(
         self,
@@ -765,42 +744,29 @@ class PlayerSaveRepository:
         updates: dict[str, Any],
     ) -> None:
         user_dir = self.get_user_dir(group_id, user_id)
-        profile_path = user_dir / "profile.json"
-        profile = self._read_json(profile_path)
-        if not profile:
-            raise ValueError("玩家 profile.json 不存在或无法读取")
-        card = profile.get("card")
-        if not isinstance(card, dict):
-            card = {}
-            profile["card"] = card
+        player_data_path = user_dir / "player_data.json"
+        player_data = self._read_json(player_data_path)
+        if not player_data:
+            raise ValueError("玩家 player_data.json 不存在或无法读取")
 
-        string_fields = {
-            "title",
-            "subtitle",
-            "target_name",
-            "class_name",
-            "appearance",
-            "personality",
-            "talent",
-            "birth_description",
-            "quote",
-            "footer",
-        }
-        for key in string_fields:
-            if key in updates:
-                card[key] = str(updates.get(key) or "").strip()
+        protagonist = player_data.setdefault("主角", {})
+        # updates 是一个 { path_tail: value } 的扁平字典
+        # 将更新写入主角树对应位置
+        for key, value in updates.items():
+            if not isinstance(value, str) or not value.strip():
+                continue
+            # 尝试匹配到主角树中的某个路径
+            self._update_protagonist_field(protagonist, key, str(value).strip())
 
-        if "likes" in updates:
-            likes = updates.get("likes")
-            if isinstance(likes, list):
-                card["likes"] = [str(item).strip() for item in likes if str(item).strip()]
+        # 更新昵称为角色名
+        name = self._get_nested(protagonist, ["个人信息", "姓名"], "")
+        if name:
+            player_data["nickname"] = name
 
-        target_name = str(card.get("target_name") or "").strip()
-        if target_name:
-            profile["nickname"] = target_name
-        profile["updated_at"] = self._now_ms()
-        self._atomic_write_json(profile_path, profile)
-        self.rebuild_player_index(group_id, user_id)
+        player_data["updated_at"] = _now_date_str()
+        self._atomic_write_json(player_data_path, player_data)
+
+    # ── 源码文件管理 ──────────────────────────────────
 
     def list_player_source_files(self, group_id: str, user_id: str) -> list[dict[str, Any]]:
         user_dir = self.get_user_dir(group_id, user_id)
@@ -839,42 +805,14 @@ class PlayerSaveRepository:
         tmp_path = path.with_suffix(path.suffix + ".tmp")
         tmp_path.write_text(str(content), encoding="utf-8")
         tmp_path.replace(path)
-        if file_name in {"index.json", "profile.json", "state.json"}:
-            self.rebuild_player_index(group_id, user_id)
 
-    def rebuild_player_index(self, group_id: str, user_id: str) -> None:
-        user_dir = self.get_user_dir(group_id, user_id)
-        profile = self._read_json(user_dir / "profile.json")
-        state = self._read_json(user_dir / "state.json")
-        index = self._read_json(user_dir / "index.json")
-        if self._remove_location_state(profile):
-            self._atomic_write_json(user_dir / "profile.json", profile)
-        if self._remove_location_state(state):
-            self._atomic_write_json(user_dir / "state.json", state)
-        self._remove_location_state(index)
-        card = profile.get("card", {}) if isinstance(profile, dict) else {}
-        target_name = (
-            card.get("target_name")
-            or profile.get("nickname")
-            or index.get("target_name")
-            or user_id
-        )
-        updated_at = max(
-            int(profile.get("updated_at", 0) or 0),
-            int(state.get("updated_at", 0) or 0),
-            int(index.get("updated_at", 0) or 0),
-            self._now_ms(),
-        )
-        self._write_player_index(
-            group_id=group_id,
-            user_id=user_id,
-            target_name=target_name,
-            updated_at=updated_at,
-        )
+    # ── 存档删除与清理 ──────────────────────────────────
 
     def delete_adventure_log(self, group_id: str, user_id: str, log_index: int) -> bool:
         user_dir = self.get_user_dir(group_id, user_id)
-        log_path = user_dir / "adventure_log.jsonl"
+        log_path = user_dir / "daily_memory.jsonl"
+        if not log_path.exists():
+            log_path = user_dir / "adventure_log.jsonl"
         root = self.root_dir.resolve()
         target = log_path.resolve()
         if root != target and root not in target.parents:
@@ -896,51 +834,35 @@ class PlayerSaveRepository:
         return True
 
     def clear_adventure_logs(self, group_id: str, user_id: str) -> bool:
-        return self._clear_player_source_file(group_id, user_id, "adventure_log.jsonl")
+        user_dir = self.get_user_dir(group_id, user_id)
+        log_path = user_dir / "daily_memory.jsonl"
+        if not log_path.exists():
+            log_path = user_dir / "adventure_log.jsonl"
+        return self._clear_file(log_path)
 
     def clear_cameo_memories(self, group_id: str, user_id: str) -> bool:
-        return self._clear_player_source_file(group_id, user_id, "cameo_memory.jsonl")
+        log_path = self.get_user_dir(group_id, user_id) / "cameo_memory.jsonl"
+        return self._clear_file(log_path)
 
     def reset_player_state(self, group_id: str, user_id: str) -> None:
         user_dir = self.get_user_dir(group_id, user_id)
-        profile = self._read_json(user_dir / "profile.json")
-        self._remove_location_state(profile)
-        if not profile:
-            raise ValueError("玩家 profile.json 不存在或无法读取")
-        card = profile.get("card", {}) if isinstance(profile.get("card"), dict) else {}
-        now = self._now_ms()
-        state = {
-            "schema_version": 1,
-            "group_id": str(group_id),
-            "user_id": str(user_id),
-            "updated_at": now,
-            "level": 1,
-            "level_exp": 0,
-            "hp": 100,
-            "mp": 100,
-            "inventory": [],
-            "skills": {},
-            "quests": [],
-            "flags": {},
-        }
-        state_path = user_dir / "state.json"
-        if state_path.exists():
-            self._backup_source_file(state_path)
-        self._atomic_write_json(state_path, state)
-        self.rebuild_player_index(group_id, user_id)
+        player_data_path = user_dir / "player_data.json"
+        player_data = self._read_json(player_data_path)
+        if not player_data:
+            raise ValueError("玩家 player_data.json 不存在或无法读取")
 
-    def _clear_player_source_file(
-        self,
-        group_id: str,
-        user_id: str,
-        file_name: str,
-    ) -> bool:
-        path = self._player_source_path(group_id, user_id, file_name)
-        if not path.exists():
-            return False
-        self._backup_source_file(path)
-        path.write_text("", encoding="utf-8")
-        return True
+        # 保留元信息和人物描述，只重置状态节点
+        protagonist = player_data.setdefault("主角", {})
+        # 移除所有状态类节点，保留人物描述
+        for key in list(protagonist.keys()):
+            if key in {"技能", "快感状态"}:
+                protagonist[key] = {}
+        protagonist["等级"] = {"等级": 1, "经验": 0}
+
+        player_data["updated_at"] = _now_date_str()
+        if player_data_path.exists():
+            self._backup_source_file(player_data_path)
+        self._atomic_write_json(player_data_path, player_data)
 
     def delete_player_save(self, group_id: str, user_id: str) -> bool:
         user_dir = self.get_user_dir(group_id, user_id)
@@ -1001,202 +923,6 @@ class PlayerSaveRepository:
             tmp_path.replace(log_path)
         return removed_count
 
-    def _cleanup_empty_parent_dirs(self, user_dir: Path) -> None:
-        for path in [user_dir.parent, user_dir.parent.parent]:
-            try:
-                if path.exists() and path.is_dir() and not any(path.iterdir()):
-                    path.rmdir()
-            except Exception:
-                break
-
-    def _touch_state_updated_at(self, state_path: Path, now: int) -> None:
-        state = self._read_json(state_path)
-        if not state:
-            return
-        self._remove_economy_state(state)
-        self._remove_location_state(state)
-        state["updated_at"] = now
-        self._atomic_write_json(state_path, state)
-
-    def _write_player_index(
-        self,
-        *,
-        group_id: str,
-        user_id: str,
-        target_name: object,
-        updated_at: int,
-    ) -> None:
-        index = {
-            "schema_version": 1,
-            "group_id": str(group_id),
-            "target_name": str(target_name or "").strip(),
-            "updated_at": int(updated_at or self._now_ms()),
-        }
-        self._atomic_write_json(self.get_user_dir(group_id, user_id) / "index.json", index)
-
-    def _atomic_write_json(self, path: Path, data: dict[str, Any]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = path.with_suffix(path.suffix + ".tmp")
-        tmp_path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        tmp_path.replace(path)
-
-    def _read_json(self, path: Path) -> dict[str, Any]:
-        try:
-            if not path.exists():
-                return {}
-            data = json.loads(path.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else {}
-        except Exception as exc:
-            logger.warning(f"读取存档 JSON 失败: {path} {exc}")
-            return {}
-
-    def _read_recent_logs(self, path: Path, limit: int) -> list[dict[str, Any]]:
-        if not path.exists():
-            return []
-        try:
-            all_lines = path.read_text(encoding="utf-8").splitlines()
-            if limit and limit > 0:
-                start_index = max(0, len(all_lines) - limit)
-                lines = all_lines[start_index:]
-            else:
-                start_index = 0
-                lines = all_lines
-        except Exception as exc:
-            logger.warning(f"读取冒险日志失败: {path} {exc}")
-            return []
-
-        logs: list[dict[str, Any]] = []
-        for offset, line in enumerate(lines):
-            try:
-                item = json.loads(line)
-                if isinstance(item, dict):
-                    self._remove_location_state(item)
-                    item["_log_index"] = start_index + offset
-                    logs.append(item)
-            except json.JSONDecodeError:
-                continue
-        return logs
-
-    def _adventure_ordinal_for_log(self, raw_lines: list[str], target_index: int) -> int:
-        ordinal = 0
-        for index, line in enumerate(raw_lines):
-            if index > target_index:
-                break
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(item, dict):
-                continue
-            if item.get("type") == "adventure_summary":
-                ordinal = max(ordinal, int(item.get("adventure_to", 0) or 0))
-            elif item.get("type") == "adventure_diary":
-                ordinal += 1
-        return max(1, ordinal)
-
-    def _adventure_ordinal_from_for_log(self, raw_lines: list[str], target_index: int) -> int:
-        """获取 target_index 处条目的起始冒险序号。
-        adventure_summary 取 adventure_from，adventure_diary 用传统计算。
-        """
-        try:
-            item = json.loads(raw_lines[target_index])
-            if isinstance(item, dict) and item.get("type") == "adventure_summary":
-                from_val = int(item.get("adventure_from", 0) or 0)
-                if from_val > 0:
-                    return from_val
-        except (json.JSONDecodeError, IndexError):
-            pass
-        return self._adventure_ordinal_for_log(raw_lines, target_index)
-
-    def _adventure_ordinal_to_for_log(self, raw_lines: list[str], target_index: int) -> int:
-        """获取 target_index 处条目的结束冒险序号。
-        adventure_summary 取 adventure_to，adventure_diary 用传统计算。
-        """
-        try:
-            item = json.loads(raw_lines[target_index])
-            if isinstance(item, dict) and item.get("type") == "adventure_summary":
-                to_val = int(item.get("adventure_to", 0) or 0)
-                if to_val > 0:
-                    return to_val
-        except (json.JSONDecodeError, IndexError):
-            pass
-        return self._adventure_ordinal_for_log(raw_lines, target_index)
-
-    def _cameo_ordinal_for_log(self, raw_lines: list[str], target_index: int) -> int:
-        ordinal = 0
-        for index, line in enumerate(raw_lines):
-            if index > target_index:
-                break
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(item, dict):
-                continue
-            if item.get("type") == "cameo_summary":
-                ordinal = max(ordinal, int(item.get("interaction_to", 0) or 0))
-            elif item.get("type") == "cameo_memory":
-                ordinal += 1
-        return max(1, ordinal)
-
-    def _cameo_ordinal_from_for_log(self, raw_lines: list[str], target_index: int) -> int:
-        try:
-            item = json.loads(raw_lines[target_index])
-            if isinstance(item, dict) and item.get("type") == "cameo_summary":
-                from_val = int(item.get("interaction_from", 0) or 0)
-                if from_val > 0:
-                    return from_val
-        except (json.JSONDecodeError, IndexError):
-            pass
-        return self._cameo_ordinal_for_log(raw_lines, target_index)
-
-    def _cameo_ordinal_to_for_log(self, raw_lines: list[str], target_index: int) -> int:
-        try:
-            item = json.loads(raw_lines[target_index])
-            if isinstance(item, dict) and item.get("type") == "cameo_summary":
-                to_val = int(item.get("interaction_to", 0) or 0)
-                if to_val > 0:
-                    return to_val
-        except (json.JSONDecodeError, IndexError):
-            pass
-        return self._cameo_ordinal_for_log(raw_lines, target_index)
-
-    def _read_last_adventure_summary(self, path: Path) -> dict[str, Any]:
-        for item in reversed(self._read_recent_logs(path, limit=80)):
-            if item.get("type") != "adventure_diary":
-                continue
-            return {
-                "encounter": item.get("encounter", ""),
-                "result": item.get("result", ""),
-                "created_at": item.get("created_at", 0),
-                "world_date": item.get("world_date", ""),
-            }
-        return {}
-
-    def _read_recent_cameo_memories(self, path: Path, limit: int = 5) -> list[dict[str, Any]]:
-        memories = [
-            {
-                "type": item.get("type", ""),
-                "created_at": item.get("created_at", 0),
-                "source_target_name": item.get("source_target_name", ""),
-                "encounter": item.get("encounter", ""),
-                "result": item.get("result", ""),
-                "title": item.get("title", ""),
-                "world_day_offset": item.get("world_day_offset"),
-                "world_date": item.get("world_date", ""),
-                "world_date_from": item.get("world_date_from", ""),
-                "world_date_to": item.get("world_date_to", ""),
-                "world_date_unknown": item.get("world_date_unknown", False),
-                "_log_index": item.get("_log_index"),
-            }
-            for item in self._read_recent_logs(path, limit=max(limit * 4, limit))
-            if item.get("type") in ("cameo_memory", "cameo_summary")
-        ]
-        return memories[-limit:]
-
     def delete_cameo_memory(self, group_id: str, user_id: str, log_index: int) -> bool:
         user_dir = self.get_user_dir(group_id, user_id)
         log_path = user_dir / "cameo_memory.jsonl"
@@ -1220,39 +946,126 @@ class PlayerSaveRepository:
         tmp_path.replace(log_path)
         return True
 
+    # ── 内部辅助 ──────────────────────────────────
+
+    def _create_default_player_data(self, group_id: str, user_id: str) -> dict[str, Any]:
+        return {
+            "schema_version": 2,
+            "group_id": str(group_id),
+            "user_id": str(user_id),
+            "nickname": "",
+            "avatar_url": "",
+            "created_at": _now_date_str(),
+            "updated_at": _now_date_str(),
+            "主角": {
+                "等级": {"等级": 1, "经验": 0},
+            },
+        }
+
+    @staticmethod
+    def _get_nested(data: dict, keys: list[str], default: str = "") -> str:
+        current = data
+        for key in keys:
+            if not isinstance(current, dict):
+                return default
+            current = current.get(key)
+            if current is None:
+                return default
+        return str(current) if current is not None else default
+
+    @staticmethod
+    def _update_protagonist_field(protagonist: dict, field_label: str, value: str) -> None:
+        """根据字段标签尝试更新主角树中对应节点。"""
+        # 映射：field 标签 → 路径
+        field_path_map = {
+            "姓名": ["个人信息", "姓名"],
+            "性格特质": ["个人信息", "性格特质"],
+            "代表色": ["个人信息", "代表色"],
+            "核心能力": ["个人信息", "核心能力"],
+            "使魔伙伴种类": ["个人信息", "使魔伙伴种类"],
+            "使魔伙伴与主角关系": ["个人信息", "使魔伙伴与主角关系"],
+            "年龄": ["个人信息", "年龄"],
+            "身份&职业": ["个人信息", "身份&职业"],
+            "身份/职业": ["个人信息", "身份&职业"],
+            "魔法少女名": ["个人信息", "魔法少女名"],
+            "武装": ["个人信息", "武装"],
+            "变身服": ["个人信息", "变身服"],
+            "脸型": ["相貌特征", "脸型"],
+            "五官": ["相貌特征", "五官"],
+            "眼睛颜色": ["相貌特征", "眼睛颜色"],
+            "发型与发色": ["相貌特征", "发型与发色"],
+            "特殊记号": ["相貌特征", "特殊记号"],
+            "身高": ["身材细节", "身高"],
+            "三围": ["身材细节", "三围"],
+            "体态": ["身材细节", "体态"],
+            "肌肉线条": ["身材细节", "肌肉线条"],
+            "体脂率": ["身材细节", "体脂率"],
+            "皮肤状态": ["身材细节", "皮肤状态"],
+            "乳房形状": ["性器官特征", "乳房形状"],
+            "乳晕与乳头颜色": ["性器官特征", "乳晕与乳头颜色"],
+            "小穴形态": ["性器官特征", "小穴形态"],
+            "体毛状况": ["性器官特征", "体毛状况"],
+            "天生敏感度": ["性器官特征", "天生敏感度"],
+        }
+        path = field_path_map.get(field_label)
+        if not path:
+            return
+        current = protagonist
+        for key in path[:-1]:
+            if key not in current or not isinstance(current.get(key), dict):
+                current[key] = {}
+            current = current[key]
+        current[path[-1]] = value
+
+    def _cleanup_empty_parent_dirs(self, user_dir: Path) -> None:
+        for path in [user_dir.parent, user_dir.parent.parent]:
+            try:
+                if path.exists() and path.is_dir() and not any(path.iterdir()):
+                    path.rmdir()
+            except Exception:
+                break
+
+    def _clear_file(self, path: Path) -> bool:
+        if not path.exists():
+            return False
+        self._backup_source_file(path)
+        path.write_text("", encoding="utf-8")
+        return True
+
     def _build_npc_package(
         self,
         user_dir: Path,
         *,
-        profile: dict[str, Any] | None = None,
         source: str,
     ) -> dict[str, Any] | None:
-        profile = profile if isinstance(profile, dict) else self._read_json(user_dir / "profile.json")
-        card = profile.get("card", {}) if isinstance(profile, dict) else {}
-        if not isinstance(card, dict):
+        player_data = self._read_json(user_dir / "player_data.json")
+        if not player_data:
             return None
-        target_name = str(
-            card.get("target_name") or profile.get("nickname") or user_dir.name
-        ).strip()
-        state = self._replace_protagonist_key(
-            self._read_json(user_dir / "state.json"),
-            target_name,
-        )
+        protagonist = player_data.get("主角", {})
+        if not isinstance(protagonist, dict):
+            return None
+
+        target_name = self._get_nested(protagonist, ["个人信息", "姓名"], user_dir.name)
+        # 将主角键替换为角色名，给其他玩家看到
+        state = self._replace_protagonist_key(protagonist, target_name)
         self._remove_economy_state(state)
         self._remove_location_state(state)
+
+        log_path = user_dir / "daily_memory.jsonl"
+        if not log_path.exists():
+            log_path = user_dir / "adventure_log.jsonl"
+
         return {
             "_user_id": user_dir.name,
             "_source": source,
             "target_name": target_name,
-            "class_name": card.get("class_name", ""),
-            "appearance": card.get("appearance", ""),
-            "personality": card.get("personality", ""),
-            "talent": card.get("talent", ""),
-            "likes": card.get("likes", []),
+            "class_name": self._get_nested(protagonist, ["个人信息", "身份&职业"], ""),
+            "appearance": self._get_nested(protagonist, ["相貌特征", "脸型"], ""),
+            "personality": self._get_nested(protagonist, ["个人信息", "性格特质"], ""),
+            "talent": self._get_nested(protagonist, ["个人信息", "核心能力"], ""),
+            "likes": [],
             "state": state,
-            "last_adventure": self._read_last_adventure_summary(
-                user_dir / "adventure_log.jsonl"
-            ),
+            "last_adventure": self._read_last_adventure_summary(log_path),
             "cameo_memories": self._read_recent_cameo_memories(
                 user_dir / "cameo_memory.jsonl",
                 limit=5,
@@ -1307,9 +1120,11 @@ class PlayerSaveRepository:
         except Exception as exc:
             logger.warning(f"备份存档源码失败: {path} {exc}")
 
+    # ── 状态变化应用 ──────────────────────────────────
+
     def _apply_state_changes(
         self,
-        state: dict[str, Any],
+        player_data: dict[str, Any],
         changes: list[dict[str, Any]],
         *,
         teammate_names: set[str] | None = None,
@@ -1343,12 +1158,21 @@ class PlayerSaveRepository:
             parts = self._split_change_path(path)
             if not parts:
                 continue
+            # 确保路径从主角节点开始
+            if parts and parts[0] == "主角":
+                # 已经在 player_data 中，直接操作
+                pass
+            elif parts and parts[0] not in {"schema_version", "group_id", "user_id",
+                                           "nickname", "avatar_url", "created_at", "updated_at", "主角"}:
+                # 路径不含主角前缀，自动补上
+                parts = ["主角"] + parts
+
             if op == "+":
-                self._apply_add_change(state, parts, change.get("value"))
+                self._apply_add_change(player_data, parts, change.get("value"))
             elif op == "-":
-                self._apply_sub_change(state, parts, change.get("value"))
+                self._apply_sub_change(player_data, parts, change.get("value"))
             elif op in {"replace", "insert"}:
-                self._set_nested_value(state, parts, change.get("value"))
+                self._set_nested_value(player_data, parts, change.get("value"))
         return teammate_state_changes
 
     def _apply_teammate_state_changes(
@@ -1356,7 +1180,6 @@ class PlayerSaveRepository:
         group_id: str,
         teammate_state_changes: dict[str, list[dict[str, Any]]],
     ) -> None:
-        """将队友状态变化应用到对应队友的存档中。"""
         users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
         if not users_dir.exists():
             return
@@ -1368,17 +1191,17 @@ class PlayerSaveRepository:
             if not target_user_dir:
                 logger.debug(f"未找到队友 {teammate_name} 的存档，跳过状态变化")
                 continue
-            state_path = target_user_dir / "state.json"
-            if not state_path.exists():
+            player_data_path = target_user_dir / "player_data.json"
+            if not player_data_path.exists():
                 continue
-            state = self._read_json(state_path)
-            if not isinstance(state, dict):
+            player_data = self._read_json(player_data_path)
+            if not isinstance(player_data, dict):
                 continue
-            self._remove_economy_state(state)
-            self._remove_location_state(state)
-            self._apply_state_changes(state, changes)
-            state["updated_at"] = self._now_ms()
-            self._atomic_write_json(state_path, state)
+            self._remove_economy_state(player_data)
+            self._remove_location_state(player_data)
+            self._apply_state_changes(player_data, changes)
+            player_data["updated_at"] = _now_date_str()
+            self._atomic_write_json(player_data_path, player_data)
             logger.info(f"已应用队友 {teammate_name} 的状态变化: {changes}")
 
     @staticmethod
@@ -1431,7 +1254,6 @@ class PlayerSaveRepository:
         return changed
 
     def _find_teammate_names(self, group_id: str, protagonist: str) -> set[str]:
-        """返回群内已有存档的角色名，不包含当前冒险主角。"""
         users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
         if not users_dir.exists():
             return set()
@@ -1439,10 +1261,14 @@ class PlayerSaveRepository:
         protagonist = str(protagonist or "").strip()
         names: set[str] = set()
         for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
-            index = self._read_json(user_dir / "index.json")
-            if not isinstance(index, dict):
+            player_data = self._read_json(user_dir / "player_data.json")
+            if not isinstance(player_data, dict):
                 continue
-            name = str(index.get("target_name") or "").strip()
+            name = self._get_nested(
+                player_data.get("主角", {}),
+                ["个人信息", "姓名"],
+                "",
+            )
             if name and name != protagonist:
                 names.add(name)
         return names
@@ -1450,7 +1276,6 @@ class PlayerSaveRepository:
     LEVEL_EXP_PATHS = {"/level/经验", "/等级/经验", "/主角/等级/经验"}
 
     def _extract_level_exp_delta(self, changes: list[dict[str, Any]]) -> int:
-        """从变化列表中提取主角获得的等级经验增量总和。"""
         if not isinstance(changes, list):
             return 0
         delta = 0
@@ -1470,11 +1295,6 @@ class PlayerSaveRepository:
         level_exp_delta: int,
         teammate_names: set[str],
     ) -> None:
-        """根据主角等级经验，按等级差为队友分配调整后的经验。
-
-        队友比主角低 n 级：经验 × (n + 1)
-        队友比主角高 n 级：经验 ÷ (n + 1)
-        """
         users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
         if not users_dir.exists():
             return
@@ -1486,16 +1306,18 @@ class PlayerSaveRepository:
             if not target_user_dir:
                 logger.debug(f"未找到队友 {name} 的存档，跳过等级经验")
                 continue
-            state_path = target_user_dir / "state.json"
-            if not state_path.exists():
+            player_data_path = target_user_dir / "player_data.json"
+            if not player_data_path.exists():
                 continue
-            state = self._read_json(state_path)
-            if not isinstance(state, dict):
+            player_data = self._read_json(player_data_path)
+            if not isinstance(player_data, dict):
                 continue
-            self._remove_economy_state(state)
-            self._remove_location_state(state)
+            self._remove_economy_state(player_data)
+            self._remove_location_state(player_data)
 
-            teammate_level = max(1, min(int(state.get("level", 1) or 1), 100))
+            protagonist = player_data.get("主角", {})
+            level_node = protagonist.get("等级", {}) if isinstance(protagonist, dict) else {}
+            teammate_level = max(1, min(int(level_node.get("等级", 1) or 1), 7))
             level_diff = main_level - teammate_level
 
             if level_diff > 0:
@@ -1508,22 +1330,22 @@ class PlayerSaveRepository:
             if adjusted <= 0:
                 continue
 
-            current_exp = max(0, min(int(state.get("level_exp", 0) or 0), 99))
+            current_exp = max(0, min(int(level_node.get("经验", 0) or 0), 99))
             new_exp = current_exp + adjusted
             level = teammate_level
 
-            while new_exp >= 100 and level < 100:
+            while new_exp >= 100 and level < 7:
                 level += 1
                 new_exp -= 100
 
-            if level >= 100:
-                level = 100
+            if level >= 7:
+                level = 7
                 new_exp = 0
 
-            state["level"] = level
-            state["level_exp"] = max(0, min(new_exp, 99))
-            state["updated_at"] = self._now_ms()
-            self._atomic_write_json(state_path, state)
+            if isinstance(protagonist, dict):
+                protagonist["等级"] = {"等级": level, "经验": max(0, min(new_exp, 99))}
+            player_data["updated_at"] = _now_date_str()
+            self._atomic_write_json(player_data_path, player_data)
             logger.info(
                 f"已应用队友 {name} 的等级经验: "
                 f"base={level_exp_delta}, adjusted={adjusted}, "
@@ -1535,7 +1357,6 @@ class PlayerSaveRepository:
         group_id: str,
         card: AdventureDiaryCard,
     ) -> set[str]:
-        """从 encounter、result、changes 中找出被提及的同群队友名字。"""
         text_parts = [
             str(card.encounter or ""),
             str(card.result or ""),
@@ -1550,14 +1371,18 @@ class PlayerSaveRepository:
         if not users_dir.exists():
             return set()
 
-        protagonist = str(card.target_name or "").strip()
+        protagonist_name = str(card.target_name or "").strip()
         matched: set[str] = set()
         for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
-            index = self._read_json(user_dir / "index.json")
-            if not isinstance(index, dict):
+            player_data = self._read_json(user_dir / "player_data.json")
+            if not isinstance(player_data, dict):
                 continue
-            name = str(index.get("target_name") or "").strip()
-            if not name or name == protagonist:
+            name = self._get_nested(
+                player_data.get("主角", {}),
+                ["个人信息", "姓名"],
+                "",
+            )
+            if not name or name == protagonist_name:
                 continue
             if name in mention_text:
                 matched.add(name)
@@ -1568,16 +1393,21 @@ class PlayerSaveRepository:
         users_dir: Path,
         target_name: str,
     ) -> Path | None:
-        """在用户目录中通过 target_name 查找对应的用户目录。"""
         if not users_dir.exists():
             return None
         for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
-            index = self._read_json(user_dir / "index.json")
-            if isinstance(index, dict):
-                name = str(index.get("target_name") or "").strip()
+            player_data = self._read_json(user_dir / "player_data.json")
+            if isinstance(player_data, dict):
+                name = self._get_nested(
+                    player_data.get("主角", {}),
+                    ["个人信息", "姓名"],
+                    "",
+                )
                 if name == target_name:
                     return user_dir
         return None
+
+    # ── 状态变化原语 ──────────────────────────────────
 
     def _apply_add_change(
         self,
@@ -1677,7 +1507,11 @@ class PlayerSaveRepository:
                 return 0
         return max(0, min(next_value, 99))
 
-    def _normalize_status_progress_in_state(self, state: dict[str, Any]) -> bool:
+    def _normalize_status_progress_in_data(self, player_data: dict[str, Any]) -> bool:
+        """规范化 player_data 中主角树下的状态进度。"""
+        protagonist = player_data.get("主角", {})
+        if not isinstance(protagonist, dict):
+            return False
         changed = False
 
         def visit(value: object, path: list[str]) -> None:
@@ -1700,7 +1534,7 @@ class PlayerSaveRepository:
                     continue
                 visit(child, child_path)
 
-        visit(state, [])
+        visit(protagonist, [])
         return changed
 
     def _is_status_progress_path(self, parts: list[str]) -> bool:
@@ -1740,6 +1574,167 @@ class PlayerSaveRepository:
             current = child
         return current
 
+    # ── JSON/JSONL 读写 ──────────────────────────────────
+
+    def _atomic_write_json(self, path: Path, data: dict[str, Any]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        tmp_path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        tmp_path.replace(path)
+
+    def _read_json(self, path: Path) -> dict[str, Any]:
+        try:
+            if not path.exists():
+                return {}
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+        except Exception as exc:
+            logger.warning(f"读取存档 JSON 失败: {path} {exc}")
+            return {}
+
+    def _read_recent_logs(self, path: Path, limit: int) -> list[dict[str, Any]]:
+        if not path.exists():
+            return []
+        try:
+            all_lines = path.read_text(encoding="utf-8").splitlines()
+            if limit and limit > 0:
+                start_index = max(0, len(all_lines) - limit)
+                lines = all_lines[start_index:]
+            else:
+                start_index = 0
+                lines = all_lines
+        except Exception as exc:
+            logger.warning(f"读取冒险日志失败: {path} {exc}")
+            return []
+
+        logs: list[dict[str, Any]] = []
+        for offset, line in enumerate(lines):
+            try:
+                item = json.loads(line)
+                if isinstance(item, dict):
+                    self._remove_location_state(item)
+                    item["_log_index"] = start_index + offset
+                    logs.append(item)
+            except json.JSONDecodeError:
+                continue
+        return logs
+
+    def _adventure_ordinal_for_log(self, raw_lines: list[str], target_index: int) -> int:
+        ordinal = 0
+        for index, line in enumerate(raw_lines):
+            if index > target_index:
+                break
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "adventure_summary":
+                ordinal = max(ordinal, int(item.get("adventure_to", 0) or 0))
+            elif item.get("type") == "adventure_diary":
+                ordinal += 1
+        return max(1, ordinal)
+
+    def _adventure_ordinal_from_for_log(self, raw_lines: list[str], target_index: int) -> int:
+        try:
+            item = json.loads(raw_lines[target_index])
+            if isinstance(item, dict) and item.get("type") == "adventure_summary":
+                from_val = int(item.get("adventure_from", 0) or 0)
+                if from_val > 0:
+                    return from_val
+        except (json.JSONDecodeError, IndexError):
+            pass
+        return self._adventure_ordinal_for_log(raw_lines, target_index)
+
+    def _adventure_ordinal_to_for_log(self, raw_lines: list[str], target_index: int) -> int:
+        try:
+            item = json.loads(raw_lines[target_index])
+            if isinstance(item, dict) and item.get("type") == "adventure_summary":
+                to_val = int(item.get("adventure_to", 0) or 0)
+                if to_val > 0:
+                    return to_val
+        except (json.JSONDecodeError, IndexError):
+            pass
+        return self._adventure_ordinal_for_log(raw_lines, target_index)
+
+    def _cameo_ordinal_for_log(self, raw_lines: list[str], target_index: int) -> int:
+        ordinal = 0
+        for index, line in enumerate(raw_lines):
+            if index > target_index:
+                break
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "cameo_summary":
+                ordinal = max(ordinal, int(item.get("interaction_to", 0) or 0))
+            elif item.get("type") == "cameo_memory":
+                ordinal += 1
+        return max(1, ordinal)
+
+    def _cameo_ordinal_from_for_log(self, raw_lines: list[str], target_index: int) -> int:
+        try:
+            item = json.loads(raw_lines[target_index])
+            if isinstance(item, dict) and item.get("type") == "cameo_summary":
+                from_val = int(item.get("interaction_from", 0) or 0)
+                if from_val > 0:
+                    return from_val
+        except (json.JSONDecodeError, IndexError):
+            pass
+        return self._cameo_ordinal_for_log(raw_lines, target_index)
+
+    def _cameo_ordinal_to_for_log(self, raw_lines: list[str], target_index: int) -> int:
+        try:
+            item = json.loads(raw_lines[target_index])
+            if isinstance(item, dict) and item.get("type") == "cameo_summary":
+                to_val = int(item.get("interaction_to", 0) or 0)
+                if to_val > 0:
+                    return to_val
+        except (json.JSONDecodeError, IndexError):
+            pass
+        return self._cameo_ordinal_for_log(raw_lines, target_index)
+
+    def _read_last_adventure_summary(self, path: Path) -> dict[str, Any]:
+        for item in reversed(self._read_recent_logs(path, limit=80)):
+            if item.get("type") != "adventure_diary":
+                continue
+            return {
+                "encounter": item.get("encounter", ""),
+                "result": item.get("result", ""),
+                "created_at": item.get("created_at", 0),
+                "world_date": item.get("world_date", ""),
+            }
+        return {}
+
+    def _read_recent_cameo_memories(self, path: Path, limit: int = 5) -> list[dict[str, Any]]:
+        memories = [
+            {
+                "type": item.get("type", ""),
+                "created_at": item.get("created_at", 0),
+                "source_target_name": item.get("source_target_name", ""),
+                "encounter": item.get("encounter", ""),
+                "result": item.get("result", ""),
+                "title": item.get("title", ""),
+                "world_day_offset": item.get("world_day_offset"),
+                "world_date": item.get("world_date", ""),
+                "world_date_from": item.get("world_date_from", ""),
+                "world_date_to": item.get("world_date_to", ""),
+                "world_date_unknown": item.get("world_date_unknown", False),
+                "_log_index": item.get("_log_index"),
+            }
+            for item in self._read_recent_logs(path, limit=max(limit * 4, limit))
+            if item.get("type") in ("cameo_memory", "cameo_summary")
+        ]
+        return memories[-limit:]
+
+    # ── 路径解析 ──────────────────────────────────
+
     @staticmethod
     def _split_change_path(path: str) -> list[str]:
         return [
@@ -1761,12 +1756,6 @@ class PlayerSaveRepository:
         text = str(value or "unknown").strip()
         text = re.sub(r"[^0-9A-Za-z_.-]+", "_", text)
         return text[:80] or "unknown"
-
-    @staticmethod
-    def _to_jsonable(value: object) -> Any:
-        if is_dataclass(value):
-            return asdict(value)
-        return value
 
     @staticmethod
     def _now_ms() -> int:
