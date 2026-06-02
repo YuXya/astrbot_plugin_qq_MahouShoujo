@@ -1,2 +1,2 @@
-"""QQ Adventurer plugin package."""
+"""QQ MahouShoujo plugin package."""
 

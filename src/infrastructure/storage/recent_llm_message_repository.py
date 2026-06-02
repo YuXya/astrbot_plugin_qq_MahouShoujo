@@ -14,7 +14,7 @@ from ...utils.logger import logger
 class RecentLLMMessageRepository:
     DEFAULT_LIMIT = 3
     MAX_LIMIT = 100
-    PLUGIN_NAME = "astrbot_plugin_qq_adventurer"
+    PLUGIN_NAME = "astrbot_plugin_qq_MahouShoujo"
     _lock = threading.Lock()
 
     def __init__(self, root_dir: Path | None = None):

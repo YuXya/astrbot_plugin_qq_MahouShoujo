@@ -44,7 +44,7 @@ https://www.youxiajiang.com/Games/AIBot/
 转生成功后会在 AstrBot 插件数据目录下创建：
 
 ```text
-data/plugin_data/astrbot_plugin_qq_adventurer/saves/groups/{group_id}/users/{user_id}/
+data/plugin_data/astrbot_plugin_qq_MahouShoujo/saves/groups/{group_id}/users/{user_id}/
 ```
 
 主要文件：

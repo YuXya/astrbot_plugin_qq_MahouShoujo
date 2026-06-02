@@ -30,7 +30,7 @@ from .src.infrastructure.web import SaveWebViewer
 from .src.utils.logger import logger
 
 
-class QQAdventurer(Star):
+class QQMahouShoujo(Star):
     config: AstrBotConfig
     config_manager: ConfigManager
     domain_service: AdventureDomainService
@@ -109,8 +109,8 @@ class QQAdventurer(Star):
         except Exception as exc:
             logger.warning(f"魔法少女存档网页自动启动失败: {exc}")
 
-    @filter.command("魔法少女帮助", alias={"adventurer_help"})
-    async def adventurer_help(
+    @filter.command("魔法少女帮助", alias={"mahoushoujo_help"})
+    async def mahoushoujo_help(
         self,
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
@@ -147,8 +147,8 @@ class QQAdventurer(Star):
             )
         )
 
-    @filter.command("魔法少女存档删除", alias={"adventurer_delete_save"})
-    async def delete_adventurer_save(
+    @filter.command("魔法少女存档删除", alias={"mahoushoujo_delete_save"})
+    async def delete_mahoushoujo_save(
         self,
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
@@ -347,14 +347,14 @@ class QQAdventurer(Star):
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("开启魔法少女网页")
-    async def start_adventurer_web(self, event: AstrMessageEvent) -> AsyncGenerator:
+    async def start_mahoushoujo_web(self, event: AstrMessageEvent) -> AsyncGenerator:
         await self.web_viewer.start()
         url = self._build_web_url()
         yield event.plain_result(f"魔法少女存档网页已开启：{url}\n打开后请输入 QQ 号登录。")
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("关闭魔法少女网页")
-    async def stop_adventurer_web(self, event: AstrMessageEvent) -> AsyncGenerator:
+    async def stop_mahoushoujo_web(self, event: AstrMessageEvent) -> AsyncGenerator:
         await self.web_viewer.stop()
         yield event.plain_result("魔法少女存档网页已关闭，当前网页登录态已失效。")
 

@@ -50,7 +50,7 @@ class PlayerSaveRepository:
 
     def __init__(
         self,
-        plugin_name: str = "astrbot_plugin_qq_adventurer",
+        plugin_name: str = "astrbot_plugin_qq_MahouShoujo",
         editable_manager: Any | None = None,
     ):
         self.root_dir = StarTools.get_data_dir(plugin_name) / "saves"

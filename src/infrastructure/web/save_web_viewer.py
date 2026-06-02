@@ -21,7 +21,7 @@ from ..storage.state_progress import (
 
 
 ADMIN_LOGIN_CODE = "优夏酱世界第一可爱"
-SESSION_COOKIE_NAME = "qq_adventurer_session"
+SESSION_COOKIE_NAME = "qq_mahoushoujo_session"
 SESSION_ADMIN_ROLE = "admin"
 SESSION_USER_ROLE = "user"
 
@@ -508,7 +508,7 @@ class SaveWebViewer:
             if file_id == "status_book/default.json"
             else "每个条目会在命中后作为世界背景补充注入 Prompt。min_level 为等级门槛，max_level 为等级上限，不到门槛或超过上限的玩家无法看到该条目。"
         )
-        storage_key = "qq_adventurer:book:open_entries:" + file_id.replace("/", ":")
+        storage_key = "qq_mahoushoujo:book:open_entries:" + file_id.replace("/", ":")
         source_url = self._url(
             f"/editable/source?id={quote(file_id, safe='')}&category={self._e(back_category)}"
         )
@@ -900,7 +900,7 @@ class SaveWebViewer:
             )
 
         book_json = self._json_script_data(book)
-        storage_key = "qq_adventurer:region_book:open_state"
+        storage_key = "qq_mahoushoujo:region_book:open_state"
         source_url = self._url(
             f"/editable/source?id={quote(file_id, safe='')}&category={self._e(back_category)}"
         )

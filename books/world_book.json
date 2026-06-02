@@ -2,15 +2,15 @@
   "version": 1,
   "entries": [
     {
-      "id": "adventurer_guild",
-      "title": "冒险者公会",
+      "id": "mahoushoujo_association",
+      "title": "魔法少女协会",
       "enabled": true,
       "recursive": true,
       "strategy": "keyword",
-      "keys": ["公会", "冒险者公会", "接任务"],
+      "keys": ["协会", "魔法少女协会", "接任务"],
       "min_level": 1,
       "max_level": 100,
-      "content": "冒险者公会是注册冒险者接取委托和获取情报的组织。新手从E级委托开始，常见任务包括采药、送信、巡逻和驱赶小型魔物。公会也会整理附近地区的魔物和道路情报。"
+      "content": "魔法少女协会是注册魔法少女接取委托和获取情报的组织。新手从E级委托开始，常见任务包括巡逻、净化魔物、送信和采集魔法素材。协会也会整理附近地区的魔物和结界情报。"
     },
     {
       "id": "dark_magic",

@@ -18,7 +18,7 @@ class EditableResourceManager:
         "default_system_prompt": "prompts/default_system_prompt.txt",
     }
 
-    def __init__(self, plugin_name: str = "astrbot_plugin_qq_adventurer"):
+    def __init__(self, plugin_name: str = "astrbot_plugin_qq_MahouShoujo"):
         self.root_dir = StarTools.get_data_dir(plugin_name) / "editable"
         self.backup_dir = self.root_dir / "backups"
         self._ensure_defaults()

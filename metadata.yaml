@@ -1,4 +1,4 @@
-name: astrbot_plugin_qq_adventurer
+name: astrbot_plugin_qq_MahouShoujo
 display_name: QQ 魔法少女转生人物卡
 desc: "命令触发 LLM 生成魔法少女转生人物卡 JSON，并渲染为 HTML 图片卡片发送。"
 version: 0.1.0
