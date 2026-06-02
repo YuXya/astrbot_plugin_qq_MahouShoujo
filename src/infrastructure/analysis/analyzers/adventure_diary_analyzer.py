@@ -32,23 +32,19 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         self.patch_book_engine = PatchBookEngine(editable_manager=self.editable_manager)
 
     def get_data_type(self) -> str:
-        return "异世界冒险日记卡"
+        return "魔法少女冒险日记卡"
 
     def build_prompt(
         self,
         theme: str,
         user_id: str | None,
         nickname: str | None,
-        player_messages: list[str] | None = None,
-        avatar_caption: str | None = None,
     ) -> str:
         return ""
 
     def create_data_object(
         self,
         data: dict,
-        avatar_url: str | None = None,
-        avatar_caption: str | None = None,
     ) -> AdventureDiaryCard:
         return self.domain_service.normalize_card(data, {}, {}, "")
 
@@ -77,11 +73,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             nickname=nickname,
             current_world_date=current_world_date,
         )
-        include_birth_fields = self._is_first_adventure(logs)
-        system_prompt = self._build_diary_character_system_prompt(
-            profile,
-            include_birth_fields=include_birth_fields,
-        )
+        system_prompt = self.editable_manager.get_prompt("default_system_prompt")
         if self.config_manager.get_debug_mode():
             self._save_debug_file("diary_prompt", prompt)
             self._save_debug_file("diary_system_prompt", system_prompt)
@@ -132,27 +124,21 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         include_birth_fields = self._is_first_adventure(logs)
         card = self._diary_profile_card(profile, include_birth_fields=include_birth_fields)
         current_level = self.domain_service.get_current_level(state)
-        player_region = str(state.get("region", "")).strip()
         action = action_text.strip() or "玩家没有指定行动，请根据当前状态自由生成一次小冒险。"
         scan_parts = [
-            "/异世界冒险",
-            "异世界冒险",
+            "/魔法少女冒险",
+            "魔法少女冒险",
             action,
-            player_region,
-            str(state.get("location", "")),
             self._format_logs_for_scan(logs),
         ]
         # --- 世界书与区域书交叉递归 ---
-        # 第一轮：各自独立扫描
         world_book_result = self.world_book_engine.build_prompt_text(
             scan_parts, player_level=current_level,
         )
         region_book_result = self.region_book_engine.build_prompt_text(
             scan_parts,
-            player_region=player_region or None,
             player_level=current_level,
         )
-        # 收集双方的命中内容
         cross_hit_parts: list[str] = []
         for entry in world_book_result.entries:
             if entry.recursive and entry.content:
@@ -160,7 +146,6 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         for entry in region_book_result.local_entries + region_book_result.remote_entries:
             if entry.recursive and entry.content:
                 cross_hit_parts.append(entry.content)
-        # 第二轮：把对方命中内容追加到扫描文本，重新扫描
         if cross_hit_parts:
             enriched_scan_parts = scan_parts + cross_hit_parts
             world_book_result = self.world_book_engine.build_prompt_text(
@@ -168,7 +153,6 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             )
             region_book_result = self.region_book_engine.build_prompt_text(
                 enriched_scan_parts,
-                player_region=player_region or None,
                 player_level=current_level,
             )
 
@@ -189,31 +173,16 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             ]
         )
         cameo_memories_text = self._format_cameo_memories(cameo_memories)
-        prompt_template = self.editable_manager.get_prompt("adventure_diary_prompt")
-        current_time_text = f"当前时间：{current_world_date}。"
-        if "{{current_world_date}}" not in prompt_template:
-            updated_template = prompt_template.replace(
-                "玩家本次行动：",
-                current_time_text + "\n\n玩家本次行动：",
-                1,
-            )
-            prompt_template = (
-                updated_template
-                if updated_template != prompt_template
-                else current_time_text + "\n\n" + prompt_template
-            )
         logs_text = self._format_logs(logs)
-        if "{{cameo_memories_text}}" not in prompt_template:
-            logs_text = self._join_optional_prompt_parts(
-                [
-                    logs_text,
-                    "其他人与主角的交互：\n" + cameo_memories_text,
-                ]
-            )
 
-        return self.editable_manager.render_text(
-            prompt_template,
+        return self.editable_manager.render_prompt(
+            "adventure_diary_prompt",
             {
+                "target_name": self._card_text(card, "target_name", "无名冒险者"),
+                "class_name": self._card_text(card, "class_name", "新手冒险者"),
+                "appearance": self._card_text(card, "appearance", "转生后的可爱魔法少女外貌"),
+                "personality": self._card_text(card, "personality", "保留转生卡中的性格"),
+                "talent": self._card_text(card, "talent", "尚未觉醒的天赋"),
                 "player_name": nickname or card.get("target_name") or user_id or "unknown",
                 "current_level": current_level,
                 "profile_card_json": self._json_dump(card),
@@ -223,7 +192,6 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
                 "action": action,
                 "current_world_date": current_world_date,
                 "supplement_text": supplement_text,
-                "world_book_text": supplement_text,
             },
         )
 
@@ -237,7 +205,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             return ""
         prompt = "\n".join(
             [
-                "请把以下多次异世界冒险日记压缩成“一次冒险记录”的文字量。",
+                "请把以下多次魔法少女冒险日记压缩成\u201c一次冒险记录\u201d的文字量。",
                 "要求：",
                 "1. 只输出压缩后的正文，不要输出 JSON，不要加解释。",
                 "2. 保留关键人物、地点、事件、收获、损失、关系变化和长期影响。",
@@ -272,7 +240,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             return ""
         prompt = "\n".join(
             [
-                "请把以下多条“其他人与主角的交互”压缩成一条交互摘要。",
+                "请把以下多条\u201c其他人与主角的交互\u201d压缩成一条交互摘要。",
                 "要求：",
                 "1. 只输出压缩后的正文，不要输出 JSON，不要加解释。",
                 "2. 保留关键人物、地点、事件、关系变化和长期影响。",
@@ -297,28 +265,6 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             self._save_debug_file("cameo_compress_response", result_text)
         return result_text.strip()
 
-    def _build_diary_character_system_prompt(
-        self,
-        profile: dict,
-        include_birth_fields: bool = True,
-    ) -> str:
-        card = self._diary_profile_card(
-            profile,
-            include_birth_fields=include_birth_fields,
-        )
-        return self.editable_manager.render_prompt(
-            "adventure_diary_system_prompt",
-            {
-                "target_name": self._card_text(card, "target_name", "无名冒险者"),
-                "race": self._card_text(card, "race", "未知种族"),
-                "class_name": self._card_text(card, "class_name", "新手冒险者"),
-                "appearance": self._card_text(card, "appearance", "转生后的可爱异世界外貌"),
-                "personality": self._card_text(card, "personality", "保留转生卡中的性格"),
-                "talent": self._card_text(card, "talent", "尚未觉醒的天赋"),
-                "birth_description": self._card_text(card, "birth_description", ""),
-            },
-        )
-
     @staticmethod
     def _diary_profile_card(
         profile: dict,
@@ -332,7 +278,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         return {
             key: value
             for key, value in card.items()
-            if key not in {"birth_description", "birth_region", "birth_location"}
+            if key != "birth_description"
         }
 
     @staticmethod
@@ -363,12 +309,9 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             action = item.get("action", "")
             result = item.get("result", "")
             level = item.get("level_change", "")
-            region = item.get("region", "")
             line = f"{index}. {title}"
             if action:
                 line += f"；行动：{action}"
-            if region:
-                line += f"；区域：{region}"
             if result:
                 line += f"；结果：{result}"
             if level:
@@ -403,8 +346,6 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
                         [
                             f"【{title}】",
                             f"行动：{item.get('action', '')}",
-                            f"地区：{item.get('region', '')}",
-                            f"地点：{item.get('location', '')}",
                             f"日记：{item.get('diary', '')}",
                             f"遭遇：{item.get('encounter', '')}",
                             f"结算：{item.get('result', '')}",
@@ -428,10 +369,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             title = AdventureDiaryAnalyzer._world_diary_title(item)
             encounter = item.get("encounter", "")
             result = item.get("result", "")
-            region = item.get("region", "")
             line = f"{index}. {source_name or '未知'}在{title}"
-            if region:
-                line += f"；区域：{region}"
             if encounter:
                 line += f"；遭遇：{encounter}"
             if result:
@@ -459,8 +397,6 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
                         [
                             f"【{title}】",
                             f"来源角色：{item.get('source_target_name', '')}",
-                            f"地区：{item.get('region', '')}",
-                            f"地点：{item.get('location', '')}",
                             f"遭遇：{item.get('encounter', '')}",
                             f"结算：{item.get('result', '')}",
                         ]
@@ -490,10 +426,10 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         return (
             "相关其他玩家：\n"
             + cls._json_dump(cls._public_nearby_players(nearby_players))
-            + "\nsource 为“同出生地区”的玩家可作为自然客串 NPC；source 为“本次行动点名”的玩家"
+            + "\nsource 为\u201c同出生地区\u201d的玩家可作为自然客串 NPC；source 为\u201c本次行动点名\u201d的玩家"
             "是玩家行动明确提到的目标、求助对象、拯救对象、寻找对象或远方联系人，即使不在同地区，"
             "主角也可以根据对方位置尝试前往或围绕对方展开事件。不要替其他玩家决定永久性重大"
-            "状态变化、死亡、失踪、残疾或重大财产损失。"
+            "状态变化、死亡、失踪、残疾或重大物品损失。"
         )
 
     @classmethod

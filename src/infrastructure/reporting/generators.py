@@ -38,9 +38,7 @@ class ReportGenerator(ICardGenerator):
         html_content = self.html_templates.render_template(
             "card.html",
             card=card,
-            stats_items=list(card.stats.items()),
             likes=card.likes,
-            avatar_url=card.avatar_url,
         )
         if not html_content:
             return None, None
@@ -96,7 +94,6 @@ class ReportGenerator(ICardGenerator):
         html_content = self.html_templates.render_template(
             "adventure_diary.html",
             card=card,
-            stats_items=list(card.stats.items()),
             changes=card.changes,
             skill_progress_title=skill_progress_title,
             skill_progress_items=progress_sections.skill_items,
@@ -105,7 +102,6 @@ class ReportGenerator(ICardGenerator):
             state_items=build_state_display_items(visible_state, limit=9),
             level_label=level_display(card.state_snapshot),
             level_exp_percent=level_exp_percent(card.state_snapshot),
-            avatar_url=card.avatar_url,
         )
         if not html_content:
             return None, None

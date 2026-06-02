@@ -31,14 +31,13 @@ class AdventureDiaryApplicationService:
         action_text: str,
         umo: str | None,
         html_render_func,
-        render_avatar_url: str | None = None,
     ) -> AdventureDiaryExecutionResult:
         try:
             save_data = self.save_repository.load_player_save(group_id, user_id)
             if not save_data:
                 return AdventureDiaryExecutionResult(
                     success=False,
-                    text="还没有你的异世界转生存档，请先使用 /异世界转生 建档。",
+                    text="还没有你的魔法少女转生存档，请先使用 /魔法少女转生 建档。",
                     error="player_save_not_found",
                 )
 
@@ -49,21 +48,12 @@ class AdventureDiaryApplicationService:
             state = save_data.get("state", {})
             logs = save_data.get("logs", [])
             cameo_memories = save_data.get("cameo_memories", [])
-            card_data = profile.get("card", {}) if isinstance(profile, dict) else {}
-            nearby_players = self.save_repository.find_birth_region_npcs(
-                group_id,
-                user_id,
-                card_data.get("birth_region", "") if isinstance(card_data, dict) else "",
-            )
             mentioned_players = self.save_repository.find_mentioned_npcs(
                 group_id,
                 user_id,
                 action_text,
             )
-            nearby_players = self._merge_nearby_players(
-                nearby_players,
-                mentioned_players,
-            )
+            nearby_players = self._merge_nearby_players(mentioned_players)
             analysis = await self.llm_analyzer.analyze_diary(
                 action_text=action_text,
                 profile=profile,
@@ -106,9 +96,6 @@ class AdventureDiaryApplicationService:
                 world_day_offset=world_day_offset,
                 current_world_date=current_world_date,
             )
-            if render_avatar_url is not None:
-                card.avatar_url = render_avatar_url
-
             image_path, _html = await self.card_generator.generate_diary_image_card(
                 card,
                 html_render_func,
@@ -130,10 +117,10 @@ class AdventureDiaryApplicationService:
                 raw_response=analysis.raw_response,
             )
         except Exception as exc:
-            logger.error(f"执行异世界冒险日记流程失败: {exc}", exc_info=True)
+            logger.error(f"执行魔法少女冒险日记流程失败: {exc}", exc_info=True)
             return AdventureDiaryExecutionResult(
                 success=False,
-                text=f"异世界冒险日记生成失败：{exc}",
+                text=f"魔法少女冒险日记生成失败：{exc}",
                 error=str(exc),
             )
 
@@ -170,8 +157,6 @@ class AdventureDiaryApplicationService:
                         "npc_target_name": npc_target_name,
                         "encounter": card.encounter,
                         "result": card.result,
-                        "region": card.region,
-                        "location": card.location,
                         "title": card.title,
                         "world_day_offset": world_day_offset,
                         "world_date": current_world_date,

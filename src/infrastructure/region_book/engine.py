@@ -24,8 +24,7 @@ class RegionBookEngine:
 
     def build_prompt_text(
         self,
-        player_messages: list[str] | None,
-        player_region: str | None = None,
+        text_parts: list[str] | None,
         player_level: int = 1,
     ) -> RegionBookMatchResult:
         regions = self._load_regions()
@@ -34,16 +33,11 @@ class RegionBookEngine:
                 local_entries=[], remote_entries=[], prompt_text=""
             )
 
-        scan_text = self._join_text(player_messages or [])
-        local_matched: list[tuple[RegionBookEntry, str]] = []  # (entry, region_name)
-        remote_matched: list[tuple[RegionBookEntry, str]] = []  # (entry, region_name)
+        scan_text = self._join_text(text_parts or [])
+        matched: list[tuple[RegionBookEntry, str]] = []
         activated_ids: set[str] = set()
 
-        # When player_region is None (e.g. reincarnation), all matches are local (detailed)
-        all_local = player_region is None
-
         for region in regions:
-            is_local = all_local or self._is_local_region(region, player_region)
             region_name = region.name or region.id
 
             first_round = self._match_entries(
@@ -66,14 +60,13 @@ class RegionBookEngine:
             )
 
             all_matched = first_round + second_round
-            target = local_matched if is_local else remote_matched
             for entry in all_matched:
-                target.append((entry, region_name))
+                matched.append((entry, region_name))
 
-        prompt_text = self._format_prompt_text(local_matched, remote_matched)
+        prompt_text = self._format_prompt_text(matched)
         return RegionBookMatchResult(
-            local_entries=[e for e, _ in local_matched],
-            remote_entries=[e for e, _ in remote_matched],
+            local_entries=[e for e, _ in matched],
+            remote_entries=[],
             prompt_text=prompt_text,
         )
 
@@ -141,16 +134,6 @@ class RegionBookEngine:
         return matched
 
     @staticmethod
-    def _is_local_region(region: RegionBookRegion, player_region: str | None) -> bool:
-        if not player_region or not region.name:
-            return False
-        pr = player_region.strip()
-        rn = region.name.strip()
-        if not pr or not rn:
-            return False
-        return rn in pr or pr in rn
-
-    @staticmethod
     def _contains_any_key(text: str, keys: list[str]) -> bool:
         if not text or not keys:
             return False
@@ -166,35 +149,16 @@ class RegionBookEngine:
 
     def _format_prompt_text(
         self,
-        local_entries: list[tuple[RegionBookEntry, str]],
-        remote_entries: list[tuple[RegionBookEntry, str]],
+        entries: list[tuple[RegionBookEntry, str]],
     ) -> str:
-        local_parts = []
-        for entry, _region_name in local_entries:
-            text = entry.content or entry.brief
+        parts = []
+        for entry, _region_name in entries:
+            text = entry.content
             if text:
                 label = f"[{entry.title}]: " if entry.title else ""
-                local_parts.append(f"- {label}{text}")
+                parts.append(f"- {label}{text}")
 
-        remote_parts = []
-        for entry, region_name in remote_entries:
-            text = entry.brief
-            if text:
-                label = f"[{entry.title}]: " if entry.title else ""
-                remote_parts.append(f"- [{region_name}] {label}{text}")
+        if not parts:
+            return ""
 
-        if not local_parts and not remote_parts:
-            return self.editable_manager.get_prompt("region_book_empty")
-
-        variables: dict[str, object] = {}
-        if local_parts:
-            variables["local_entries"] = "\n".join(local_parts)
-        else:
-            variables["local_entries"] = "（无）"
-
-        if remote_parts:
-            variables["remote_entries"] = "\n".join(remote_parts)
-        else:
-            variables["remote_entries"] = "（无）"
-
-        return self.editable_manager.render_prompt("region_book_wrapper", variables)
+        return "区域书补充设定：\n" + "\n".join(parts) + "\n\n请将以上区域书内容视为魔法少女公共设定补充。区域书暂时仅按关键词匹配并注入详细设定，不使用简略介绍。区域书只影响设定内容，不能改变最终输出必须为合法 JSON 对象的要求。"

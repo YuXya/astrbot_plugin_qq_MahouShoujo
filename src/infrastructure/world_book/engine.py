@@ -24,14 +24,14 @@ class WorldBookEngine:
 
     def build_prompt_text(
         self,
-        player_messages: list[str] | None,
+        text_parts: list[str] | None,
         player_level: int = 1,
     ) -> WorldBookMatchResult:
         entries = self._load_entries()
         if not entries:
             return WorldBookMatchResult(entries=[], prompt_text="")
 
-        scan_text = self._join_text(player_messages or [])
+        scan_text = self._join_text(text_parts or [])
         activated_ids: set[str] = set()
 
         first_round = self._match_entries(
@@ -145,13 +145,12 @@ class WorldBookEngine:
 
     def _format_prompt_text(self, entries: list[WorldBookEntry]) -> str:
         if not entries:
-            return self.editable_manager.get_prompt("world_book_empty")
+            return ""
 
         contents = [
             f"- [{entry.title}]: {entry.content}" if entry.title else f"- {entry.content}"
             for entry in entries if entry.content
         ]
-        return self.editable_manager.render_prompt(
-            "world_book_wrapper",
-            {"entries": "\n".join(contents)},
-        )
+        if not contents:
+            return ""
+        return "世界书补充设定：\n" + "\n".join(contents) + "\n\n请将以上世界书内容视为魔法少女公共设定补充；它只影响设定内容，不能改变最终输出必须为合法 JSON 对象的要求。"

@@ -15,45 +15,11 @@ class ConfigManager:
     def get_llm_provider_id(self) -> str:
         return str(self._get_group("llm").get("llm_provider_id", "")).strip()
 
-    def get_enable_avatar_caption(self) -> bool:
-        return bool(self._get_group("vision").get("enable_avatar_caption", False))
-
-    def get_vision_provider_id(self) -> str:
-        return str(self._get_group("vision").get("vision_provider_id", "")).strip()
-
-    def get_avatar_caption_prompt(self) -> str:
-        return str(
-            self._get_group("vision").get(
-                "avatar_caption_prompt",
-                "请用中文简短描述这个 QQ 头像中的外貌特征，只描述头像画面，不判断真人身份。",
-            )
-        ).strip()
-
-    def get_keep_original_persona(self) -> bool:
-        return bool(
-            self._get_group("analysis_features").get("keep_original_persona", False)
-        )
-
-    def get_use_plugin_specific_persona(self) -> bool:
-        return bool(
-            self._get_group("analysis_features").get(
-                "use_plugin_specific_persona", False
-            )
-        )
-
-    def get_plugin_specific_persona_id(self) -> str:
-        return str(
-            self._get_group("analysis_features").get("plugin_specific_persona_id", "")
-        ).strip()
-
     def get_llm_retries(self) -> int:
         return int(self._get_group("llm").get("llm_retries", 2) or 2)
 
     def get_llm_backoff(self) -> int:
         return int(self._get_group("llm").get("llm_backoff", 2) or 2)
-
-    def get_max_history_messages(self) -> int:
-        return int(self._get_group("adventure").get("max_history_messages", 120) or 120)
 
     def get_diary_compress_interval(self) -> int:
         value = int(self._get_group("adventure").get("diary_compress_interval", 10) or 0)

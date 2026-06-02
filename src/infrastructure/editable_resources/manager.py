@@ -15,15 +15,7 @@ class EditableResourceManager:
     PROMPT_FILES = {
         "reincarnation_prompt": "prompts/reincarnation_prompt.txt",
         "adventure_diary_prompt": "prompts/adventure_diary_prompt.txt",
-        "adventure_diary_system_prompt": "prompts/adventure_diary_system_prompt.txt",
-        "persona_reinforcement": "prompts/persona_reinforcement.txt",
         "default_system_prompt": "prompts/default_system_prompt.txt",
-        "world_book_wrapper": "prompts/world_book_wrapper.txt",
-        "skill_book_wrapper": "prompts/skill_book_wrapper.txt",
-        "status_book_wrapper": "prompts/status_book_wrapper.txt",
-        "world_book_empty": "prompts/world_book_empty.txt",
-        "region_book_wrapper": "prompts/region_book_wrapper.txt",
-        "region_book_empty": "prompts/region_book_empty.txt",
     }
 
     def __init__(self, plugin_name: str = "astrbot_plugin_qq_adventurer"):
@@ -215,56 +207,8 @@ class EditableResourceManager:
                 "category": "text_completion",
             },
             {
-                "id": self.PROMPT_FILES["adventure_diary_system_prompt"],
-                "label": "冒险日记第一人称人格 Prompt",
-                "type": "text",
-                "category": "text_completion",
-            },
-            {
-                "id": self.PROMPT_FILES["persona_reinforcement"],
-                "label": "人格格式优先级 Prompt",
-                "type": "text",
-                "category": "text_completion",
-            },
-            {
                 "id": self.PROMPT_FILES["default_system_prompt"],
                 "label": "默认 System Prompt",
-                "type": "text",
-                "category": "text_completion",
-            },
-            {
-                "id": self.PROMPT_FILES["world_book_wrapper"],
-                "label": "世界书包装话术",
-                "type": "text",
-                "category": "text_completion",
-            },
-            {
-                "id": self.PROMPT_FILES["skill_book_wrapper"],
-                "label": "技能书包装话术",
-                "type": "text",
-                "category": "text_completion",
-            },
-            {
-                "id": self.PROMPT_FILES["status_book_wrapper"],
-                "label": "状态书包装话术",
-                "type": "text",
-                "category": "text_completion",
-            },
-            {
-                "id": self.PROMPT_FILES["world_book_empty"],
-                "label": "世界书未命中话术",
-                "type": "text",
-                "category": "text_completion",
-            },
-            {
-                "id": self.PROMPT_FILES["region_book_wrapper"],
-                "label": "区域书包装话术",
-                "type": "text",
-                "category": "text_completion",
-            },
-            {
-                "id": self.PROMPT_FILES["region_book_empty"],
-                "label": "区域书未命中话术",
                 "type": "text",
                 "category": "text_completion",
             },
@@ -272,92 +216,53 @@ class EditableResourceManager:
 
     def _default_content_map(self) -> dict[str, str]:
         return {
-            "world_book/default.json": defaults.load_builtin_world_book(),
+            "world_book/default.json": defaults.WORLD_BOOK_DEFAULT,
             "skill_book/default.json": defaults.SKILL_BOOK_DEFAULT,
             "status_book/default.json": defaults.STATUS_BOOK_DEFAULT,
             "region_book/default.json": defaults.REGION_BOOK_DEFAULT,
             self.PROMPT_FILES["reincarnation_prompt"]: defaults.REINCARNATION_PROMPT,
             self.PROMPT_FILES["adventure_diary_prompt"]: defaults.ADVENTURE_DIARY_PROMPT,
-            self.PROMPT_FILES[
-                "adventure_diary_system_prompt"
-            ]: defaults.ADVENTURE_DIARY_SYSTEM_PROMPT,
-            self.PROMPT_FILES["persona_reinforcement"]: defaults.PERSONA_REINFORCEMENT_PROMPT,
             self.PROMPT_FILES["default_system_prompt"]: defaults.DEFAULT_SYSTEM_PROMPT,
-            self.PROMPT_FILES["world_book_wrapper"]: defaults.WORLD_BOOK_WRAPPER,
-            self.PROMPT_FILES["skill_book_wrapper"]: defaults.SKILL_BOOK_WRAPPER,
-            self.PROMPT_FILES["status_book_wrapper"]: defaults.STATUS_BOOK_WRAPPER,
-            self.PROMPT_FILES["world_book_empty"]: defaults.WORLD_BOOK_EMPTY,
-            self.PROMPT_FILES["region_book_wrapper"]: defaults.REGION_BOOK_WRAPPER,
-            self.PROMPT_FILES["region_book_empty"]: defaults.REGION_BOOK_EMPTY,
         }
 
     def _default_note_map(self) -> dict[str, str]:
         return {
             "world_book/default.json": (
-                "世界书公共设定文件。转生卡和冒险日记生成前会扫描聊天记录、玩家行动、"
-                "当前位置和日志等文本，命中 always 或 keyword 条目后，把条目内容通过世界书"
-                "包装话术注入主任务 Prompt。这个说明文件只用于网页提示，不会发送给 AI。"
+                "世界书公共设定文件。转生卡和冒险日记生成前会扫描玩家偏好、玩家行动、"
+                "日志等文本，命中 always 或 keyword 条目后，把条目内容注入主任务 Prompt。"
+                "这个说明文件只用于网页提示，不会发送给 AI。"
             ),
             "skill_book/default.json": (
-                "技能书文件。结构与世界书一致，冒险日记生成前会扫描玩家行动、当前位置和日志，"
+                "技能书文件。结构与世界书一致，冒险日记生成前会扫描玩家行动和日志，"
                 "命中条目后把技能说明注入 Prompt。base_path 是给 AI 输出 update.patches 的路径提示。"
             ),
             "status_book/default.json": (
                 "状态书文件。条目标题代表全部可觉醒状态，content 是简单介绍，level_descriptions 是 Lv.1 到 Lv.Max"
-                " 的分级效果。已拥有状态只会注入简介和当前等级效果；“总是注入”的已拥有状态每次都会注入，"
+                " 的分级效果。已拥有状态只会注入简介和当前等级效果；\u201c总是注入\u201d的已拥有状态每次都会注入，"
                 "未拥有时会在待觉醒列表附带简单介绍。"
                 "状态最高 Lv.5；base_path 是给 AI 输出 update.patches 的路径提示。"
             ),
             "region_book/default.json": (
-                "区域书文件。按区域（如艾尔森林、碧叶镇、德尔地下城）划分条目，每个条目有简略介绍和详细介绍。"
-                "玩家当前区域命中的条目返回详细介绍，其他区域命中的条目返回简略介绍。"
+                "区域书文件。暂时按世界书方式匹配：扫描文本命中条目后注入详细介绍。"
+                "简略介绍暂时保留在文件中，但不会参与匹配或注入。"
                 "min_level 为等级门槛，max_level 为等级上限，玩家等级不足或超过上限时不命中。排序由网页上的上下位置决定。"
             ),
             self.PROMPT_FILES["reincarnation_prompt"]: (
-                "用于 /异世界转生 的主任务 Prompt。它会组合触发命令、目标群友昵称或 ID、"
-                "最近聊天记录、头像转述结果和世界书补充设定，然后要求 AI 输出转生人物卡 JSON。"
+                "用于 /魔法少女转生 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
+                "可用变量：{{theme}}（触发命令+玩家偏好）、{{player_text}}（目标群友昵称或ID）、"
+                "{{supplement_text}}（世界书+区域书命中的补充设定，未命中时为空）。"
             ),
             self.PROMPT_FILES["adventure_diary_prompt"]: (
-                "用于 /异世界冒险 的主任务 Prompt。它会组合玩家人物卡、当前状态、最近冒险日志、"
-                "群级当前时间、本次行动和补充设定，然后要求 AI 输出冒险日记卡 JSON。"
-                "当前时间变量为 {{current_world_date}}，补充设定变量为 {{supplement_text}}，"
-                "旧变量 {{world_book_text}} 仍兼容。"
-            ),
-            self.PROMPT_FILES["adventure_diary_system_prompt"]: (
-                "只用于 /异世界冒险 的 system_prompt。它由玩家转生人物卡中的名称、种族、职阶、"
-                "外貌、性格、天赋和初醒之地渲染，要求 AI 以该角色第一人称写冒险日记，不继承 AstrBot 全局人格。"
-            ),
-            self.PROMPT_FILES["persona_reinforcement"]: (
-                "只用于 /异世界转生 流程。系统人格确定后，会先作为 llm_generate 的 system_prompt 发送，"
-                "再通过这个模板嵌入普通 Prompt 的 [SYSTEM_IDENTITY] 区域，用来强化人格与 JSON 格式优先级。"
+                "用于 /魔法少女冒险 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
+                "可用变量：{{target_name}}、{{class_name}}、{{appearance}}、{{personality}}、{{talent}}"
+                "（来自玩家转生人物卡，用于第一人称人格设定）；"
+                "{{player_name}}、{{current_level}}、{{profile_card_json}}、{{state_json}}、"
+                "{{logs_text}}、{{cameo_memories_text}}、{{current_world_date}}、{{action}}、"
+                "{{supplement_text}}（世界书+区域书+技能书+状态书命中的补充设定，未命中时为空）。"
             ),
             self.PROMPT_FILES["default_system_prompt"]: (
-                "用于 /异世界转生 的默认 system_prompt。当没有插件指定人格、会话人格或全局默认人格可用时，"
-                "会使用这里的内容；同一内容还会被人格格式优先级 Prompt 嵌入普通 Prompt。"
-            ),
-            self.PROMPT_FILES["world_book_wrapper"]: (
-                "当世界书命中至少一个条目时使用。命中的条目会先格式化为列表，再填入这里的 {{entries}}。"
-                "它只包装世界背景条目，不包装技能书和状态书。"
-            ),
-            self.PROMPT_FILES["skill_book_wrapper"]: (
-                "当技能书命中至少一个条目时使用。可用变量：{{base_path}} 和 {{entries}}。"
-                "最终会嵌入冒险日记主任务 Prompt 的补充设定区域。"
-            ),
-            self.PROMPT_FILES["status_book_wrapper"]: (
-                "每次冒险日记生成时用于包装状态书内容。可用变量：{{base_path}}、{{owned_entries}}、{{pending_entries}}。"
-                "{{owned_entries}} 是已拥有状态的简介与当前等级效果，{{pending_entries}} 是未拥有状态标题列表。"
-            ),
-            self.PROMPT_FILES["world_book_empty"]: (
-                "当世界书没有命中任何条目时使用。它会作为占位文本嵌入转生卡或冒险日记的主任务 Prompt，"
-                "说明本次没有额外世界书补充设定。"
-            ),
-            self.PROMPT_FILES["region_book_wrapper"]: (
-                "当区域书命中至少一个条目时使用。可用变量：{{local_entries}}（当前区域详细设定）和 "
-                "{{remote_entries}}（其他区域简略设定）。最终会嵌入冒险日记主任务 Prompt 的补充设定区域。"
-            ),
-            self.PROMPT_FILES["region_book_empty"]: (
-                "当区域书没有命中任何条目时使用。它会作为占位文本嵌入冒险日记的主任务 Prompt，"
-                "说明本次没有额外区域书补充设定。"
+                "用于 /魔法少女转生 和 /魔法少女冒险 的 system message。"
+                "你可以在这里定义 AI 的基础人格和行为准则。"
             ),
         }
 

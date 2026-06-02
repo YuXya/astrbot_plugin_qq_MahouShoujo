@@ -23,8 +23,6 @@ from .src.infrastructure.analysis.llm_adventure_diary_analyzer import (
 )
 from .src.infrastructure.config.config_manager import ConfigManager
 from .src.infrastructure.editable_resources import EditableResourceManager
-from .src.infrastructure.messaging.avatar_service import QQAvatarService
-from .src.infrastructure.messaging.history_reader import ChatHistoryReader
 from .src.infrastructure.messaging.message_sender import MessageSender
 from .src.infrastructure.reporting.generators import ReportGenerator
 from .src.infrastructure.storage import PlayerSaveRepository, PlayerTaskQueue
@@ -43,8 +41,6 @@ class QQAdventurer(Star):
     report_generator: ReportGenerator
     adventure_service: AdventureApplicationService
     diary_service: AdventureDiaryApplicationService
-    history_reader: ChatHistoryReader
-    avatar_service: QQAvatarService
     message_sender: MessageSender
     save_repository: PlayerSaveRepository
     player_queue: PlayerTaskQueue
@@ -76,11 +72,6 @@ class QQAdventurer(Star):
             self.llm_analyzer,
             self.report_generator,
         )
-        self.history_reader = ChatHistoryReader(
-            context,
-            max_history_messages=self.config_manager.get_max_history_messages(),
-        )
-        self.avatar_service = QQAvatarService(context, self.config_manager)
         self.message_sender = MessageSender()
         self.save_repository = PlayerSaveRepository(
             editable_manager=self.editable_manager,
@@ -116,35 +107,34 @@ class QQAdventurer(Star):
         try:
             await self.web_viewer.start()
         except Exception as exc:
-            logger.warning(f"异世界存档网页自动启动失败: {exc}")
+            logger.warning(f"魔法少女存档网页自动启动失败: {exc}")
 
-    @filter.command("异世界帮助", alias={"adventurer_help"})
+    @filter.command("魔法少女帮助", alias={"adventurer_help"})
     async def adventurer_help(
         self,
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
-        """显示异世界插件的新手指引。用法：/异世界帮助"""
+        """显示魔法少女插件的新手指引。用法：/魔法少女帮助"""
         event.should_call_llm(False)
         yield event.plain_result(
             "\n".join(
                 [
-                    "异世界新手指引",
+                    "魔法少女新手指引",
                     "",
                     "玩家可使用指令：",
-                    "1. /异世界转生",
-                    "   创建你的异世界角色档案。",
-                    "   不写补充偏好：参考你在群里的发言和 QQ 头像。",
-                    "   写了补充偏好：按你的偏好建档，不读取群发言。",
-                    "   示例：/异世界转生 想要成为白毛红瞳双马尾小萝莉",
+                    "1. /魔法少女转生",
+                    "   创建你的魔法少女角色档案。",
+                    "   可以在命令后填写补充偏好，影响角色设定。",
+                    "   示例：/魔法少女转生 想要成为白毛红瞳双马尾小萝莉",
                     "",
-                    "2. /异世界冒险",
+                    "2. /魔法少女冒险",
                     "   根据你的角色档案、当前状态和最近记录，生成一次冒险日记。",
                     "   可以直接自由冒险，也可以在命令后写本次行动。",
-                    "   示例：/异世界冒险 去森林战斗爽",
+                    "   示例：/魔法少女冒险 去森林战斗爽",
                     "",
-                    "3. /异世界存档删除",
-                    "   删除你在当前群的异世界存档，并清理其他玩家记忆中由你产生的客串记录。",
-                    "   为避免误删，需要输入：/异世界存档删除 确认",
+                    "3. /魔法少女存档删除",
+                    "   删除你在当前群的魔法少女存档，并清理其他玩家记忆中由你产生的客串记录。",
+                    "   为避免误删，需要输入：/魔法少女存档删除 确认",
                     "",
                     "角色档案面板：",
                     "https://www.youxiajiang.com/Games/AIBot/",
@@ -153,17 +143,17 @@ class QQAdventurer(Star):
             )
         )
 
-    @filter.command("异世界存档删除", alias={"adventurer_delete_save"})
+    @filter.command("魔法少女存档删除", alias={"adventurer_delete_save"})
     async def delete_adventurer_save(
         self,
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
-        """删除触发者在当前群的异世界存档。用法：/异世界存档删除 确认"""
+        """删除触发者在当前群的魔法少女存档。用法：/魔法少女存档删除 确认"""
         event.should_call_llm(False)
 
         group_id = self._get_group_id_from_event(event)
         if not group_id:
-            yield event.plain_result("请在群聊中使用 /异世界存档删除。")
+            yield event.plain_result("请在群聊中使用 /魔法少女存档删除。")
             return
 
         user_id = self._get_sender_id_from_event(event)
@@ -171,21 +161,21 @@ class QQAdventurer(Star):
             yield event.plain_result("没有拿到你的 QQ 号，暂时不能删除玩家存档。")
             return
 
-        confirm_text = self._extract_command_tail(event, "异世界存档删除")
+        confirm_text = self._extract_command_tail(event, "魔法少女存档删除")
         if confirm_text != "确认":
             yield event.plain_result(
                 "\n".join(
                     [
-                        "这是不可逆操作，会删除你在当前群的异世界存档。",
+                        "这是不可逆操作，会删除你在当前群的魔法少女存档。",
                         "同时会清理其他玩家记忆中由你产生的客串记录。",
-                        "确认删除请发送：/异世界存档删除 确认",
+                        "确认删除请发送：/魔法少女存档删除 确认",
                     ]
                 )
             )
             return
 
         if await self.player_queue.is_locked(group_id, user_id):
-            yield event.plain_result("你的上一条异世界请求还在处理，删除请求已进入队列。")
+            yield event.plain_result("你的上一条魔法少女请求还在处理，删除请求已进入队列。")
 
         async with self.player_queue.lock_for(group_id, user_id):
             deleted = self.save_repository.delete_player_save(group_id, user_id)
@@ -193,19 +183,19 @@ class QQAdventurer(Star):
         if deleted:
             yield event.plain_result("存档已删除，其他玩家记忆中由你产生的客串记录也已清理。")
         else:
-            yield event.plain_result("没有找到你的异世界存档。")
+            yield event.plain_result("没有找到你的魔法少女存档。")
 
-    @filter.command("异世界转生", alias={"reincarnate"})
+    @filter.command("魔法少女转生", alias={"reincarnate"})
     async def reincarnate(
         self,
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
-        """根据触发者的群聊发言和 QQ 头像生成一张异世界转生人物卡。用法：/异世界转生"""
+        """生成一张魔法少女转生人物卡。用法：/魔法少女转生"""
         event.should_call_llm(True)
 
         group_id = self._get_group_id_from_event(event)
         if not group_id:
-            yield event.plain_result("请在群聊中使用 /异世界转生，这样我才能读取群聊上下文。")
+            yield event.plain_result("请在群聊中使用 /魔法少女转生。")
             return
 
         user_id = self._get_sender_id_from_event(event)
@@ -214,9 +204,9 @@ class QQAdventurer(Star):
             return
 
         if await self.player_queue.is_locked(group_id, user_id):
-            yield event.plain_result("你的上一条异世界请求还在处理，已经进入队列，马上轮到你。")
+            yield event.plain_result("你的上一条魔法少女请求还在处理，已经进入队列，马上轮到你。")
 
-        preference_text = self._extract_command_tail(event, "异世界转生")
+        preference_text = self._extract_command_tail(event, "魔法少女转生")
 
         async with self.player_queue.lock_for(group_id, user_id):
             async for result in self._run_reincarnation(
@@ -235,45 +225,10 @@ class QQAdventurer(Star):
         preference_text: str = "",
     ) -> AsyncGenerator:
         nickname = self._get_sender_name_from_event(event)
-        avatar_url = self.avatar_service.build_avatar_url(user_id)
-        if avatar_url:
-            avatar_loaded, avatar_error = await self.avatar_service.validate_avatar_url(
-                avatar_url
-            )
-            if not avatar_loaded:
-                yield event.plain_result(
-                    f"QQ 头像加载失败：{avatar_error}。"
-                    "本次将不使用头像；下次运行时会重新加载。"
-                )
-                avatar_url = ""
-
         if preference_text:
-            player_messages = []
+            progress = "已读取本次转生偏好"
         else:
-            player_messages = await self.history_reader.read_player_messages(
-                event,
-                group_id=group_id,
-                user_id=user_id,
-            )
-        avatar_caption, avatar_caption_error = (
-            await self.avatar_service.describe_avatar_with_error(avatar_url)
-        )
-        if avatar_caption_error:
-            yield event.plain_result(
-                f"QQ 头像转述失败：{avatar_caption_error}。"
-                "本次将跳过头像转述；下次运行时会重新加载。"
-            )
-
-        if preference_text:
-            progress = "已读取本次转生偏好，将跳过历史聊天记录"
-        elif player_messages:
-            progress = f"正在读取 {len(player_messages)} 条发言"
-        else:
-            progress = "没有读到足够发言，先按玩具测试样例"
-        if avatar_caption:
-            progress += "，并已完成头像转述"
-        elif avatar_url:
-            progress += "，头像将只用于卡面显示"
+            progress = "未填写补充偏好，将按默认设定生成"
         yield event.plain_result(f"{progress}，准备转生人物卡...")
 
         umo = getattr(event, "unified_msg_origin", None)
@@ -281,7 +236,7 @@ class QQAdventurer(Star):
             platform_id = self._get_platform_id_from_event(event)
             umo = f"{platform_id}:GroupMessage:{group_id}"
 
-        theme = "/异世界转生"
+        theme = "/魔法少女转生"
         if preference_text:
             theme = f"{theme} {preference_text}"
 
@@ -291,13 +246,10 @@ class QQAdventurer(Star):
             user_id=user_id,
             nickname=nickname,
             umo=umo,
-            player_messages=player_messages,
-            avatar_url=avatar_url,
-            avatar_caption=avatar_caption,
         )
 
         if result.error:
-            logger.warning(f"异世界转生人物卡流程结束但存在错误: {result.error}")
+            logger.warning(f"魔法少女转生人物卡流程结束但存在错误: {result.error}")
 
         if result.card:
             self.save_repository.save_reincarnation(
@@ -314,17 +266,17 @@ class QQAdventurer(Star):
             fallback_text=result.text,
         )
 
-    @filter.command("异世界冒险", alias={"adventure"})
+    @filter.command("魔法少女冒险", alias={"adventure"})
     async def adventure_diary(
         self,
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
-        """根据玩家存档生成一次完整的异世界冒险日记卡。用法：/异世界冒险 我要到森林里冒险"""
+        """根据玩家存档生成一次完整的魔法少女冒险日记卡。用法：/魔法少女冒险 我要到森林里冒险"""
         event.should_call_llm(True)
 
         group_id = self._get_group_id_from_event(event)
         if not group_id:
-            yield event.plain_result("请在群聊中使用 /异世界冒险。")
+            yield event.plain_result("请在群聊中使用 /魔法少女冒险。")
             return
 
         user_id = self._get_sender_id_from_event(event)
@@ -333,7 +285,7 @@ class QQAdventurer(Star):
             return
 
         if await self.player_queue.is_locked(group_id, user_id):
-            yield event.plain_result("你的上一条异世界请求还在处理，已经进入队列，马上轮到你。")
+            yield event.plain_result("你的上一条魔法少女请求还在处理，已经进入队列，马上轮到你。")
 
         async with self.player_queue.lock_for(group_id, user_id):
             async with self.player_queue.group_lock_for(group_id):
@@ -347,28 +299,11 @@ class QQAdventurer(Star):
         user_id: str,
     ) -> AsyncGenerator:
         save_data = self.save_repository.load_player_save(group_id, user_id)
-        card_data = (save_data or {}).get("profile", {}).get("card", {})
-        saved_avatar_url = (
-            str(card_data.get("avatar_url") or "").strip()
-            if isinstance(card_data, dict)
-            else ""
-        )
-        render_avatar_url: str | None = None
-        if saved_avatar_url:
-            avatar_loaded, avatar_error = await self.avatar_service.validate_avatar_url(
-                saved_avatar_url
-            )
-            if not avatar_loaded:
-                yield event.plain_result(
-                    f"QQ 头像加载失败：{avatar_error}。"
-                    "本次冒险卡将不使用头像；下次运行时会重新加载。"
-                )
-                render_avatar_url = ""
         if not save_data:
-            yield event.plain_result("还没有你的异世界转生存档，请先使用 /异世界转生 建档。")
+            yield event.plain_result("还没有你的魔法少女转生存档，请先使用 /魔法少女转生 建档。")
             return
 
-        action_text = self._extract_command_tail(event, "异世界冒险")
+        action_text = self._extract_command_tail(event, "魔法少女冒险")
         nickname = self._get_sender_name_from_event(event)
         umo = getattr(event, "unified_msg_origin", None)
         if not umo:
@@ -385,11 +320,10 @@ class QQAdventurer(Star):
             action_text=action_text,
             umo=umo,
             html_render_func=self.html_render,
-            render_avatar_url=render_avatar_url,
         )
 
         if result.error:
-            logger.warning(f"异世界冒险日记流程结束但存在错误: {result.error}")
+            logger.warning(f"魔法少女冒险日记流程结束但存在错误: {result.error}")
 
         yield await self.message_sender.send_image_or_text(
             event,
@@ -399,17 +333,17 @@ class QQAdventurer(Star):
         )
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @filter.command("开启异世界网页")
+    @filter.command("开启魔法少女网页")
     async def start_adventurer_web(self, event: AstrMessageEvent) -> AsyncGenerator:
         await self.web_viewer.start()
         url = self._build_web_url()
-        yield event.plain_result(f"异世界存档网页已开启：{url}\n打开后请输入 QQ 号登录。")
+        yield event.plain_result(f"魔法少女存档网页已开启：{url}\n打开后请输入 QQ 号登录。")
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @filter.command("关闭异世界网页")
+    @filter.command("关闭魔法少女网页")
     async def stop_adventurer_web(self, event: AstrMessageEvent) -> AsyncGenerator:
         await self.web_viewer.stop()
-        yield event.plain_result("异世界存档网页已关闭，当前网页登录态已失效。")
+        yield event.plain_result("魔法少女存档网页已关闭，当前网页登录态已失效。")
 
     async def terminate(self) -> None:
         await self.web_viewer.stop()

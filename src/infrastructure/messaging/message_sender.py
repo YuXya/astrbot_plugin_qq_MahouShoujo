@@ -24,5 +24,5 @@ class MessageSender:
         if not text and fallback_card:
             text = fallback_card.to_text()
         if not text:
-            text = "异世界卡片生成失败，请稍后再试。"
+            text = "魔法少女卡片生成失败，请稍后再试。"
         return event.plain_result(text)

@@ -47,7 +47,7 @@ class LLMAdventureDiaryAnalyzer:
             current_world_date=current_world_date,
         )
         if card is None:
-            raise ValueError("LLM 响应无法解析为异世界冒险日记卡 JSON")
+            raise ValueError("LLM 响应无法解析为魔法少女冒险日记卡 JSON")
         return AdventureDiaryAnalysisResult(
             card=card,
             token_usage=usage,

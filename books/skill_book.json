@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "display_name": "技能&熟练度",
+  "base_path": "/主角/技能/",
+  "entries": [
+    {
+      "id": "gathering",
+      "title": "采集",
+      "enabled": true,
+      "recursive": true,
+      "strategy": "keyword",
+      "keys": ["采集", "草药", "浆果", "木柴", "找吃的"],
+      "min_level": 1,
+      "max_level": 100,
+      "content": "采集用于寻找草药、浆果、木柴、蘑菇、矿石等野外资源。角色认真辨认、收集、整理资源时，可以增加采集经验。"
+    },
+    {
+      "id": "combat_basics",
+      "title": "战斗基础",
+      "enabled": true,
+      "recursive": true,
+      "strategy": "keyword",
+      "keys": ["战斗", "攻击", "挥剑", "格挡", "反击"],
+      "min_level": 5,
+      "max_level": 100,
+      "content": "战斗基础用于衡量角色在近身搏斗中的技巧和反应速度。成功击退敌人或在战斗中保护自己时，可以增加战斗基础经验。"
+    }
+  ]
+}

@@ -27,21 +27,15 @@ class LLMAdventureAnalyzer(IAdventureAnalysisProvider):
         user_id: str | None = None,
         nickname: str | None = None,
         umo: str | None = None,
-        player_messages: list[str] | None = None,
-        avatar_url: str | None = None,
-        avatar_caption: str | None = None,
     ) -> AdventureAnalysisResult:
         card, usage, raw_response = await self.analyzer.analyze(
             theme,
             user_id=user_id,
             nickname=nickname,
             umo=umo,
-            player_messages=player_messages,
-            avatar_url=avatar_url,
-            avatar_caption=avatar_caption,
         )
         if card is None:
-            raise ValueError("LLM 响应无法解析为异世界转生人物卡 JSON")
+            raise ValueError("LLM 响应无法解析为魔法少女转生人物卡 JSON")
         return AdventureAnalysisResult(
             card=card,
             token_usage=usage,

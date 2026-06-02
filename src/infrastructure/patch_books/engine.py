@@ -55,12 +55,13 @@ class PatchBookEngine:
             for entry in matched
             if entry.content
         )
-        return self.editable_manager.render_prompt(
-            "skill_book_wrapper",
-            {
-                "base_path": base_path,
-                "entries": entries_text or "（暂无命中技能说明。）",
-            },
+        if not entries_text:
+            return ""
+        return (
+            "技能书补充设定：\n"
+            f"默认 patch 基础路径：{base_path}\n"
+            "命中技能说明：\n"
+            + entries_text
         )
 
     def build_status_prompt_text(
@@ -102,7 +103,7 @@ class PatchBookEngine:
                 if entry.content or entry.level_descriptions
             )
         else:
-            owned_entries = "（暂无命中。）"
+            owned_entries = ""
 
         if pending_candidates:
             pending_entries = "\n".join(
@@ -110,15 +111,19 @@ class PatchBookEngine:
                 for entry in pending_candidates
             )
         else:
-            pending_entries = "（暂无待觉醒状态。）"
-        return self.editable_manager.render_prompt(
-            "status_book_wrapper",
-            {
-                "base_path": base_path,
-                "owned_entries": owned_entries,
-                "pending_entries": pending_entries,
-            },
-        )
+            pending_entries = ""
+
+        if not owned_entries and not pending_entries:
+            return ""
+
+        parts = ["状态书补充设定：", f"默认 patch 基础路径：{base_path}"]
+        if owned_entries:
+            parts.append("已拥有状态说明：")
+            parts.append(owned_entries)
+        if pending_entries:
+            parts.append("待觉醒列表：")
+            parts.append(pending_entries)
+        return "\n".join(parts)
 
     @staticmethod
     def _format_owned_status_entry(entry: WorldBookEntry, level: int) -> str:

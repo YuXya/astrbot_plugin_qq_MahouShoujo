@@ -215,11 +215,8 @@ class PlayerSaveRepository:
             "updated_at": now,
             "level": 1,
             "level_exp": 0,
-            "region": card.birth_region or "未知区域",
-            "location": card.birth_location or "醒来的地方",
             "hp": 100,
             "mp": 100,
-            "gold": 0,
             "inventory": [],
             "skills": {},
             "quests": [],
@@ -239,8 +236,6 @@ class PlayerSaveRepository:
             group_id=group_id,
             user_id=user_id,
             target_name=card.target_name,
-            region=state.get("region") or card.birth_region,
-            location=state.get("location") or card.birth_location,
             updated_at=now,
         )
 
@@ -249,7 +244,7 @@ class PlayerSaveRepository:
             user_id,
             {
                 "type": "reincarnation",
-                "message": "完成异世界转生",
+                "message": "完成魔法少女转生",
                 "created_at": now,
                 "title": card.title,
                 "target_name": card.target_name,
@@ -267,9 +262,15 @@ class PlayerSaveRepository:
         profile_path = user_dir / "profile.json"
         if not profile_path.exists():
             return None
+        index_path = user_dir / "index.json"
+        index = self._read_json(index_path)
+        if self._remove_location_state(index):
+            self._atomic_write_json(index_path, index)
 
         state_path = user_dir / "state.json"
         profile = self._read_json(profile_path)
+        if self._remove_location_state(profile):
+            self._atomic_write_json(profile_path, profile)
         state = self._read_json(state_path)
         if not state:
             now = self._now_ms()
@@ -280,11 +281,8 @@ class PlayerSaveRepository:
                 "updated_at": now,
                 "level": 1,
                 "level_exp": 0,
-                "region": "转生大厅",
-                "location": "转生大厅",
                 "hp": 100,
                 "mp": 100,
-                "gold": 0,
                 "inventory": [],
                 "skills": {},
                 "quests": [],
@@ -293,14 +291,15 @@ class PlayerSaveRepository:
             self._atomic_write_json(state_path, state)
         else:
             changed = False
+            if self._remove_economy_state(state):
+                changed = True
+            if self._remove_location_state(state):
+                changed = True
             if "level" not in state:
                 state["level"] = 1
                 changed = True
             if "level_exp" not in state:
                 state["level_exp"] = 0
-                changed = True
-            if "region" not in state:
-                state["region"] = state.get("location") or "未知区域"
                 changed = True
             if "skills" not in state or not isinstance(state.get("skills"), dict):
                 state["skills"] = {}
@@ -353,13 +352,12 @@ class PlayerSaveRepository:
                 "updated_at": now,
                 "level": max(1, min(int(new_level), 100)),
                 "level_exp": max(0, min(int(new_level_exp), 99)),
-                "region": card.region,
-                "location": card.location,
             }
         )
         state.setdefault("hp", 100)
         state.setdefault("mp", 100)
-        state.setdefault("gold", 0)
+        self._remove_economy_state(state)
+        self._remove_location_state(state)
         state.setdefault("inventory", [])
         state.setdefault("skills", {})
         state.setdefault("quests", [])
@@ -376,8 +374,6 @@ class PlayerSaveRepository:
             group_id=group_id,
             user_id=user_id,
             target_name=card.target_name,
-            region=state.get("region") or card.region,
-            location=state.get("location") or card.location,
             updated_at=now,
         )
 
@@ -408,8 +404,6 @@ class PlayerSaveRepository:
                 "world_day_offset": world_day_offset,
                 "world_date": world_date,
                 "action": card.action,
-                "region": card.region,
-                "location": card.location,
                 "diary": card.diary,
                 "encounter": card.encounter,
                 "level_change": card.level_change,
@@ -680,15 +674,11 @@ class PlayerSaveRepository:
                 state: dict[str, Any] = {}
                 if index:
                     target_name = index.get("target_name", "")
-                    region = index.get("region", "")
-                    location = index.get("location", "")
                     updated_at = int(index.get("updated_at", 0) or 0)
                 else:
                     profile = self._read_json(user_dir / "profile.json")
                     state = self._read_json(user_dir / "state.json")
                     target_name = profile.get("card", {}).get("target_name", "")
-                    region = state.get("region", "")
-                    location = state.get("location", "")
                     updated_at = max(
                         int(profile.get("updated_at", 0) or 0),
                         int(state.get("updated_at", 0) or 0),
@@ -699,11 +689,8 @@ class PlayerSaveRepository:
                         "user_id": user_dir.name,
                         "nickname": index.get("target_name", "") if index else profile.get("nickname", ""),
                         "target_name": target_name,
-                        "race": profile.get("card", {}).get("race", ""),
                         "class_name": profile.get("card", {}).get("class_name", ""),
                         "level": state.get("level", 1),
-                        "region": region,
-                        "location": location,
                         "updated_at": updated_at,
                     }
                 )
@@ -712,38 +699,6 @@ class PlayerSaveRepository:
     def list_saves_by_user(self, user_id: str) -> list[dict[str, Any]]:
         safe_user = self._safe_id(user_id)
         return [item for item in self.list_saves() if item.get("user_id") == safe_user]
-
-    def find_birth_region_npcs(
-        self,
-        group_id: str,
-        user_id: str,
-        birth_region: str,
-    ) -> list[dict[str, Any]]:
-        region = str(birth_region or "").strip()
-        if not region:
-            return []
-
-        current_user = self._safe_id(user_id)
-        users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
-        if not users_dir.exists():
-            return []
-
-        npcs: list[dict[str, Any]] = []
-        for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
-            if user_dir.name == current_user:
-                continue
-
-            profile = self._read_json(user_dir / "profile.json")
-            card = profile.get("card", {}) if isinstance(profile, dict) else {}
-            if not isinstance(card, dict):
-                continue
-            if str(card.get("birth_region") or "").strip() != region:
-                continue
-
-            npc = self._build_npc_package(user_dir, profile=profile, source="same_birth_region")
-            if npc:
-                npcs.append(npc)
-        return npcs
 
     def find_mentioned_npcs(
         self,
@@ -780,12 +735,21 @@ class PlayerSaveRepository:
             return None
         state_path = user_dir / "state.json"
         state = self._read_json(state_path)
+        changed = self._remove_economy_state(state)
+        if self._remove_location_state(state):
+            changed = True
         if self._normalize_status_progress_in_state(state):
+            changed = True
+        if changed:
             self._atomic_write_json(state_path, state)
+        profile_path = user_dir / "profile.json"
+        profile = self._read_json(profile_path)
+        if self._remove_location_state(profile):
+            self._atomic_write_json(profile_path, profile)
         return {
             "group_id": self._safe_id(group_id),
             "user_id": self._safe_id(user_id),
-            "profile": self._read_json(user_dir / "profile.json"),
+            "profile": profile,
             "state": state,
             "logs": self._read_recent_logs(user_dir / "adventure_log.jsonl", limit=80),
             "cameo_memories": self._read_recent_cameo_memories(
@@ -814,14 +778,11 @@ class PlayerSaveRepository:
             "title",
             "subtitle",
             "target_name",
-            "race",
             "class_name",
             "appearance",
             "personality",
             "talent",
             "birth_description",
-            "birth_region",
-            "birth_location",
             "quote",
             "footer",
         }
@@ -833,15 +794,6 @@ class PlayerSaveRepository:
             likes = updates.get("likes")
             if isinstance(likes, list):
                 card["likes"] = [str(item).strip() for item in likes if str(item).strip()]
-
-        if "stats" in updates:
-            stats = updates.get("stats")
-            if isinstance(stats, dict):
-                card["stats"] = {
-                    str(key).strip(): str(value).strip()
-                    for key, value in stats.items()
-                    if str(key).strip()
-                }
 
         target_name = str(card.get("target_name") or "").strip()
         if target_name:
@@ -895,6 +847,11 @@ class PlayerSaveRepository:
         profile = self._read_json(user_dir / "profile.json")
         state = self._read_json(user_dir / "state.json")
         index = self._read_json(user_dir / "index.json")
+        if self._remove_location_state(profile):
+            self._atomic_write_json(user_dir / "profile.json", profile)
+        if self._remove_location_state(state):
+            self._atomic_write_json(user_dir / "state.json", state)
+        self._remove_location_state(index)
         card = profile.get("card", {}) if isinstance(profile, dict) else {}
         target_name = (
             card.get("target_name")
@@ -912,8 +869,6 @@ class PlayerSaveRepository:
             group_id=group_id,
             user_id=user_id,
             target_name=target_name,
-            region=state.get("region") or index.get("region", ""),
-            location=state.get("location") or index.get("location", ""),
             updated_at=updated_at,
         )
 
@@ -949,6 +904,7 @@ class PlayerSaveRepository:
     def reset_player_state(self, group_id: str, user_id: str) -> None:
         user_dir = self.get_user_dir(group_id, user_id)
         profile = self._read_json(user_dir / "profile.json")
+        self._remove_location_state(profile)
         if not profile:
             raise ValueError("玩家 profile.json 不存在或无法读取")
         card = profile.get("card", {}) if isinstance(profile.get("card"), dict) else {}
@@ -960,11 +916,8 @@ class PlayerSaveRepository:
             "updated_at": now,
             "level": 1,
             "level_exp": 0,
-            "region": card.get("birth_region") or "未知区域",
-            "location": card.get("birth_location") or "醒来的地方",
             "hp": 100,
             "mp": 100,
-            "gold": 0,
             "inventory": [],
             "skills": {},
             "quests": [],
@@ -1060,6 +1013,8 @@ class PlayerSaveRepository:
         state = self._read_json(state_path)
         if not state:
             return
+        self._remove_economy_state(state)
+        self._remove_location_state(state)
         state["updated_at"] = now
         self._atomic_write_json(state_path, state)
 
@@ -1069,16 +1024,12 @@ class PlayerSaveRepository:
         group_id: str,
         user_id: str,
         target_name: object,
-        region: object,
-        location: object,
         updated_at: int,
     ) -> None:
         index = {
             "schema_version": 1,
             "group_id": str(group_id),
             "target_name": str(target_name or "").strip(),
-            "region": str(region or "").strip(),
-            "location": str(location or "").strip(),
             "updated_at": int(updated_at or self._now_ms()),
         }
         self._atomic_write_json(self.get_user_dir(group_id, user_id) / "index.json", index)
@@ -1122,6 +1073,7 @@ class PlayerSaveRepository:
             try:
                 item = json.loads(line)
                 if isinstance(item, dict):
+                    self._remove_location_state(item)
                     item["_log_index"] = start_index + offset
                     logs.append(item)
             except json.JSONDecodeError:
@@ -1219,8 +1171,6 @@ class PlayerSaveRepository:
             return {
                 "encounter": item.get("encounter", ""),
                 "result": item.get("result", ""),
-                "region": item.get("region", ""),
-                "location": item.get("location", ""),
                 "created_at": item.get("created_at", 0),
                 "world_date": item.get("world_date", ""),
             }
@@ -1234,8 +1184,6 @@ class PlayerSaveRepository:
                 "source_target_name": item.get("source_target_name", ""),
                 "encounter": item.get("encounter", ""),
                 "result": item.get("result", ""),
-                "region": item.get("region", ""),
-                "location": item.get("location", ""),
                 "title": item.get("title", ""),
                 "world_day_offset": item.get("world_day_offset"),
                 "world_date": item.get("world_date", ""),
@@ -1290,18 +1238,16 @@ class PlayerSaveRepository:
             self._read_json(user_dir / "state.json"),
             target_name,
         )
+        self._remove_economy_state(state)
+        self._remove_location_state(state)
         return {
             "_user_id": user_dir.name,
             "_source": source,
             "target_name": target_name,
-            "race": card.get("race", ""),
             "class_name": card.get("class_name", ""),
             "appearance": card.get("appearance", ""),
             "personality": card.get("personality", ""),
             "talent": card.get("talent", ""),
-            "birth_region": card.get("birth_region", ""),
-            "birth_location": card.get("birth_location", ""),
-            "stats": card.get("stats", {}),
             "likes": card.get("likes", []),
             "state": state,
             "last_adventure": self._read_last_adventure_summary(
@@ -1361,8 +1307,6 @@ class PlayerSaveRepository:
         except Exception as exc:
             logger.warning(f"备份存档源码失败: {path} {exc}")
 
-    GOLD_PATHS = {"/金币", "/主角/金币", "/gold", "/主角/gold"}
-
     def _apply_state_patches(
         self,
         state: dict[str, Any],
@@ -1379,7 +1323,9 @@ class PlayerSaveRepository:
                 continue
             op = str(patch.get("op") or "").strip()
             path = str(patch.get("path") or "").strip()
-            if not path.startswith("/") or path in {"/region", "/location"}:
+            if not path.startswith("/") or self._is_location_path(path):
+                continue
+            if self._is_economy_path(path):
                 continue
             raw_parts = path.split("/")[1:]
             first_part = (
@@ -1394,9 +1340,6 @@ class PlayerSaveRepository:
                 continue
             if path in {"/level/经验", "/等级/经验", "/主角/等级/经验"}:
                 continue
-            if path in self.GOLD_PATHS:
-                self._apply_gold_patch(state, op, patch.get("value"))
-                continue
             parts = self._split_patch_path(path)
             if not parts:
                 continue
@@ -1407,19 +1350,6 @@ class PlayerSaveRepository:
             elif op in {"replace", "insert"}:
                 self._set_nested_value(state, parts, patch.get("value"))
         return teammate_state_patches
-
-    def _apply_gold_patch(
-        self,
-        state: dict[str, Any],
-        op: str,
-        value: object,
-    ) -> None:
-        delta = self._number_value(value)
-        current = self._number_value(state.get("gold", 0))
-        if op == "+":
-            state["gold"] = max(0, current + delta)
-        elif op == "-":
-            state["gold"] = max(0, current - delta)
 
     def _apply_teammate_state_patches(
         self,
@@ -1444,10 +1374,61 @@ class PlayerSaveRepository:
             state = self._read_json(state_path)
             if not isinstance(state, dict):
                 continue
+            self._remove_economy_state(state)
+            self._remove_location_state(state)
             self._apply_state_patches(state, patches)
             state["updated_at"] = self._now_ms()
             self._atomic_write_json(state_path, state)
             logger.info(f"已应用队友 {teammate_name} 的状态补丁: {patches}")
+
+    @staticmethod
+    def _is_economy_path(path: str) -> bool:
+        return any(
+            part.replace("~1", "/").replace("~0", "~") in {"gold", "金币"}
+            for part in str(path or "").split("/")[1:]
+        )
+
+    @staticmethod
+    def _is_location_path(path: str) -> bool:
+        return any(
+            part.replace("~1", "/").replace("~0", "~")
+            in {"region", "location", "birth_region", "birth_location"}
+            for part in str(path or "").split("/")[1:]
+        )
+
+    @classmethod
+    def _remove_economy_state(cls, value: object) -> bool:
+        changed = False
+        if isinstance(value, dict):
+            for key in list(value):
+                if str(key) in {"gold", "金币"}:
+                    value.pop(key, None)
+                    changed = True
+                    continue
+                if cls._remove_economy_state(value.get(key)):
+                    changed = True
+        elif isinstance(value, list):
+            for item in value:
+                if cls._remove_economy_state(item):
+                    changed = True
+        return changed
+
+    @classmethod
+    def _remove_location_state(cls, value: object) -> bool:
+        changed = False
+        if isinstance(value, dict):
+            for key in list(value):
+                if str(key) in {"region", "location", "birth_region", "birth_location"}:
+                    value.pop(key, None)
+                    changed = True
+                    continue
+                if cls._remove_location_state(value.get(key)):
+                    changed = True
+        elif isinstance(value, list):
+            for item in value:
+                if cls._remove_location_state(item):
+                    changed = True
+        return changed
 
     def _find_teammate_names(self, group_id: str, protagonist: str) -> set[str]:
         """返回群内已有存档的角色名，不包含当前冒险主角。"""
@@ -1511,6 +1492,8 @@ class PlayerSaveRepository:
             state = self._read_json(state_path)
             if not isinstance(state, dict):
                 continue
+            self._remove_economy_state(state)
+            self._remove_location_state(state)
 
             teammate_level = max(1, min(int(state.get("level", 1) or 1), 100))
             level_diff = main_level - teammate_level

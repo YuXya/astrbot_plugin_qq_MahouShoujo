@@ -96,7 +96,6 @@ def state_label(label: str) -> str:
         "level_exp": "等级经验",
         "hp": "HP",
         "mp": "MP",
-        "gold": "金币",
         "inventory": "物品",
         "skills": "技能",
         "quests": "任务",

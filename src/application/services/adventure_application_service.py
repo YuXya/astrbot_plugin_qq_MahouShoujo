@@ -29,20 +29,12 @@ class AdventureApplicationService:
         user_id: str | None = None,
         nickname: str | None = None,
         umo: str | None = None,
-        player_messages: list[str] | None = None,
-        avatar_url: str | None = None,
-        avatar_caption: str | None = None,
     ) -> AdventureExecutionResult:
-        theme = (theme or "/异世界转生").strip()
+        theme = (theme or "/魔法少女转生").strip()
 
         try:
             if self.config_manager.get_use_mock_data():
-                card = self.domain_service.build_mock_card(
-                    theme,
-                    nickname,
-                    avatar_url=avatar_url,
-                    avatar_caption=avatar_caption,
-                )
+                card = self.domain_service.build_mock_card(theme, nickname)
                 raw_response = ""
             else:
                 analysis = await self.llm_analyzer.analyze_adventure(
@@ -50,9 +42,6 @@ class AdventureApplicationService:
                     user_id=user_id,
                     nickname=nickname,
                     umo=umo,
-                    player_messages=player_messages,
-                    avatar_url=avatar_url,
-                    avatar_caption=avatar_caption,
                 )
                 card = analysis.card
                 raw_response = analysis.raw_response
@@ -78,9 +67,9 @@ class AdventureApplicationService:
                 raw_response=raw_response,
             )
         except Exception as exc:
-            logger.error(f"执行异世界转生卡片流程失败: {exc}", exc_info=True)
+            logger.error(f"执行魔法少女转生卡片流程失败: {exc}", exc_info=True)
             return AdventureExecutionResult(
                 success=False,
-                text=f"异世界转生卡生成失败：{exc}",
+                text=f"魔法少女转生卡生成失败：{exc}",
                 error=str(exc),
             )

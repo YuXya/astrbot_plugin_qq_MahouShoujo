@@ -12,7 +12,6 @@
       --line: #d7c7a8;
       --green: #52796f;
       --red: #b75d4a;
-      --gold: #bf8f3c;
     }
 
     * { box-sizing: border-box; }
@@ -91,16 +90,9 @@
       color: var(--green);
     }
 
-    .avatar img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
     .meta {
       display: grid;
-      grid-template-columns: 1.15fr 1fr 1fr 1fr;
+      grid-template-columns: 1.15fr 1fr;
       gap: 12px;
       margin-top: 24px;
     }
@@ -150,34 +142,6 @@
       font-size: 23px;
       line-height: 1.5;
       color: #343932;
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-top: 20px;
-    }
-
-    .stat {
-      border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.58);
-      padding: 12px;
-      text-align: center;
-      min-height: 74px;
-    }
-
-    .stat-key {
-      color: var(--muted);
-      font-size: 16px;
-      font-weight: 800;
-    }
-
-    .stat-value {
-      color: var(--green);
-      font-size: 28px;
-      font-weight: 900;
-      margin-top: 4px;
     }
 
     .changes {
@@ -338,11 +302,7 @@
         <div class="subtitle">{{ card.subtitle }}</div>
       </div>
       <div class="avatar">
-        {% if avatar_url %}
-        <img src="{{ avatar_url }}" alt="{{ card.target_name }}">
-        {% else %}
         旅
-        {% endif %}
       </div>
     </section>
 
@@ -350,14 +310,6 @@
       <div class="box">
         <div class="label">冒险者</div>
         <div class="value">{{ card.target_name }}</div>
-      </div>
-      <div class="box">
-        <div class="label">区域</div>
-        <div class="value">{{ card.region }}</div>
-      </div>
-      <div class="box">
-        <div class="label">地点</div>
-        <div class="value">{{ card.location }}</div>
       </div>
       <div class="box">
         <div class="label">等级</div>
@@ -389,15 +341,6 @@
         <div class="change">{{ change }}</div>
         {% endfor %}
       </div>
-    </section>
-
-    <section class="stats">
-      {% for key, value in stats_items %}
-      <div class="stat">
-        <div class="stat-key">{{ key }}</div>
-        <div class="stat-value">{{ value }}</div>
-      </div>
-      {% endfor %}
     </section>
 
     <footer class="footer">{{ card.footer }}</footer>

@@ -90,7 +90,7 @@ class SaveWebViewer:
         await self._runner.setup()
         self._site = web.TCPSite(self._runner, self.host, self.port)
         await self._site.start()
-        logger.info(f"异世界存档网页已启动: {self.host}:{self.port}")
+        logger.info(f"魔法少女存档网页已启动: {self.host}:{self.port}")
         return self.token
 
     async def stop(self) -> None:
@@ -99,7 +99,7 @@ class SaveWebViewer:
         self._runner = None
         self._site = None
         self.token = ""
-        logger.info("异世界存档网页已关闭")
+        logger.info("魔法少女存档网页已关闭")
 
     def _add_route(self, app: web.Application, method: str, path: str, handler) -> None:
         app.router.add_route(method, path, handler)
@@ -120,7 +120,7 @@ class SaveWebViewer:
         else:
             saves = self.repository.list_saves_by_user(qq_id)
             if not saves:
-                return self._login_response("没有找到这个 QQ 号的异世界存档。", status=401)
+                return self._login_response("没有找到这个 QQ 号的魔法少女存档。", status=401)
             cookie_value = self._build_session_cookie(SESSION_USER_ROLE, self._safe_session_id(qq_id))
 
         response = self._redirect("/")
@@ -141,10 +141,10 @@ class SaveWebViewer:
     def _login_response(self, error: str = "", status: int = 200) -> web.Response:
         error_html = f"<p class=\"error\">{self._e(error)}</p>" if error else ""
         return self._html_response(
-            "异世界登录",
+            "魔法少女登录",
             f"""
             <section class="login-panel">
-              <h1>异世界网页登录</h1>
+              <h1>魔法少女网页登录</h1>
               <p class="muted">请输入 QQ 号登录。</p>
               {error_html}
               <form method="post" action="{self._url('/login')}">
@@ -270,21 +270,18 @@ class SaveWebViewer:
                 f"<td>{row['group_id']}</td>"
                 f"<td>{row['user_id']}</td>"
                 f"<td><a href=\"{row['href']}\">{row['nickname']}</a></td>"
-                f"<td>{row['race']}</td>"
                 f"<td>{row['class_name']}</td>"
                 f"<td>{row['level']}</td>"
-                f"<td>{row['region']}</td>"
-                f"<td>{row['location']}</td>"
                 f"<td>{row['updated_at']}</td>"
                 f"<td>{delete_form}</td>"
                 "</tr>"
             )
 
-        body = "\n".join(rows) or "<tr><td colspan=\"10\">还没有任何玩家存档。</td></tr>"
+        body = "\n".join(rows) or "<tr><td colspan=\"7\">还没有任何玩家存档。</td></tr>"
         return self._html_response(
-            "异世界存档",
+            "魔法少女存档",
             f"""
-            <h1>异世界存档</h1>
+            <h1>魔法少女存档</h1>
             <p class="muted">管理员页面。关闭网页命令会立即使当前网页登录态失效。</p>
             <p class="nav-actions">
               <a class="button-link" href="{self._url('/editable?category=world_background')}">编辑世界背景</a>
@@ -295,7 +292,7 @@ class SaveWebViewer:
               <thead>
                 <tr>
                   <th>群</th><th>用户</th><th>角色</th>
-                  <th>种族</th><th>职阶</th><th>等级</th><th>区域</th><th>地点</th><th>更新时间</th><th>操作</th>
+                  <th>职阶</th><th>等级</th><th>更新时间</th><th>操作</th>
                 </tr>
               </thead>
               <tbody>{body}</tbody>
@@ -312,25 +309,22 @@ class SaveWebViewer:
                 "<tr>"
                 f"<td>{row['group_id']}</td>"
                 f"<td><a href=\"{row['href']}\">{row['nickname']}</a></td>"
-                f"<td>{row['race']}</td>"
                 f"<td>{row['class_name']}</td>"
                 f"<td>{row['level']}</td>"
-                f"<td>{row['region']}</td>"
-                f"<td>{row['location']}</td>"
                 f"<td>{row['updated_at']}</td>"
                 "</tr>"
             )
 
-        body = "\n".join(rows) or "<tr><td colspan=\"8\">还没有找到你的异世界存档。</td></tr>"
+        body = "\n".join(rows) or "<tr><td colspan=\"5\">还没有找到你的魔法少女存档。</td></tr>"
         return self._html_response(
-            "我的异世界存档",
+            "我的魔法少女存档",
             f"""
-            <h1>我的异世界存档</h1>
+            <h1>我的魔法少女存档</h1>
             <p class="muted">当前登录 QQ：{self._e(user_id)}</p>
             <table>
               <thead>
                 <tr>
-                  <th>群</th><th>角色</th><th>种族</th><th>职阶</th><th>等级</th><th>区域</th><th>地点</th><th>更新时间</th>
+                  <th>群</th><th>角色</th><th>职阶</th><th>等级</th><th>更新时间</th>
                 </tr>
               </thead>
               <tbody>{body}</tbody>
@@ -346,11 +340,8 @@ class SaveWebViewer:
             "group_id": group_id,
             "user_id": user_id,
             "nickname": self._e(item.get("nickname") or item.get("target_name") or "未命名"),
-            "race": self._e(item.get("race", "")),
             "class_name": self._e(item.get("class_name", "")),
             "level": self._e(f"{item.get('level', 1)}级"),
-            "region": self._e(item.get("region", "")),
-            "location": self._e(item.get("location", "")),
             "updated_at": self._format_time(item.get("updated_at")),
             "href": href,
         }
@@ -365,7 +356,7 @@ class SaveWebViewer:
             "text_completion": "文本补全",
         }
         category_descriptions = {
-            "world_background": "影响异世界公共设定、地点、魔物、种族和职业等背景内容。",
+            "world_background": "影响魔法少女公共设定、地点、魔物、种族和职业等背景内容。",
             "text_completion": "管理发给 AI 的 Prompt、System Prompt 和世界书注入话术。",
         }
         if selected_category not in category_titles:
@@ -923,7 +914,7 @@ class SaveWebViewer:
             <h1>{self._e(title)}</h1>
             <p><a href="{self._url(f'/editable?category={self._e(back_category)}')}">返回{self._e(self._editable_category_title(back_category))}</a></p>
             <p class="muted">{self._e(file_id)}</p>
-            <p class="muted">区域书按地区划分条目。玩家当前区域命中的条目返回详细介绍，其他区域命中的条目返回简略介绍。min_level 为等级门槛，max_level 为等级上限。排序由网页上下位置决定。</p>
+            <p class="muted">区域书暂时按世界书方式匹配：命中关键词后注入详细介绍。简略介绍暂时保留，但永远不会触发。min_level 为等级门槛，max_level 为等级上限。排序由网页上下位置决定。</p>
             <div class="source-actions">
               <a class="button-link secondary-link" href="{source_url}">编辑源码</a>
               <a class="button-link secondary-link" href="{export_url}">导出 JSON</a>
@@ -1167,10 +1158,10 @@ class SaveWebViewer:
                             <label class="block-field">关键词（支持中文逗号、英文逗号或换行分隔；触发方式为"总是注入"时可留空）
                               <textarea data-field="keys" class="keys-editor" spellcheck="false">${{rbEscapeHtml(eNorm.keys.join("\\n"))}}</textarea>
                             </label>
-                            <label class="block-field">简略介绍（其他区域命中时返回此内容）
+                            <label class="block-field">简略介绍（暂不触发，仅保留备用）
                               <textarea data-field="brief" class="entry-content-editor" spellcheck="false" style="height:60px">${{rbEscapeHtml(eNorm.brief)}}</textarea>
                             </label>
-                            <label class="block-field">详细介绍（当前区域命中时返回此内容）
+                            <label class="block-field">详细介绍（关键词命中时注入）
                               <textarea data-field="content" class="entry-content-editor" spellcheck="false">${{rbEscapeHtml(eNorm.content)}}</textarea>
                             </label>
                           </div>
@@ -1994,7 +1985,7 @@ class SaveWebViewer:
                 user_id,
                 "/player/state/reset",
                 "刷新状态",
-                "确定刷新 state.json？等级、物品、金币、技能和状态进度都会恢复为初始值。",
+                "确定刷新 state.json？等级、物品、技能和状态进度都会恢复为初始值。",
             )
             if is_admin
             else ""
@@ -2081,14 +2072,11 @@ class SaveWebViewer:
             "title",
             "subtitle",
             "target_name",
-            "race",
             "class_name",
             "appearance",
             "personality",
             "talent",
             "birth_description",
-            "birth_region",
-            "birth_location",
             "quote",
             "footer",
         ]
@@ -2102,32 +2090,6 @@ class SaveWebViewer:
             for item in re.split(r"[\n,，、]+", likes_text)
             if item.strip()
         ]
-
-        stats_raw = str(data.get("stats_json", "")).strip()
-        if stats_raw:
-            try:
-                stats = json.loads(stats_raw)
-            except json.JSONDecodeError as exc:
-                return self._html_response(
-                    "保存角色档案失败",
-                    f"""
-                    <h1>保存角色档案失败</h1>
-                    <p class="error">属性 JSON 格式不正确：{self._e(exc)}</p>
-                    <p><a class="button-link secondary-link" href="{self._url(f'/player?group_id={quote(group_id, safe="")}&user_id={quote(user_id, safe="")}')}">返回角色档案</a></p>
-                    """,
-                )
-            if not isinstance(stats, dict):
-                return self._html_response(
-                    "保存角色档案失败",
-                    f"""
-                    <h1>保存角色档案失败</h1>
-                    <p class="error">属性必须是 JSON 对象，例如 {self._e('{"力量": "A", "敏捷": "B"}')}。</p>
-                    <p><a class="button-link secondary-link" href="{self._url(f'/player?group_id={quote(group_id, safe="")}&user_id={quote(user_id, safe="")}')}">返回角色档案</a></p>
-                    """,
-                )
-            updates["stats"] = stats
-        else:
-            updates["stats"] = {}
 
         try:
             self.repository.update_profile_card(group_id, user_id, updates)
@@ -2201,24 +2163,13 @@ class SaveWebViewer:
         card: dict[str, Any],
         can_edit: bool = False,
     ) -> str:
-        avatar_url = card.get("avatar_url") or ""
-        avatar_html = (
-            f"<img src=\"{self._e(avatar_url)}\" alt=\"avatar\">"
-            if avatar_url
-            else "<span>転</span>"
-        )
-        stats = card.get("stats") if isinstance(card.get("stats"), dict) else {}
-        stat_items = "".join(
-            f"<div class=\"stat-pill\"><span>{self._e(key)}</span><strong>{self._e(value)}</strong></div>"
-            for key, value in stats.items()
-        ) or "<div class=\"stat-pill\"><span>四维</span><strong>未记录</strong></div>"
+        avatar_html = "<span>転</span>"
         likes = card.get("likes") if isinstance(card.get("likes"), list) else []
         like_items = "".join(
             f"<span class=\"tag\">{self._e(item)}</span>"
             for item in likes[:8]
         )
         likes_text = "\n".join(str(item) for item in likes)
-        stats_json = json.dumps(stats, ensure_ascii=False, indent=2)
         created_at = self._format_time(profile.get("created_at"))
         updated_at = self._format_time(state.get("updated_at") or profile.get("updated_at"))
         profile_panel = (
@@ -2234,17 +2185,13 @@ class SaveWebViewer:
                   {self._profile_edit_field("标题", "title", card.get("title"))}
                   {self._profile_edit_field("副标题", "subtitle", card.get("subtitle"))}
                   {self._profile_edit_field("姓名", "target_name", card.get("target_name"))}
-                  {self._profile_edit_field("种族", "race", card.get("race"))}
                   {self._profile_edit_field("职业", "class_name", card.get("class_name"))}
-                  {self._profile_edit_field("出生地区", "birth_region", card.get("birth_region"))}
-                  {self._profile_edit_field("出生地点", "birth_location", card.get("birth_location"))}
                 </div>
                 {self._profile_edit_field("外貌", "appearance", card.get("appearance"), multiline=True)}
                 {self._profile_edit_field("性格", "personality", card.get("personality"), multiline=True)}
                 {self._profile_edit_field("天赋", "talent", card.get("talent"), multiline=True)}
                 {self._profile_edit_field("初醒之地", "birth_description", card.get("birth_description"), multiline=True)}
                 {self._profile_edit_field("喜好", "likes", likes_text, multiline=True)}
-                {self._profile_edit_field("属性 JSON", "stats_json", stats_json, multiline=True, monospace=True)}
                 {self._profile_edit_field("台词", "quote", card.get("quote"), multiline=True)}
                 {self._profile_edit_field("页脚", "footer", card.get("footer"))}
               </form>
@@ -2266,15 +2213,12 @@ class SaveWebViewer:
               <div class="avatar-large">{avatar_html}</div>
               <div class="hero-main">
                 <div class="kicker">群 {self._e(group_id)} / 用户 {self._e(user_id)}</div>
-                <h2>{self._e(card.get("title") or "异世界转生人物卡")}</h2>
+                <h2>{self._e(card.get("title") or "魔法少女转生人物卡")}</h2>
                 <p class="subtitle">{self._e(card.get("subtitle") or "")}</p>
                 <div class="identity-line">
                   <span>{self._e(level_display(state))}</span>
                   <span>等级经验 {self._e(level_exp_percent(state))}%</span>
-                  <span>{self._e(card.get("race") or "未知种族")}</span>
                   <span>{self._e(card.get("class_name") or "未知职阶")}</span>
-                  <span>{self._e(state.get("region") or "未知区域")}</span>
-                  <span>{self._e(state.get("location") or "未知地点")}</span>
                 </div>
               </div>
             </section>
@@ -2282,12 +2226,10 @@ class SaveWebViewer:
               {profile_panel}
               <article class="detail-panel">
                 <h2>当前状态</h2>
-                <div class="stats-grid">{stat_items}</div>
                 <div class="tag-row">{like_items}</div>
                 <div class="meta-list">
                   <div><span>HP</span><strong>{self._e(state.get("hp", 100))}</strong></div>
                   <div><span>MP</span><strong>{self._e(state.get("mp", 100))}</strong></div>
-                  <div><span>金币</span><strong>{self._e(state.get("gold", 0))}</strong></div>
                   <div><span>等级经验</span><strong>{self._e(level_exp_percent(state))}%</strong></div>
                   <div><span>创建</span><strong>{self._e(created_at)}</strong></div>
                   <div><span>更新</span><strong>{self._e(updated_at)}</strong></div>
@@ -2345,8 +2287,6 @@ class SaveWebViewer:
             log_type = self._e(raw_log_type)
             title = self._e(log.get("title") or log.get("message") or "冒险记录")
             action = self._e(log.get("action") or "")
-            region = self._e(log.get("region") or "")
-            location = self._e(log.get("location") or "")
             level_change = self._e(log.get("level_change") or "")
             diary = self._e(log.get("diary") or "")
             encounter = self._e(log.get("encounter") or "")
@@ -2358,8 +2298,6 @@ class SaveWebViewer:
             created_at = self._format_time(log.get("created_at"))
             world_date = self._world_date_display(log)
             world_date_html = f"<span>{self._e(world_date)}</span>" if world_date else ""
-            region_html = f"<span>{region}</span>" if region else ""
-            location_html = f"<span>{location}</span>" if location else ""
             level_html = f"<span>{level_change}</span>" if level_change else ""
             action_html = f"<p class=\"log-action\">{action}</p>" if action else ""
             diary_html = f"<p class=\"log-result\">{diary}</p>" if diary else ""
@@ -2398,8 +2336,6 @@ class SaveWebViewer:
                       <span>{self._e(created_at)}</span>
                       {world_date_html}
                       <span>{log_type}</span>
-                      {region_html}
-                      {location_html}
                       {level_html}
                     </div>
                   </summary>
@@ -2408,8 +2344,6 @@ class SaveWebViewer:
                       <span>{self._e(created_at)}</span>
                       {world_date_html}
                       <span>{log_type}</span>
-                      {region_html}
-                      {location_html}
                       {level_html}
                     </div>
                     {action_html}
@@ -2441,15 +2375,11 @@ class SaveWebViewer:
                 if memory.get("type") == "cameo_summary"
                 else memory.get("source_target_name") or "未知角色"
             )
-            region = self._e(memory.get("region") or "")
-            location = self._e(memory.get("location") or "")
             encounter = self._e(memory.get("encounter") or "")
             result = self._e(memory.get("result") or "")
             created_at = self._format_time(memory.get("created_at"))
             world_date = self._world_date_display(memory)
             world_date_html = f"<span>{self._e(world_date)}</span>" if world_date else ""
-            region_html = f"<span>{region}</span>" if region else ""
-            location_html = f"<span>{location}</span>" if location else ""
             encounter_html = (
                 f"<p class=\"log-action\">遭遇：{encounter}</p>"
                 if encounter
@@ -2481,8 +2411,6 @@ class SaveWebViewer:
                       <span>{self._e(created_at)}</span>
                       {world_date_html}
                       <span>来源：{source_name}</span>
-                      {region_html}
-                      {location_html}
                     </div>
                   </summary>
                   <div class="log-card-body">
@@ -2490,8 +2418,6 @@ class SaveWebViewer:
                       <span>{self._e(created_at)}</span>
                       {world_date_html}
                       <span>来源：{source_name}</span>
-                      {region_html}
-                      {location_html}
                     </div>
                     {encounter_html}
                     <p class="log-result">{result}</p>
@@ -2947,10 +2873,7 @@ class SaveWebViewer:
     .profile-edit-field input[type="text"] {{ padding: 8px 10px; min-height: 38px; }}
     textarea.profile-edit-textarea {{ min-height: 72px; resize: vertical; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
     textarea.profile-edit-textarea.monospace-editor {{ min-height: 96px; font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }}
-    .stats-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }}
-    .stat-pill {{ padding: 12px; border-radius: 8px; background: #f7fafc; border: 1px solid #dde2ea; }}
-    .stat-pill span, .meta-list span {{ display: block; color: #68707d; font-size: 12px; font-weight: 800; }}
-    .stat-pill strong {{ display: block; margin-top: 3px; font-size: 22px; color: #172033; }}
+    .meta-list span {{ display: block; color: #68707d; font-size: 12px; font-weight: 800; }}
     .tag-row {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }}
     .meta-list {{ display: grid; gap: 8px; margin-top: 16px; }}
     .meta-list div {{ display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid #edf1f5; }}
