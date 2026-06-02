@@ -1,6 +1,6 @@
 # QQ 魔法少女转生人物卡
 
-这是一个 AstrBot 插件，用于在群聊中生成“魔法少女转生人物卡”和后续“冒险日记”。玩家可以先建档，再通过命令推进自己的魔法少女生活；插件会把角色档案、状态、冒险记录和其他玩家互动保存到本地存档中。
+这是一个 AstrBot 插件，用于在群聊中生成"魔法少女转生人物卡"和后续"冒险日记"。玩家可以先建档，再通过命令推进自己的魔法少女生活；插件会把角色档案、状态、冒险记录和其他玩家互动保存到本地存档中。
 
 ## 玩家命令
 
@@ -17,7 +17,7 @@
 - `/魔法少女帮助`：显示玩家可用命令、新手用法和角色档案面板地址。
 - `/魔法少女转生`：创建角色档案。命令后可填写补充偏好，影响角色设定。
 - `/魔法少女冒险`：读取玩家自己的存档、状态、最近冒险日志、其他人与主角的交互、世界书/技能书/状态书，然后生成一次冒险日记。命令后可写本次行动；不写行动时由 LLM 根据当前状态自由生成。
-- 每个群拥有独立的创世纪时间。该群第一次冒险为 `创世纪1000年1月1日`，之后每次成功保存冒险自动推进一天。
+- 每个群拥有独立的公元时间。该群第一次冒险为 `公元2025年1月1日`，之后每次成功保存冒险自动推进一天。
 - `/魔法少女存档删除`：删除当前群自己的魔法少女存档。为避免误删，需要再次发送 `/魔法少女存档删除 确认`；删除时会同步清理同群其他玩家记忆中由你产生的客串记录。
 
 角色档案面板：
@@ -80,18 +80,17 @@ data/plugin_data/astrbot_plugin_qq_adventurer/saves/groups/{group_id}/users/{use
   "diary": "完整冒险日记正文",
   "encounter": "本次主要遭遇",
   "result": "本次事件结算",
-  "changes": ["获得物品", "技能熟练度提升"],
   "footer": "底部说明",
   "update": {
-    "analysis": "状态更新依据",
-    "patches": [
+    "reason": "状态更新依据",
+    "changes": [
       {"op": "delta", "path": "/主角/等级/经验", "value": 20}
     ]
   }
 }
 ```
 
-当前代码会处理等级、等级经验并追加日志。`update.patches` 还会用于技能、状态等嵌套进度；经验满 100 后自动升级。
+当前代码会处理等级、等级经验并追加日志。`update.changes` 还会用于技能、状态等嵌套进度；经验满 100 后自动升级。
 
 ## 世界书、技能书和状态书
 
@@ -100,8 +99,8 @@ data/plugin_data/astrbot_plugin_qq_adventurer/saves/groups/{group_id}/users/{use
 管理员网页中可编辑三类世界背景资源：
 
 - `world_book/default.json`：公共世界设定。
-- `skill_book/default.json`：技能成长提示和默认 patch 路径。
-- `status_book/default.json`：可觉醒状态、简单介绍、Lv.1 至 Lv.Max 的分级效果和默认 patch 路径。状态最高 Lv.5；已拥有状态只会向 AI 注入简介和当前等级效果。“总是注入”的状态已拥有时每次都会注入，未拥有时会在待觉醒列表附带简单介绍。
+- `skill_book/default.json`：技能成长提示和默认 change 路径。
+- `status_book/default.json`：可觉醒状态、简单介绍、Lv.1 至 Lv.Max 的分级效果和默认 change 路径。状态最高 Lv.5；已拥有状态只会向 AI 注入简介和当前等级效果。"总是注入"的状态已拥有时每次都会注入，未拥有时会在待觉醒列表附带简单介绍。
 
 这些资源支持：
 
@@ -119,7 +118,7 @@ data/plugin_data/astrbot_plugin_qq_adventurer/saves/groups/{group_id}/users/{use
 - 查看玩家列表。
 - 查看角色档案、状态概览、成长进度。
 - 查看冒险记录。
-- 查看“其他人与主角的交互”。
+- 查看"其他人与主角的交互"。
 - 管理员删除玩家存档或删除单条冒险日志。
 - 管理员编辑、导出、导入玩家存档源码。
 - 管理员查看最近文本补全消息记录，并调整保留数量。默认保存最近 3 次发送给 AI 的完整消息和 AI 原始回复。
@@ -140,7 +139,7 @@ data/plugin_data/astrbot_plugin_qq_adventurer/saves/groups/{group_id}/users/{use
 - `analysis_features.keep_original_persona`：是否保留原会话人格影响。
 - `analysis_features.use_plugin_specific_persona`：是否强制使用插件指定人格。
 - `analysis_features.plugin_specific_persona_id`：插件指定人格 ID。
-- `adventure.diary_compress_interval` / `adventure.diary_compress_count`：冒险记录压缩配置。默认每 10 条未压缩冒险，把最早 6 条交给 AI 压缩为一条“第 1-6 次冒险”范围摘要。
+- `adventure.diary_compress_interval` / `adventure.diary_compress_count`：冒险记录压缩配置。默认每 10 条未压缩冒险，把最早 6 条交给 AI 压缩为一条"第 1-6 次冒险"范围摘要。
 - `adventure.cameo_compress_interval` / `adventure.cameo_compress_count`：其他人与主角的交互压缩配置。默认每 10 条交互记录，把最早 6 条交给 AI 压缩为一条范围摘要。
 - `adventure.use_mock_data`：静态假数据模式。
 - `t2i_rendering`：HTML 转图片策略。

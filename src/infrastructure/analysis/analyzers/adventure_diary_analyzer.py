@@ -5,7 +5,7 @@ import json
 from ....domain.models.data_models import AdventureDiaryCard, TokenUsage
 from ....domain.services.adventure_diary_domain_service import AdventureDiaryDomainService
 from ....utils.logger import logger
-from ...patch_books import PatchBookEngine
+from ...change_books import ChangeBookEngine
 from ...region_book import RegionBookEngine
 from ...world_book import WorldBookEngine
 from ..utils.json_utils import parse_json_object_response
@@ -29,7 +29,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         self.domain_service = domain_service
         self.world_book_engine = WorldBookEngine(editable_manager=self.editable_manager)
         self.region_book_engine = RegionBookEngine(editable_manager=self.editable_manager)
-        self.patch_book_engine = PatchBookEngine(editable_manager=self.editable_manager)
+        self.change_book_engine = ChangeBookEngine(editable_manager=self.editable_manager)
 
     def get_data_type(self) -> str:
         return "魔法少女冒险日记卡"
@@ -162,11 +162,11 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             [
                 world_book_text,
                 region_book_text,
-                self.patch_book_engine.build_skill_prompt_text(
+                self.change_book_engine.build_skill_prompt_text(
                     enriched_scan_parts if cross_hit_parts else scan_parts,
                     player_level=current_level,
                 ),
-                self.patch_book_engine.build_status_prompt_text(
+                self.change_book_engine.build_status_prompt_text(
                     state, player_level=current_level,
                 ),
                 self._format_nearby_players(nearby_players),

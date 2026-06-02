@@ -476,7 +476,7 @@ class SaveWebViewer:
             )
 
         book_json = self._json_script_data(book)
-        is_patch_book = file_id in {"skill_book/default.json", "status_book/default.json"}
+        is_change_book = file_id in {"skill_book/default.json", "status_book/default.json"}
         base_path_block = (
             f"""
               <div class="book-config-grid">
@@ -485,13 +485,13 @@ class SaveWebViewer:
                   <input id="book-display-name" type="text" value="{self._e(book.get('display_name') or self._default_book_display_name(file_id))}" spellcheck="false">
                 </div>
                 <div>
-                  <label for="book-base-path">默认 patch 基础路径</label>
+                  <label for="book-base-path">默认 change 基础路径</label>
                   <input id="book-base-path" type="text" value="{self._e(book.get('base_path') or '')}" spellcheck="false">
                 </div>
               </div>
-              <p class="muted">这个路径会发给 AI 作为 update.patches 的路径提示，不代表 JSON 文件实际存放路径。</p>
+              <p class="muted">这个路径会发给 AI 作为 update.changes 的路径提示，不代表 JSON 文件实际存放路径。</p>
             """
-            if is_patch_book
+            if is_change_book
             else ""
         )
         book_title = (

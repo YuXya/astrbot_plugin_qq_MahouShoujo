@@ -64,8 +64,8 @@ class AdventureDiaryCard:
     result: str
     level_change: str
     level_exp_after: int = 0
-    changes: list[str] = field(default_factory=list)
-    update_patches: list[dict[str, Any]] = field(default_factory=list)
+    reason: list[str] = field(default_factory=list)
+    update_changes: list[dict[str, Any]] = field(default_factory=list)
     state_snapshot: dict[str, Any] = field(default_factory=dict)
     footer: str = ""
 
@@ -80,8 +80,8 @@ class AdventureDiaryCard:
             f"遭遇：{self.encounter}",
             f"结算：{self.result}",
         ]
-        if self.changes:
-            parts.append(f"变化：{'、'.join(self.changes)}")
+        if self.reason:
+            parts.append(f"原因：{'、'.join(self.reason)}")
         if self.footer:
             parts.append(self.footer)
         return "\n".join(part for part in parts if part)

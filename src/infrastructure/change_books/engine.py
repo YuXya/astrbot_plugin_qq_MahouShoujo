@@ -14,7 +14,7 @@ except Exception:
     logger = logging.getLogger(__name__)
 
 
-class PatchBookEngine:
+class ChangeBookEngine:
     def __init__(self, editable_manager: EditableResourceManager | None = None):
         self.editable_manager = editable_manager or EditableResourceManager()
 
@@ -59,7 +59,7 @@ class PatchBookEngine:
             return ""
         return (
             "技能书补充设定：\n"
-            f"默认 patch 基础路径：{base_path}\n"
+            f"默认 change 基础路径：{base_path}\n"
             "命中技能说明：\n"
             + entries_text
         )
@@ -116,7 +116,7 @@ class PatchBookEngine:
         if not owned_entries and not pending_entries:
             return ""
 
-        parts = ["状态书补充设定：", f"默认 patch 基础路径：{base_path}"]
+        parts = ["状态书补充设定：", f"默认 change 基础路径：{base_path}"]
         if owned_entries:
             parts.append("已拥有状态说明：")
             parts.append(owned_entries)

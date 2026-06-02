@@ -24,7 +24,7 @@ class PlayerSaveRepository:
         "adventure_log.jsonl",
         "cameo_memory.jsonl",
     }
-    WORLD_ERA_START = date(1000, 1, 1)
+    WORLD_ERA_START = date(2025, 1, 1)
 
     def __init__(
         self,
@@ -37,7 +37,7 @@ class PlayerSaveRepository:
     @classmethod
     def format_world_date(cls, day_offset: int) -> str:
         value = cls.WORLD_ERA_START + timedelta(days=max(0, int(day_offset)))
-        return f"创世纪{value.year}年{value.month}月{value.day}日"
+        return f"公元{value.year}年{value.month}月{value.day}日"
 
     def get_current_world_day_offset(self, group_id: str) -> int:
         clock_path = self._world_clock_path(group_id)
@@ -363,9 +363,9 @@ class PlayerSaveRepository:
         state.setdefault("quests", [])
         state.setdefault("flags", {})
         teammate_names = self._find_teammate_names(group_id, card.target_name)
-        teammate_state_patches = self._apply_state_patches(
+        teammate_state_changes = self._apply_state_changes(
             state,
-            card.update_patches,
+            card.update_changes,
             teammate_names=teammate_names,
         )
         card.state_snapshot = self._to_jsonable(state)
@@ -377,12 +377,12 @@ class PlayerSaveRepository:
             updated_at=now,
         )
 
-        # 应用队友状态补丁
-        if teammate_state_patches:
-            self._apply_teammate_state_patches(group_id, teammate_state_patches)
+        # 应用队友状态变化
+        if teammate_state_changes:
+            self._apply_teammate_state_changes(group_id, teammate_state_changes)
 
         # 应用队友等级经验（纯代码，AI 无需输出）
-        level_exp_delta = self._extract_level_exp_delta(card.update_patches)
+        level_exp_delta = self._extract_level_exp_delta(card.update_changes)
         if level_exp_delta > 0:
             mentioned_names = self._find_mentioned_teammate_names(group_id, card)
             if mentioned_names:
@@ -409,8 +409,8 @@ class PlayerSaveRepository:
                 "level_change": card.level_change,
                 "level_exp": card.level_exp_after,
                 "result": card.result,
-                "changes": card.changes,
-                "update_patches": card.update_patches,
+                "reason": card.reason,
+                "update_changes": card.update_changes,
             },
         )
         self.advance_world_clock(group_id, expected_day_offset=world_day_offset)
@@ -1307,22 +1307,22 @@ class PlayerSaveRepository:
         except Exception as exc:
             logger.warning(f"备份存档源码失败: {path} {exc}")
 
-    def _apply_state_patches(
+    def _apply_state_changes(
         self,
         state: dict[str, Any],
-        patches: list[dict[str, Any]],
+        changes: list[dict[str, Any]],
         *,
         teammate_names: set[str] | None = None,
     ) -> dict[str, list[dict[str, Any]]]:
-        """应用当前玩家补丁，返回需要写入其他玩家存档的队友补丁。"""
-        teammate_state_patches: dict[str, list[dict[str, Any]]] = {}
-        if not isinstance(patches, list):
-            return teammate_state_patches
-        for patch in patches:
-            if not isinstance(patch, dict):
+        """应用当前玩家变化，返回需要写入其他玩家存档的队友变化。"""
+        teammate_state_changes: dict[str, list[dict[str, Any]]] = {}
+        if not isinstance(changes, list):
+            return teammate_state_changes
+        for change in changes:
+            if not isinstance(change, dict):
                 continue
-            op = str(patch.get("op") or "").strip()
-            path = str(patch.get("path") or "").strip()
+            op = str(change.get("op") or "").strip()
+            path = str(change.get("path") or "").strip()
             if not path.startswith("/") or self._is_location_path(path):
                 continue
             if self._is_economy_path(path):
@@ -1334,39 +1334,39 @@ class PlayerSaveRepository:
                 else ""
             )
             if teammate_names and first_part in teammate_names and len(raw_parts) > 1:
-                teammate_patch = dict(patch)
-                teammate_patch["path"] = "/" + "/".join(raw_parts[1:])
-                teammate_state_patches.setdefault(first_part, []).append(teammate_patch)
+                teammate_change = dict(change)
+                teammate_change["path"] = "/" + "/".join(raw_parts[1:])
+                teammate_state_changes.setdefault(first_part, []).append(teammate_change)
                 continue
             if path in {"/level/经验", "/等级/经验", "/主角/等级/经验"}:
                 continue
-            parts = self._split_patch_path(path)
+            parts = self._split_change_path(path)
             if not parts:
                 continue
             if op == "+":
-                self._apply_add_patch(state, parts, patch.get("value"))
+                self._apply_add_change(state, parts, change.get("value"))
             elif op == "-":
-                self._apply_sub_patch(state, parts, patch.get("value"))
+                self._apply_sub_change(state, parts, change.get("value"))
             elif op in {"replace", "insert"}:
-                self._set_nested_value(state, parts, patch.get("value"))
-        return teammate_state_patches
+                self._set_nested_value(state, parts, change.get("value"))
+        return teammate_state_changes
 
-    def _apply_teammate_state_patches(
+    def _apply_teammate_state_changes(
         self,
         group_id: str,
-        teammate_state_patches: dict[str, list[dict[str, Any]]],
+        teammate_state_changes: dict[str, list[dict[str, Any]]],
     ) -> None:
-        """将队友状态补丁应用到对应队友的存档中。"""
+        """将队友状态变化应用到对应队友的存档中。"""
         users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
         if not users_dir.exists():
             return
 
-        for teammate_name, patches in teammate_state_patches.items():
-            if not teammate_name or not patches:
+        for teammate_name, changes in teammate_state_changes.items():
+            if not teammate_name or not changes:
                 continue
             target_user_dir = self._find_user_dir_by_target_name(users_dir, teammate_name)
             if not target_user_dir:
-                logger.debug(f"未找到队友 {teammate_name} 的存档，跳过状态补丁")
+                logger.debug(f"未找到队友 {teammate_name} 的存档，跳过状态变化")
                 continue
             state_path = target_user_dir / "state.json"
             if not state_path.exists():
@@ -1376,10 +1376,10 @@ class PlayerSaveRepository:
                 continue
             self._remove_economy_state(state)
             self._remove_location_state(state)
-            self._apply_state_patches(state, patches)
+            self._apply_state_changes(state, changes)
             state["updated_at"] = self._now_ms()
             self._atomic_write_json(state_path, state)
-            logger.info(f"已应用队友 {teammate_name} 的状态补丁: {patches}")
+            logger.info(f"已应用队友 {teammate_name} 的状态变化: {changes}")
 
     @staticmethod
     def _is_economy_path(path: str) -> bool:
@@ -1449,18 +1449,18 @@ class PlayerSaveRepository:
 
     LEVEL_EXP_PATHS = {"/level/经验", "/等级/经验", "/主角/等级/经验"}
 
-    def _extract_level_exp_delta(self, patches: list[dict[str, Any]]) -> int:
-        """从补丁列表中提取主角获得的等级经验增量总和。"""
-        if not isinstance(patches, list):
+    def _extract_level_exp_delta(self, changes: list[dict[str, Any]]) -> int:
+        """从变化列表中提取主角获得的等级经验增量总和。"""
+        if not isinstance(changes, list):
             return 0
         delta = 0
-        for patch in patches:
-            if not isinstance(patch, dict):
+        for change in changes:
+            if not isinstance(change, dict):
                 continue
-            op = str(patch.get("op") or "").strip()
-            path = str(patch.get("path") or "").strip()
+            op = str(change.get("op") or "").strip()
+            path = str(change.get("path") or "").strip()
             if op == "+" and path in self.LEVEL_EXP_PATHS:
-                delta += self._number_value(patch.get("value"))
+                delta += self._number_value(change.get("value"))
         return delta
 
     def _apply_teammate_level_exp(
@@ -1540,8 +1540,8 @@ class PlayerSaveRepository:
             str(card.encounter or ""),
             str(card.result or ""),
         ]
-        if isinstance(card.changes, list):
-            text_parts.extend(str(c) for c in card.changes)
+        if isinstance(card.reason, list):
+            text_parts.extend(str(c) for c in card.reason)
         mention_text = "\n".join(text_parts)
         if not mention_text.strip():
             return set()
@@ -1579,7 +1579,7 @@ class PlayerSaveRepository:
                     return user_dir
         return None
 
-    def _apply_add_patch(
+    def _apply_add_change(
         self,
         state: dict[str, Any],
         parts: list[str],
@@ -1599,7 +1599,7 @@ class PlayerSaveRepository:
             )
         parent[key] = next_value
 
-    def _apply_sub_patch(
+    def _apply_sub_change(
         self,
         state: dict[str, Any],
         parts: list[str],
@@ -1723,7 +1723,7 @@ class PlayerSaveRepository:
             )
         else:
             base_path = fallback
-        parts = tuple(self._split_patch_path(base_path))
+        parts = tuple(self._split_change_path(base_path))
         return parts[1:] if parts and parts[0] == "主角" else parts
 
     def _ensure_nested_parent(
@@ -1741,7 +1741,7 @@ class PlayerSaveRepository:
         return current
 
     @staticmethod
-    def _split_patch_path(path: str) -> list[str]:
+    def _split_change_path(path: str) -> list[str]:
         return [
             part.replace("~1", "/").replace("~0", "~")
             for part in path.split("/")[1:]

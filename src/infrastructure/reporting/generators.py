@@ -94,7 +94,7 @@ class ReportGenerator(ICardGenerator):
         html_content = self.html_templates.render_template(
             "adventure_diary.html",
             card=card,
-            changes=card.changes,
+            reason=card.reason,
             skill_progress_title=skill_progress_title,
             skill_progress_items=progress_sections.skill_items,
             status_progress_title=status_progress_title,

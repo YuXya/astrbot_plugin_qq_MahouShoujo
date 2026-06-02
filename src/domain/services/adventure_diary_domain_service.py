@@ -15,14 +15,14 @@ class AdventureDiaryDomainService:
         action_text: str,
     ) -> AdventureDiaryCard:
         card_data = profile.get("card", {}) if isinstance(profile, dict) else {}
-        update_patches = self.normalize_update_patches(
-            raw.get("update", {}).get("patches")
+        update_changes = self.normalize_update_changes(
+            raw.get("update", {}).get("changes")
             if isinstance(raw.get("update"), dict)
             else None
         )
         level_change, level_exp_after = self.calculate_level_progression(
             state,
-            update_patches,
+            update_changes,
         )
         target_name = self._clean_text(
             raw.get("target_name"),
@@ -40,23 +40,27 @@ class AdventureDiaryDomainService:
             result=self._clean_text(raw.get("result"), "安全归来，并整理了新的见闻。")[:220],
             level_change=level_change,
             level_exp_after=level_exp_after,
-            changes=self.normalize_changes(raw.get("changes", raw.get("rewards"))),
-            update_patches=update_patches,
+            reason=self.normalize_reason(
+                raw.get("update", {}).get("reason")
+                if isinstance(raw.get("update"), dict)
+                else None
+            ),
+            update_changes=update_changes,
             footer=self._clean_text(raw.get("footer"), "冒险记录已写入存档。")[:120],
         )
 
     def calculate_level_progression(
         self,
         state: dict,
-        patches: list[dict[str, Any]],
+        changes: list[dict[str, Any]],
     ) -> tuple[str, int]:
         start_level = self.get_current_level(state)
         level = start_level
         level_exp = self.get_level_exp(state)
         level_exp += sum(
-            self.patch_delta_value(patch.get("value"))
-            for patch in patches
-            if patch.get("op") == "+" and self.is_level_exp_path(patch.get("path"))
+            self.change_delta_value(change.get("value"))
+            for change in changes
+            if change.get("op") == "+" and self.is_level_exp_path(change.get("path"))
         )
         level_exp = max(0, level_exp)
         while level_exp >= 100 and level < 100:
@@ -107,7 +111,7 @@ class AdventureDiaryDomainService:
         }
 
     @staticmethod
-    def patch_delta_value(value: object) -> int:
+    def change_delta_value(value: object) -> int:
         try:
             return max(-100, min(int(value or 0), 100))
         except Exception:
@@ -118,29 +122,33 @@ class AdventureDiaryDomainService:
         return max(1, min(int(value), 100))
 
     @staticmethod
-    def normalize_changes(raw_changes: object) -> list[str]:
-        if not isinstance(raw_changes, list):
-            return ["见闻"]
-        changes = [str(item).strip()[:32] for item in raw_changes if str(item).strip()]
-        return changes[:6] or ["见闻"]
+    def normalize_reason(raw_reason: object) -> list[str]:
+        if not isinstance(raw_reason, list):
+            return []
+        reason: list[str] = []
+        for item in raw_reason:
+            text = str(item or "").strip()
+            if text:
+                reason.append(text[:120])
+        return reason[:6]
 
     @staticmethod
-    def normalize_update_patches(raw_patches: object) -> list[dict[str, Any]]:
-        if not isinstance(raw_patches, list):
+    def normalize_update_changes(raw_changes: object) -> list[dict[str, Any]]:
+        if not isinstance(raw_changes, list):
             return []
-        patches: list[dict[str, Any]] = []
-        for item in raw_patches:
+        changes: list[dict[str, Any]] = []
+        for item in raw_changes:
             if not isinstance(item, dict):
                 continue
             op = str(item.get("op") or "").strip()
             path = str(item.get("path") or "").strip()
             if op not in {"replace", "insert", "+", "-"} or not path.startswith("/"):
                 continue
-            patch: dict[str, Any] = {"op": op, "path": path}
+            change: dict[str, Any] = {"op": op, "path": path}
             if "value" in item:
-                patch["value"] = item.get("value")
-            patches.append(patch)
-        return patches[:20]
+                change["value"] = item.get("value")
+            changes.append(change)
+        return changes[:20]
 
     @staticmethod
     def _clean_text(value: object, default: object) -> str:

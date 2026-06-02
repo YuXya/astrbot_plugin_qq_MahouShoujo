@@ -144,20 +144,12 @@
       color: #343932;
     }
 
-    .changes {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 18px;
-    }
-
-    .change {
-      border: 1px solid rgba(191, 143, 60, 0.44);
-      background: rgba(255, 246, 220, 0.76);
-      color: #765d28;
+    .reason {
+      margin-top: 14px;
       font-size: 20px;
-      font-weight: 800;
-      padding: 9px 13px;
+      line-height: 1.5;
+      color: #765d28;
+      font-style: italic;
     }
 
     .footer {
@@ -336,11 +328,9 @@
     <section class="section">
       <div class="section-title">结算</div>
       <div class="text">{{ card.result }}</div>
-      <div class="changes">
-        {% for change in changes %}
-        <div class="change">{{ change }}</div>
-        {% endfor %}
-      </div>
+      {% if reason %}
+      <div class="reason">{{ reason | join('；') }}</div>
+      {% endif %}
     </section>
 
     <footer class="footer">{{ card.footer }}</footer>

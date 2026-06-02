@@ -234,13 +234,13 @@ class EditableResourceManager:
             ),
             "skill_book/default.json": (
                 "技能书文件。结构与世界书一致，冒险日记生成前会扫描玩家行动和日志，"
-                "命中条目后把技能说明注入 Prompt。base_path 是给 AI 输出 update.patches 的路径提示。"
+                "命中条目后把技能说明注入 Prompt。base_path 是给 AI 输出 update.changes 的路径提示。"
             ),
             "status_book/default.json": (
                 "状态书文件。条目标题代表全部可觉醒状态，content 是简单介绍，level_descriptions 是 Lv.1 到 Lv.Max"
                 " 的分级效果。已拥有状态只会注入简介和当前等级效果；\u201c总是注入\u201d的已拥有状态每次都会注入，"
                 "未拥有时会在待觉醒列表附带简单介绍。"
-                "状态最高 Lv.5；base_path 是给 AI 输出 update.patches 的路径提示。"
+                "状态最高 Lv.5；base_path 是给 AI 输出 update.changes 的路径提示。"
             ),
             "region_book/default.json": (
                 "区域书文件。暂时按世界书方式匹配：扫描文本命中条目后注入详细介绍。"
