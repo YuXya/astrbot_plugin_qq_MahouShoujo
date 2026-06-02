@@ -116,6 +116,10 @@ class QQAdventurer(Star):
     ) -> AsyncGenerator:
         """显示魔法少女插件的新手指引。用法：/魔法少女帮助"""
         event.should_call_llm(False)
+
+        if not self._is_group_event_allowed(event):
+            return
+
         yield event.plain_result(
             "\n".join(
                 [
@@ -150,6 +154,9 @@ class QQAdventurer(Star):
     ) -> AsyncGenerator:
         """删除触发者在当前群的魔法少女存档。用法：/魔法少女存档删除 确认"""
         event.should_call_llm(False)
+
+        if not self._is_group_event_allowed(event):
+            return
 
         group_id = self._get_group_id_from_event(event)
         if not group_id:
@@ -192,6 +199,9 @@ class QQAdventurer(Star):
     ) -> AsyncGenerator:
         """生成一张魔法少女转生人物卡。用法：/魔法少女转生"""
         event.should_call_llm(True)
+
+        if not self._is_group_event_allowed(event):
+            return
 
         group_id = self._get_group_id_from_event(event)
         if not group_id:
@@ -273,6 +283,9 @@ class QQAdventurer(Star):
     ) -> AsyncGenerator:
         """根据玩家存档生成一次完整的魔法少女冒险日记卡。用法：/魔法少女冒险 我要到森林里冒险"""
         event.should_call_llm(True)
+
+        if not self._is_group_event_allowed(event):
+            return
 
         group_id = self._get_group_id_from_event(event)
         if not group_id:
@@ -362,6 +375,21 @@ class QQAdventurer(Star):
             return str(group_id) if group_id else None
         except Exception:
             return None
+
+    def _is_group_event_allowed(self, event: AstrMessageEvent) -> bool:
+        """检查当前事件是否来自允许的群。不在名单中的群直接返回 False，不执行任何代码。"""
+        group_id = self._get_group_id_from_event(event)
+        if not group_id:
+            # 非群聊消息，放行（私聊不影响）
+            return True
+
+        # 优先使用 UMO 进行匹配
+        check_target = getattr(event, "unified_msg_origin", None)
+        if not check_target:
+            platform_id = self._get_platform_id_from_event(event)
+            check_target = f"{platform_id}:GroupMessage:{group_id}"
+
+        return self.config_manager.is_group_allowed(check_target)
 
     def _get_platform_id_from_event(self, event: AstrMessageEvent) -> str:
         try:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from ..utils.logger import logger
+
 
 class ConfigManager:
     def __init__(self, config):
@@ -11,6 +13,82 @@ class ConfigManager:
         except AttributeError:
             value = getattr(self.config, name, {})
         return value if isinstance(value, dict) else {}
+
+    # ========== 群聊权限 ==========
+
+    def get_group_list_mode(self) -> str:
+        """获取群组列表模式 (whitelist/blacklist/none)"""
+        return self._get_group("basic").get("group_list_mode", "none")
+
+    def get_group_list(self) -> list[str]:
+        """获取群组列表（用于黑白名单）"""
+        return self._get_group("basic").get("group_list", [])
+
+    def is_group_allowed(self, group_id_or_umo: str) -> bool:
+        """
+        根据配置的白/黑名单判断是否允许在该群聊中使用。
+        支持传入 simple group_id 或 UMO (Unified Message Origin)。
+        """
+        mode = self.get_group_list_mode().lower()
+        if mode not in ("whitelist", "blacklist", "none"):
+            mode = "none"
+
+        if mode == "none":
+            return True
+
+        glist = [str(g).strip() for g in self.get_group_list()]
+        target = str(group_id_or_umo).strip()
+
+        is_in_list = any(self._is_group_match(target, item) for item in glist)
+
+        if mode == "whitelist":
+            return is_in_list
+        if mode == "blacklist":
+            return not is_in_list
+
+        return True
+
+    def _is_group_match(self, target: str, item: str) -> bool:
+        """
+        核心匹配逻辑：判断名单中的 item 是否匹配目标的 target (UMO 或纯 ID)。
+        支持完整会话ID、纯群号、以及 Telegram 话题(#)/隔离(_) 的穿透匹配。
+        """
+        if item == target:
+            return True
+
+        # 分解目标 UMO 的前缀和 ID 部分
+        if ":" in target:
+            target_prefix, target_id = target.rsplit(":", 1)
+        else:
+            target_prefix, target_id = "", target
+
+        # 生成目标 ID 的所有"穿透"候选
+        candidates = {target_id}
+        if "#" in target_id:
+            candidates.add(target_id.split("#", 1)[0])
+        if "_" in target_id:
+            for part in target_id.split("_"):
+                candidates.add(part)
+
+        # 检查名单项的格式
+        if ":" in item:
+            i_prefix, i_id = item.rsplit(":", 1)
+            if target_prefix and i_prefix != target_prefix:
+                return False
+        else:
+            i_id = item
+
+        # 名单项 ID 也可能包含复合形式，需要拆解匹配
+        item_variants = {i_id}
+        if "#" in i_id:
+            item_variants.add(i_id.split("#", 1)[0])
+        if "_" in i_id:
+            for part in i_id.split("_"):
+                item_variants.add(part)
+
+        return not item_variants.isdisjoint(candidates)
+
+    # ========== LLM 设置 ==========
 
     def get_llm_provider_id(self) -> str:
         return str(self._get_group("llm").get("llm_provider_id", "")).strip()
