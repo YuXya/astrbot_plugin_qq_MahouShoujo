@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..utils.logger import logger
+from ...utils.logger import logger
 
 
 class ConfigManager:
