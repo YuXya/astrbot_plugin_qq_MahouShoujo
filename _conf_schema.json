@@ -13,7 +13,7 @@
           "none"
         ],
         "default": "none",
-        "hint": "先决定"哪些群可以用这个插件"。这是第一道门槛：不通过这里，所有命令都不会响应。whitelist=只允许列表里的群；blacklist=屏蔽列表里的群；none=所有群都可以。示例：whitelist + [\"onebot:GroupMessage:123456\"] 表示只有这个群能用。"
+        "hint": "先决定「哪些群可以用这个插件」。这是第一道门槛：不通过这里，所有命令都不会响应。whitelist=只允许列表里的群；blacklist=屏蔽列表里的群；none=所有群都可以。示例：whitelist + [\"onebot:GroupMessage:123456\"] 表示只有这个群能用。"
       },
       "group_list": {
         "type": "list",
