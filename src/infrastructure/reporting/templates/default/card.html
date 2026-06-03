@@ -175,13 +175,11 @@
       place-items: center;
       justify-self: end;
       border-radius: 50%;
+      padding: 3px;
       color: #fff;
       font-family: Georgia, serif;
       font-size: 56px;
-      background:
-        radial-gradient(circle at 50% 42%, #fff 0 10%, transparent 11%),
-        conic-gradient(from 18deg, var(--rose), var(--gold-light), var(--aqua), var(--lilac), var(--rose));
-      clip-path: polygon(50% 0, 61% 29%, 93% 20%, 72% 48%, 100% 67%, 64% 68%, 50% 100%, 36% 68%, 0 67%, 28% 48%, 7% 20%, 39% 29%);
+      background: conic-gradient(from 18deg, var(--rose), var(--gold-light), var(--aqua), var(--lilac), var(--rose));
       filter: drop-shadow(0 16px 20px rgba(185, 47, 104, 0.24));
     }
 
@@ -190,7 +188,7 @@
       height: 100%;
       object-fit: cover;
       display: block;
-      clip-path: inherit;
+      border-radius: 50%;
     }
 
     .sections {
@@ -316,7 +314,8 @@
       font-weight: 900;
       line-height: 1.25;
       text-align: center;
-      white-space: nowrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
     }
 
     .info-value {
