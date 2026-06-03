@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import AsyncGenerator
 
 from astrbot.api import AstrBotConfig
@@ -28,6 +29,24 @@ from .src.infrastructure.reporting.generators import ReportGenerator
 from .src.infrastructure.storage import PlayerSaveRepository, PlayerTaskQueue
 from .src.infrastructure.web import SaveWebViewer
 from .src.utils.logger import logger
+
+REINCARNATION_FIELDS = [
+    "姓名", "性格特质", "初始性癖", "使魔种类",
+    "与主角关系", "代表色", "核心能力", "外貌描述", "其他设定",
+]
+
+REINCARNATION_TEMPLATE = (
+    "/魔法少女转生\n"
+    "姓名：\n"
+    "性格特质：\n"
+    "初始性癖：\n"
+    "使魔种类：\n"
+    "与主角关系：\n"
+    "代表色：\n"
+    "核心能力：\n"
+    "外貌描述：\n"
+    "其他设定："
+)
 
 
 class QQMahouShoujo(Star):
@@ -128,8 +147,12 @@ class QQMahouShoujo(Star):
                     "玩家可使用指令：",
                     "1. /魔法少女转生",
                     "   创建你的魔法少女角色档案。",
-                    "   可以在命令后填写补充偏好，影响角色设定。",
-                    "   示例：/魔法少女转生 想要成为白毛红瞳双马尾小萝莉",
+                    "   请按指定格式填写角色设定，至少填写3项属性。",
+                    "   示例：",
+                    "   /魔法少女转生",
+                    "   姓名：星野梦美",
+                    "   性格特质：温柔内敛",
+                    "   代表色：星空蓝",
                     "",
                     "2. /魔法少女冒险",
                     "   根据你的角色档案、当前状态和最近记录，生成一次冒险日记。",
@@ -198,7 +221,6 @@ class QQMahouShoujo(Star):
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
         """生成一张魔法少女转生人物卡。用法：/魔法少女转生"""
-        event.should_call_llm(True)
 
         if not self._is_group_event_allowed(event):
             return
@@ -216,7 +238,29 @@ class QQMahouShoujo(Star):
         if await self.player_queue.is_locked(group_id, user_id):
             yield event.plain_result("你的上一条魔法少女请求还在处理，已经进入队列，马上轮到你。")
 
-        preference_text = self._extract_command_tail(event, "魔法少女转生")
+        # 提取命令后的完整文本（支持多行格式）
+        raw_text = self._extract_reincarnation_text(event)
+
+        # 解析结构化字段
+        parsed_fields = self._parse_reincarnation_fields(raw_text)
+        filled_count = len(parsed_fields)
+
+        # 至少需要 3 个字段，否则返回模板
+        if filled_count < 3:
+            event.should_call_llm(False)
+            if raw_text and filled_count > 0:
+                message = (
+                    f"填写信息不足（已填写 {filled_count}/9 项，至少需要 3 项），"
+                    f"请按以下格式重新发送：\n\n{REINCARNATION_TEMPLATE}"
+                )
+            else:
+                message = f"请按以下格式填写转生信息：\n\n{REINCARNATION_TEMPLATE}"
+            yield event.plain_result(message)
+            return
+
+        # 通过验证，将结构化字段拼接为 preference_text 发给 AI
+        event.should_call_llm(True)
+        preference_text = "\n".join(f"{k}：{v}" for k, v in parsed_fields.items())
 
         async with self.player_queue.lock_for(group_id, user_id):
             async for result in self._run_reincarnation(
@@ -236,9 +280,9 @@ class QQMahouShoujo(Star):
     ) -> AsyncGenerator:
         nickname = self._get_sender_name_from_event(event)
         if preference_text:
-            progress = "已读取本次转生偏好"
+            progress = "已读取转生自定义设定"
         else:
-            progress = "未填写补充偏好，将按默认设定生成"
+            progress = "未填写自定义设定，将按默认设定生成"
         yield event.plain_result(f"{progress}，准备转生人物卡...")
 
         umo = getattr(event, "unified_msg_origin", None)
@@ -421,6 +465,42 @@ class QQMahouShoujo(Star):
                 except Exception:
                     pass
         return None
+
+    @staticmethod
+    def _extract_reincarnation_text(event: AstrMessageEvent) -> str:
+        """提取转生命令后的完整文本（支持空格或换行分隔的多行格式）"""
+        try:
+            text = event.get_message_str()
+        except Exception:
+            text = getattr(event, "message_str", "")
+        text = str(text or "").strip()
+
+        prefixes = ["/魔法少女转生", "／魔法少女转生", "魔法少女转生"]
+        for prefix in prefixes:
+            if text == prefix:
+                return ""
+            if text.startswith(prefix):
+                remaining = text[len(prefix):]
+                return remaining.strip()
+        return ""
+
+    @staticmethod
+    def _parse_reincarnation_fields(text: str) -> dict[str, str]:
+        """解析玩家填写的转生表单字段，返回已填写的字段字典"""
+        if not text:
+            return {}
+
+        fields = {}
+        for field_name in REINCARNATION_FIELDS:
+            other_fields = [re.escape(f) for f in REINCARNATION_FIELDS if f != field_name]
+            lookahead = "|".join(other_fields) if other_fields else "$"
+            pattern = rf'{re.escape(field_name)}[：:]\s*(.*?)(?=(?:{lookahead})[：:]|$)'
+            match = re.search(pattern, text, re.DOTALL)
+            if match:
+                value = match.group(1).strip()
+                if value:
+                    fields[field_name] = value
+        return fields
 
     @staticmethod
     def _extract_command_tail(event: AstrMessageEvent, command_name: str) -> str:
