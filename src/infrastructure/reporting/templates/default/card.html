@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=1920, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <style>
     :root {
       --ink: #3d1f2e;
@@ -15,6 +16,10 @@
       --gold-light: #f5e6c8;
       --section-bg: rgba(255, 255, 255, 0.55);
       --section-border: rgba(232, 96, 138, 0.3);
+      --row-height: 42px;
+      --label-width: 80px;
+      --icon-width: 22px;
+      --value-font: 14px;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -23,8 +28,8 @@
       width: 1920px;
       min-width: 1920px;
       max-width: 1920px;
-      min-height: 1080px;
-      overflow-x: hidden;
+      height: 1080px;
+      overflow: hidden;
     }
 
     body {
@@ -35,7 +40,6 @@
         radial-gradient(ellipse at 80% 15%, rgba(212, 166, 90, 0.2), transparent 35%),
         radial-gradient(ellipse at 50% 85%, rgba(255, 211, 223, 0.6), transparent 45%),
         linear-gradient(170deg, #fff0f5 0%, #ffe8ef 30%, #ffd3df 60%, #ffc8d9 100%);
-      padding: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -56,8 +60,8 @@
     .card {
       position: relative;
       width: 1920px;
-      min-height: 1080px;
-      padding: 44px 52px;
+      height: 1080px;
+      padding: 40px 48px 20px;
       z-index: 1;
       display: flex;
       flex-direction: column;
@@ -67,7 +71,7 @@
     .card::before {
       content: "";
       position: absolute;
-      inset: 20px;
+      inset: 18px;
       border: 2px solid rgba(232, 96, 138, 0.25);
       border-radius: 12px;
       pointer-events: none;
@@ -75,7 +79,7 @@
     .card::after {
       content: "";
       position: absolute;
-      inset: 28px;
+      inset: 26px;
       border: 1px solid rgba(212, 166, 90, 0.2);
       border-radius: 10px;
       pointer-events: none;
@@ -84,73 +88,74 @@
     /* ── 角落装饰 ── */
     .corner {
       position: absolute;
-      width: 44px;
-      height: 44px;
+      width: 40px;
+      height: 40px;
       border-color: var(--gold);
       border-style: solid;
       opacity: 0.45;
       z-index: 2;
     }
-    .corner.tl { top: 30px; left: 30px; border-width: 2px 0 0 2px; border-radius: 6px 0 0 0; }
-    .corner.tr { top: 30px; right: 30px; border-width: 2px 2px 0 0; border-radius: 0 6px 0 0; }
-    .corner.bl { bottom: 30px; left: 30px; border-width: 0 0 2px 2px; border-radius: 0 0 0 6px; }
-    .corner.br { bottom: 30px; right: 30px; border-width: 0 2px 2px 0; border-radius: 0 0 6px 0; }
+    .corner.tl { top: 28px; left: 28px; border-width: 2px 0 0 2px; border-radius: 6px 0 0 0; }
+    .corner.tr { top: 28px; right: 28px; border-width: 2px 2px 0 0; border-radius: 0 6px 0 0; }
+    .corner.bl { bottom: 28px; left: 28px; border-width: 0 0 2px 2px; border-radius: 0 0 0 6px; }
+    .corner.br { bottom: 28px; right: 28px; border-width: 0 2px 2px 0; border-radius: 0 0 6px 0; }
 
     /* ── 标题区 ── */
     .title-area {
       text-align: center;
-      padding: 28px 0 34px;
+      padding: 16px 0 20px;
       position: relative;
+      flex-shrink: 0;
     }
 
     .title-deco {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 18px;
-      margin-bottom: 12px;
+      gap: 16px;
+      margin-bottom: 8px;
     }
 
     .title-deco .line {
-      width: 88px;
+      width: 72px;
       height: 1px;
       background: linear-gradient(90deg, transparent, var(--gold), transparent);
     }
 
     .title-deco .star {
-      font-size: 20px;
+      font-size: 16px;
       color: var(--gold);
     }
 
     .title-eyebrow {
-      font-size: 16px;
-      letter-spacing: 9px;
+      font-size: 13px;
+      letter-spacing: 8px;
       color: var(--muted);
       font-weight: 400;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       text-transform: uppercase;
     }
 
     h1 {
-      font-size: 52px;
+      font-size: 42px;
       font-weight: 900;
       color: var(--pink-deep);
-      letter-spacing: 5px;
-      line-height: 1.2;
+      letter-spacing: 4px;
+      line-height: 1.15;
       text-shadow: 0 2px 6px rgba(232, 96, 138, 0.15);
     }
 
     .title-divider {
-      width: 260px;
+      width: 220px;
       height: 2px;
-      margin: 20px auto 0;
+      margin: 14px auto 0;
       background: linear-gradient(90deg, transparent, var(--pink), var(--gold), var(--pink), transparent);
       border-radius: 1px;
     }
 
     .player-name-line {
-      margin-top: 14px;
-      font-size: 18px;
+      margin-top: 10px;
+      font-size: 15px;
       color: var(--muted);
       font-weight: 400;
       letter-spacing: 2px;
@@ -159,15 +164,17 @@
     /* ── 双列内容区 ── */
     .columns {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
+      grid-template-columns: 2fr 5fr;
+      gap: 20px;
       flex: 1;
+      min-height: 0;
     }
 
     .column {
       display: flex;
       flex-direction: column;
-      gap: 22px;
+      gap: 14px;
+      min-height: 0;
     }
 
     /* ── 分组区块 ── */
@@ -175,84 +182,108 @@
       background: var(--section-bg);
       border: 1px solid var(--section-border);
       border-radius: 10px;
-      padding: 20px 22px;
+      padding: 16px 18px;
       backdrop-filter: blur(4px);
+    }
+
+    /* 左列个人信息独占，底部留白 */
+    .column-left .section {
+      flex-shrink: 0;
     }
 
     .section-header {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 16px;
-      padding-bottom: 10px;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
       border-bottom: 1px solid rgba(232, 96, 138, 0.18);
     }
 
     .section-icon {
-      width: 26px;
-      height: 26px;
+      width: 22px;
+      height: 22px;
       border-radius: 50%;
       background: linear-gradient(135deg, var(--pink-light), var(--pink));
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
+      font-size: 10px;
       color: #fff;
-      font-weight: 700;
       flex-shrink: 0;
     }
 
     .section-title {
-      font-size: 22px;
+      font-size: 16px;
       font-weight: 800;
       color: var(--pink);
       letter-spacing: 2px;
     }
 
-    /* ── 信息行 ── */
+    /* ── 信息行：固定高度两行，居中 ── */
     .info-row {
       display: flex;
-      align-items: baseline;
-      padding: 7px 0;
-      border-bottom: 1px dashed rgba(232, 96, 138, 0.1);
+      align-items: center;
+      height: var(--row-height);
+      border-bottom: 1px dashed rgba(232, 96, 138, 0.08);
+      overflow: hidden;
     }
 
     .info-row:last-child {
       border-bottom: none;
-      padding-bottom: 0;
+    }
+
+    .info-icon {
+      width: var(--icon-width);
+      flex-shrink: 0;
+      text-align: center;
+      font-size: 11px;
+      color: var(--pink);
+      opacity: 0.75;
     }
 
     .info-label {
       flex-shrink: 0;
-      width: 100px;
-      font-size: 16px;
+      width: var(--label-width);
+      font-size: 13px;
       color: var(--muted);
       font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .info-value {
-      font-size: 16px;
+      flex: 1;
+      font-size: var(--value-font);
       color: var(--ink);
-      font-weight: 700;
+      font-weight: 600;
       line-height: 1.5;
+      /* 最多两行，超出隐藏 */
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* ── 页脚 ── */
     .footer-area {
       text-align: center;
-      padding: 28px 0 14px;
+      padding: 12px 0 6px;
       position: relative;
+      flex-shrink: 0;
     }
 
     .footer-divider {
-      width: 200px;
+      width: 160px;
       height: 1px;
-      margin: 0 auto 14px;
+      margin: 0 auto 8px;
       background: linear-gradient(90deg, transparent, var(--gold), transparent);
     }
 
     .footer-text {
-      font-size: 14px;
+      font-size: 12px;
       color: var(--muted);
       letter-spacing: 3px;
       opacity: 0.7;
@@ -285,30 +316,30 @@
 
     <!-- 双列信息区 -->
     <div class="columns">
-      <!-- 左列 -->
-      <div class="column">
-        <!-- 个人信息 -->
+      <!-- 左列：仅个人信息 -->
+      <div class="column column-left">
         <div class="section">
           <div class="section-header">
-            <div class="section-icon">P</div>
+            <div class="section-icon"><i class="fa-solid fa-id-card fa-xs"></i></div>
             <div class="section-title">个人信息</div>
           </div>
           {% for item in card.info if item.path.startswith('/主角/个人信息/') and item.path != '/主角/个人信息/魔法少女名' %}
           <div class="info-row">
-            <div class="info-label">{{ item.field }}</div>
-            <div class="info-value">{{ item.description }}</div>
-          </div>
-          {% endfor %}
-        </div>
-
-        <!-- 相貌特征 -->
-        <div class="section">
-          <div class="section-header">
-            <div class="section-icon">A</div>
-            <div class="section-title">相貌特征</div>
-          </div>
-          {% for item in card.info if item.path.startswith('/主角/相貌特征/') %}
-          <div class="info-row">
+            <div class="info-icon"><i class="fa-solid fa-{{ {
+              '年龄': 'cake-candles',
+              '身份': 'user-tie',
+              '性格': 'masks-theater',
+              '代表色': 'palette',
+              '使魔': 'paw',
+              '强度': 'burst',
+              '武装': 'gavel',
+              '变身服': 'shirt',
+              '核心能力': 'bolt',
+              '契约': 'file-contract',
+              '愿望': 'star',
+              '魔力': 'hat-wizard',
+              '属性': 'fire',
+            }.get(item.field, 'circle') }}"></i></div>
             <div class="info-label">{{ item.field }}</div>
             <div class="info-value">{{ item.description }}</div>
           </div>
@@ -316,16 +347,46 @@
         </div>
       </div>
 
-      <!-- 右列 -->
+      <!-- 右列：其余所有分组 -->
       <div class="column">
+        <!-- 相貌特征 -->
+        <div class="section">
+          <div class="section-header">
+            <div class="section-icon"><i class="fa-solid fa-palette fa-xs"></i></div>
+            <div class="section-title">相貌特征</div>
+          </div>
+          {% for item in card.info if item.path.startswith('/主角/相貌特征/') %}
+          <div class="info-row">
+            <div class="info-icon"><i class="fa-solid fa-{{ {
+              '脸型': 'face-smile',
+              '五官': 'eye',
+              '发型': 'wind',
+              '眼睛': 'eye-dropper',
+              '肤色': 'droplet',
+            }.get(item.field, 'circle') }}"></i></div>
+            <div class="info-label">{{ item.field }}</div>
+            <div class="info-value">{{ item.description }}</div>
+          </div>
+          {% endfor %}
+        </div>
+
         <!-- 身材细节 -->
         <div class="section">
           <div class="section-header">
-            <div class="section-icon">F</div>
+            <div class="section-icon"><i class="fa-solid fa-ruler fa-xs"></i></div>
             <div class="section-title">身材细节</div>
           </div>
           {% for item in card.info if item.path.startswith('/主角/身材细节/') %}
           <div class="info-row">
+            <div class="info-icon"><i class="fa-solid fa-{{ {
+              '身高': 'ruler-vertical',
+              '三围': 'ruler-combined',
+              '体态': 'person-walking',
+              '皮肤': 'feather',
+              '皮肤状态': 'feather',
+              '肌肉': 'dumbbell',
+              '肌肉线条': 'dumbbell',
+            }.get(item.field, 'circle') }}"></i></div>
             <div class="info-label">{{ item.field }}</div>
             <div class="info-value">{{ item.description }}</div>
           </div>
@@ -335,11 +396,19 @@
         <!-- 性器官特征 -->
         <div class="section">
           <div class="section-header">
-            <div class="section-icon">S</div>
+            <div class="section-icon"><i class="fa-solid fa-gem fa-xs"></i></div>
             <div class="section-title">性器官特征</div>
           </div>
           {% for item in card.info if item.path.startswith('/主角/性器官特征/') %}
           <div class="info-row">
+            <div class="info-icon"><i class="fa-solid fa-{{ {
+              '乳房': 'venus',
+              '乳首': 'circle-dot',
+              '阴唇': 'fan',
+              '体毛': 'leaf',
+              '敏感度': 'bolt-lightning',
+              '阴道': 'lock',
+            }.get(item.field, 'circle') }}"></i></div>
             <div class="info-label">{{ item.field }}</div>
             <div class="info-value">{{ item.description }}</div>
           </div>
