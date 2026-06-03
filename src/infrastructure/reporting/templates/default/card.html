@@ -18,6 +18,7 @@
       --glass-strong: rgba(255, 255, 255, 0.84);
       --line: rgba(185, 47, 104, 0.18);
       --row-h: 42px;
+      --profile-row-h: 50px;
     }
 
     * {
@@ -148,7 +149,7 @@
 
     .header {
       position: relative;
-      height: 166px;
+      height: 154px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -159,7 +160,9 @@
     .crest {
       width: 88px;
       height: 88px;
-      margin-bottom: -6px;
+      position: absolute;
+      top: 18px;
+      right: 138px;
       display: grid;
       place-items: center;
       color: #fff;
@@ -173,6 +176,7 @@
     }
 
     .eyebrow {
+      margin-bottom: 8px;
       font-size: 13px;
       font-weight: 700;
       color: var(--soft-ink);
@@ -183,7 +187,7 @@
 
     h1 {
       max-width: 1240px;
-      margin-top: 8px;
+      margin-top: 0;
       font-size: 54px;
       font-weight: 900;
       line-height: 1.06;
@@ -199,10 +203,10 @@
 
     .layout {
       position: relative;
-      height: 846px;
+      height: 858px;
       display: grid;
-      grid-template-columns: 520px 1fr 1fr;
-      grid-template-rows: 380px 1fr;
+      grid-template-columns: 470px 760px 470px;
+      grid-template-rows: 392px 1fr;
       gap: 22px;
       padding: 4px 8px 0;
     }
@@ -246,30 +250,39 @@
     }
 
     .profile {
+      grid-column: 2;
       grid-row: 1 / 3;
     }
 
     .appearance {
-      grid-column: 2;
+      grid-column: 1;
       grid-row: 1;
     }
 
     .body-detail {
-      grid-column: 2;
+      grid-column: 1;
       grid-row: 2;
     }
 
     .intimate {
       grid-column: 3;
-      grid-row: 1;
+      grid-row: 1 / 3;
+    }
+
+    .intimate .seal {
+      position: absolute;
+      left: 50%;
+      bottom: 70px;
+      transform: translateX(-50%);
+      width: 286px;
+      height: 286px;
+      opacity: 0.92;
     }
 
     .seal-panel {
       grid-column: 3;
       grid-row: 2;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: none;
       min-height: 0;
       background:
         radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.36) 46%, transparent 47%),
@@ -353,7 +366,7 @@
       min-width: 0;
       height: var(--row-h);
       display: grid;
-      grid-template-columns: 30px 88px minmax(0, 1fr);
+      grid-template-columns: 30px 82px minmax(0, 1fr);
       align-items: center;
       column-gap: 10px;
       padding: 0 12px;
@@ -405,12 +418,21 @@
       -webkit-box-orient: vertical;
     }
 
+    .profile .rows {
+      grid-auto-rows: var(--profile-row-h);
+      gap: 4px;
+    }
+
     .profile .info-row {
-      grid-template-columns: 30px 86px minmax(0, 1fr);
+      height: var(--profile-row-h);
+      grid-template-columns: 30px 96px minmax(0, 1fr);
     }
 
     .profile .info-value {
+      max-height: 45px;
       font-size: 15px;
+      line-height: 15px;
+      -webkit-line-clamp: 3;
     }
   </style>
 </head>
@@ -433,7 +455,7 @@
       <div class="crest">✦</div>
       <div class="eyebrow">MAGICAL GIRL IDENTITY</div>
       <h1>
-        魔法少女
+        魔法少女&nbsp;
         {%- for item in card.info if item.path == '/主角/个人信息/魔法少女名' -%}
           {{ item.description }}
         {%- endfor -%}
@@ -449,7 +471,24 @@
         <div class="rows">
           {% for item in card.info if item.path.startswith('/主角/个人信息/') and item.path != '/主角/个人信息/魔法少女名' %}
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">{{ {
+              '姓名': '✒',
+              '年龄': '⌛',
+              '身份': '♛',
+              '身份&职业': '♛',
+              '性格': '☯',
+              '性格特质': '☯',
+              '代表色': '◈',
+              '使魔': '♢',
+              '强度': '✹',
+              '武装': '⚔',
+              '变身服': '✧',
+              '核心能力': '✺',
+              '契约': '§',
+              '愿望': '☆',
+              '魔力': '✦',
+              '属性': '◆',
+            }.get(item.field, '✦') }}</div>
             <div class="info-label">{{ item.field }}</div>
             <div class="info-value">{{ item.description }}</div>
           </div>
@@ -465,7 +504,13 @@
         <div class="rows">
           {% for item in card.info if item.path.startswith('/主角/相貌特征/') %}
           <div class="info-row">
-            <div class="info-icon">✧</div>
+            <div class="info-icon">{{ {
+              '脸型': '◌',
+              '五官': '✣',
+              '发型': '〰',
+              '眼睛': '◉',
+              '肤色': '◍',
+            }.get(item.field, '✧') }}</div>
             <div class="info-label">{{ item.field }}</div>
             <div class="info-value">{{ item.description }}</div>
           </div>
@@ -481,7 +526,15 @@
         <div class="rows">
           {% for item in card.info if item.path.startswith('/主角/身材细节/') %}
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">{{ {
+              '身高': '↕',
+              '三围': '◇',
+              '体态': '⌁',
+              '皮肤': '◌',
+              '皮肤状态': '◍',
+              '肌肉': '△',
+              '肌肉线条': '≋',
+            }.get(item.field, '✦') }}</div>
             <div class="info-label">{{ item.field }}</div>
             <div class="info-value">{{ item.description }}</div>
           </div>
@@ -497,12 +550,20 @@
         <div class="rows">
           {% for item in card.info if item.path.startswith('/主角/性器官特征/') %}
           <div class="info-row">
-            <div class="info-icon">✧</div>
+            <div class="info-icon">{{ {
+              '乳房': '♡',
+              '乳首': '⊙',
+              '阴唇': '❧',
+              '体毛': '♧',
+              '敏感度': '✺',
+              '阴道': '◇',
+            }.get(item.field, '✧') }}</div>
             <div class="info-label">{{ item.field }}</div>
             <div class="info-value">{{ item.description }}</div>
           </div>
           {% endfor %}
         </div>
+        <div class="seal" aria-hidden="true">✦</div>
       </div>
 
       <div class="section seal-panel" aria-hidden="true">

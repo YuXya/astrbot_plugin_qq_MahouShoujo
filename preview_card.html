@@ -18,6 +18,7 @@
       --glass-strong: rgba(255, 255, 255, 0.84);
       --line: rgba(185, 47, 104, 0.18);
       --row-h: 42px;
+      --profile-row-h: 50px;
     }
 
     * {
@@ -148,7 +149,7 @@
 
     .header {
       position: relative;
-      height: 166px;
+      height: 154px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -159,7 +160,9 @@
     .crest {
       width: 88px;
       height: 88px;
-      margin-bottom: -6px;
+      position: absolute;
+      top: 18px;
+      right: 138px;
       display: grid;
       place-items: center;
       color: #fff;
@@ -173,6 +176,7 @@
     }
 
     .eyebrow {
+      margin-bottom: 8px;
       font-size: 13px;
       font-weight: 700;
       color: var(--soft-ink);
@@ -183,7 +187,7 @@
 
     h1 {
       max-width: 1240px;
-      margin-top: 8px;
+      margin-top: 0;
       font-size: 54px;
       font-weight: 900;
       line-height: 1.06;
@@ -199,10 +203,10 @@
 
     .layout {
       position: relative;
-      height: 846px;
+      height: 858px;
       display: grid;
-      grid-template-columns: 520px 1fr 1fr;
-      grid-template-rows: 380px 1fr;
+      grid-template-columns: 470px 760px 470px;
+      grid-template-rows: 392px 1fr;
       gap: 22px;
       padding: 4px 8px 0;
     }
@@ -246,30 +250,39 @@
     }
 
     .profile {
+      grid-column: 2;
       grid-row: 1 / 3;
     }
 
     .appearance {
-      grid-column: 2;
+      grid-column: 1;
       grid-row: 1;
     }
 
     .body-detail {
-      grid-column: 2;
+      grid-column: 1;
       grid-row: 2;
     }
 
     .intimate {
       grid-column: 3;
-      grid-row: 1;
+      grid-row: 1 / 3;
+    }
+
+    .intimate .seal {
+      position: absolute;
+      left: 50%;
+      bottom: 70px;
+      transform: translateX(-50%);
+      width: 286px;
+      height: 286px;
+      opacity: 0.92;
     }
 
     .seal-panel {
       grid-column: 3;
       grid-row: 2;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: none;
       min-height: 0;
       background:
         radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.36) 46%, transparent 47%),
@@ -353,7 +366,7 @@
       min-width: 0;
       height: var(--row-h);
       display: grid;
-      grid-template-columns: 30px 88px minmax(0, 1fr);
+      grid-template-columns: 30px 82px minmax(0, 1fr);
       align-items: center;
       column-gap: 10px;
       padding: 0 12px;
@@ -405,12 +418,21 @@
       -webkit-box-orient: vertical;
     }
 
+    .profile .rows {
+      grid-auto-rows: var(--profile-row-h);
+      gap: 4px;
+    }
+
     .profile .info-row {
-      grid-template-columns: 30px 86px minmax(0, 1fr);
+      height: var(--profile-row-h);
+      grid-template-columns: 30px 96px minmax(0, 1fr);
     }
 
     .profile .info-value {
+      max-height: 45px;
       font-size: 15px;
+      line-height: 15px;
+      -webkit-line-clamp: 3;
     }
   </style>
 </head>
@@ -444,62 +466,62 @@
         </div>
         <div class="rows">
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">✒</div>
             <div class="info-label">姓名</div>
             <div class="info-value">星野铃音</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">⌛</div>
             <div class="info-label">年龄</div>
             <div class="info-value">16岁</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">♛</div>
             <div class="info-label">身份</div>
             <div class="info-value">月辉学园二年级生，放学后守护街区结界</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">☯</div>
             <div class="info-label">性格</div>
             <div class="info-value">温柔坚定，遇到危机时会变得格外冷静</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">◈</div>
             <div class="info-label">代表色</div>
             <div class="info-value">蔷薇粉与星尘金</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">♢</div>
             <div class="info-label">使魔</div>
             <div class="info-value">会说话的水晶兔露娜</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">✹</div>
             <div class="info-label">强度</div>
             <div class="info-value">新星级，爆发时可短暂进入满月形态</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">⚔</div>
             <div class="info-label">武装</div>
             <div class="info-value">月辉法杖，可展开星环护盾</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">✧</div>
             <div class="info-label">变身服</div>
             <div class="info-value">层叠纱裙、金色星扣、透明披肩与银白长靴</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">✺</div>
             <div class="info-label">核心能力</div>
             <div class="info-value">以月光净化污秽，将碎裂的情绪编成守护结晶</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">§</div>
             <div class="info-label">契约</div>
             <div class="info-value">守护重要之人的笑容</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">☆</div>
             <div class="info-label">愿望</div>
             <div class="info-value">让失去光芒的夜晚重新拥有星星</div>
           </div>
@@ -509,7 +531,7 @@
             <div class="info-value">柔和但延展性极强，适合防御与净化</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">◆</div>
             <div class="info-label">属性</div>
             <div class="info-value">月光、蔷薇、结晶</div>
           </div>
@@ -523,29 +545,29 @@
         </div>
         <div class="rows">
           <div class="info-row">
-            <div class="info-icon">✧</div>
+            <div class="info-icon">◌</div>
             <div class="info-label">脸型</div>
-            <div class="info-value">小巧柔和的鹅蛋脸，笑起来有浅浅酒窝</div>
+            <div class="info-value">小巧柔和的鹅蛋脸</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✧</div>
+            <div class="info-icon">✣</div>
             <div class="info-label">五官</div>
-            <div class="info-value">眉眼清亮，鼻梁秀气，唇色像淡樱果冻</div>
+            <div class="info-value">眉眼清亮，鼻梁秀气</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✧</div>
+            <div class="info-icon">〰</div>
             <div class="info-label">发型</div>
-            <div class="info-value">银粉渐变长发，变身后会浮起星屑发尾</div>
+            <div class="info-value">银粉渐变长发</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✧</div>
+            <div class="info-icon">◉</div>
             <div class="info-label">眼睛</div>
-            <div class="info-value">紫罗兰色瞳孔，虹膜里有月牙般高光</div>
+            <div class="info-value">紫罗兰色瞳孔</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✧</div>
+            <div class="info-icon">◍</div>
             <div class="info-label">肤色</div>
-            <div class="info-value">白皙透亮，带一点健康的玫瑰色</div>
+            <div class="info-value">白皙透亮</div>
           </div>
         </div>
       </div>
@@ -557,39 +579,39 @@
         </div>
         <div class="rows">
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">↕</div>
             <div class="info-label">身高</div>
             <div class="info-value">158cm</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">◇</div>
             <div class="info-label">三围</div>
-            <div class="info-value">纤细匀称，整体线条轻盈</div>
+            <div class="info-value">纤细匀称</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">⌁</div>
             <div class="info-label">体态</div>
-            <div class="info-value">站姿端正，动作像跳舞一样轻快</div>
+            <div class="info-value">站姿端正</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">◌</div>
             <div class="info-label">皮肤</div>
-            <div class="info-value">细腻柔软，魔力流动时泛起微光</div>
+            <div class="info-value">细腻柔软</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">◍</div>
             <div class="info-label">皮肤状态</div>
-            <div class="info-value">无明显瑕疵，战斗后会留下短暂星纹</div>
+            <div class="info-value">无明显瑕疵</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">△</div>
             <div class="info-label">肌肉</div>
-            <div class="info-value">薄而有韧性，爆发力隐藏在轻盈动作里</div>
+            <div class="info-value">薄而有韧性</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✦</div>
+            <div class="info-icon">≋</div>
             <div class="info-label">肌肉线条</div>
-            <div class="info-value">肩颈与小腿线条清晰但不夸张</div>
+            <div class="info-value">清晰但不夸张</div>
           </div>
         </div>
       </div>
@@ -601,36 +623,37 @@
         </div>
         <div class="rows">
           <div class="info-row">
-            <div class="info-icon">✧</div>
+            <div class="info-icon">♡</div>
             <div class="info-label">乳房</div>
-            <div class="info-value">设定项示例：请按你的实际生成内容替换</div>
+            <div class="info-value">设定项示例</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✧</div>
+            <div class="info-icon">⊙</div>
             <div class="info-label">乳首</div>
-            <div class="info-value">设定项示例：固定两行，过长会自动裁切</div>
+            <div class="info-value">设定项示例</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✧</div>
+            <div class="info-icon">❧</div>
             <div class="info-label">阴唇</div>
-            <div class="info-value">设定项示例：信息居中显示</div>
+            <div class="info-value">设定项示例</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✧</div>
+            <div class="info-icon">♧</div>
             <div class="info-label">体毛</div>
-            <div class="info-value">设定项示例：保持卡片排版稳定</div>
+            <div class="info-value">设定项示例</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✧</div>
+            <div class="info-icon">✺</div>
             <div class="info-label">敏感度</div>
-            <div class="info-value">设定项示例：右侧不会再撑破画布</div>
+            <div class="info-value">设定项示例</div>
           </div>
           <div class="info-row">
-            <div class="info-icon">✧</div>
+            <div class="info-icon">◇</div>
             <div class="info-label">阴道</div>
-            <div class="info-value">设定项示例：最长显示两行</div>
+            <div class="info-value">设定项示例</div>
           </div>
         </div>
+        <div class="seal" aria-hidden="true">✦</div>
       </div>
 
       <div class="section seal-panel" aria-hidden="true">
