@@ -433,11 +433,7 @@
       <div class="crest">✦</div>
       <div class="eyebrow">MAGICAL GIRL IDENTITY</div>
       <h1>
-        魔法少女
-        {%- for item in card.info if item.path == '/主角/个人信息/魔法少女名' -%}
-          {{ item.description }}
-        {%- endfor -%}
-      </h1>
+        魔法少女绯月琉璃</h1>
     </header>
 
     <section class="layout">
@@ -447,13 +443,76 @@
           <div class="section-title">个人信息</div>
         </div>
         <div class="rows">
-          {% for item in card.info if item.path.startswith('/主角/个人信息/') and item.path != '/主角/个人信息/魔法少女名' %}
           <div class="info-row">
             <div class="info-icon">✦</div>
-            <div class="info-label">{{ item.field }}</div>
-            <div class="info-value">{{ item.description }}</div>
+            <div class="info-label">姓名</div>
+            <div class="info-value">星野铃音</div>
           </div>
-          {% endfor %}
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">年龄</div>
+            <div class="info-value">16岁</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">身份</div>
+            <div class="info-value">月辉学园二年级生，放学后守护街区结界</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">性格</div>
+            <div class="info-value">温柔坚定，遇到危机时会变得格外冷静</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">代表色</div>
+            <div class="info-value">蔷薇粉与星尘金</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">使魔</div>
+            <div class="info-value">会说话的水晶兔露娜</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">强度</div>
+            <div class="info-value">新星级，爆发时可短暂进入满月形态</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">武装</div>
+            <div class="info-value">月辉法杖，可展开星环护盾</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">变身服</div>
+            <div class="info-value">层叠纱裙、金色星扣、透明披肩与银白长靴</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">核心能力</div>
+            <div class="info-value">以月光净化污秽，将碎裂的情绪编成守护结晶</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">契约</div>
+            <div class="info-value">守护重要之人的笑容</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">愿望</div>
+            <div class="info-value">让失去光芒的夜晚重新拥有星星</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">魔力</div>
+            <div class="info-value">柔和但延展性极强，适合防御与净化</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">属性</div>
+            <div class="info-value">月光、蔷薇、结晶</div>
+          </div>
         </div>
       </div>
 
@@ -463,13 +522,31 @@
           <div class="section-title">相貌特征</div>
         </div>
         <div class="rows">
-          {% for item in card.info if item.path.startswith('/主角/相貌特征/') %}
           <div class="info-row">
             <div class="info-icon">✧</div>
-            <div class="info-label">{{ item.field }}</div>
-            <div class="info-value">{{ item.description }}</div>
+            <div class="info-label">脸型</div>
+            <div class="info-value">小巧柔和的鹅蛋脸，笑起来有浅浅酒窝</div>
           </div>
-          {% endfor %}
+          <div class="info-row">
+            <div class="info-icon">✧</div>
+            <div class="info-label">五官</div>
+            <div class="info-value">眉眼清亮，鼻梁秀气，唇色像淡樱果冻</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✧</div>
+            <div class="info-label">发型</div>
+            <div class="info-value">银粉渐变长发，变身后会浮起星屑发尾</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✧</div>
+            <div class="info-label">眼睛</div>
+            <div class="info-value">紫罗兰色瞳孔，虹膜里有月牙般高光</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✧</div>
+            <div class="info-label">肤色</div>
+            <div class="info-value">白皙透亮，带一点健康的玫瑰色</div>
+          </div>
         </div>
       </div>
 
@@ -479,13 +556,41 @@
           <div class="section-title">身材细节</div>
         </div>
         <div class="rows">
-          {% for item in card.info if item.path.startswith('/主角/身材细节/') %}
           <div class="info-row">
             <div class="info-icon">✦</div>
-            <div class="info-label">{{ item.field }}</div>
-            <div class="info-value">{{ item.description }}</div>
+            <div class="info-label">身高</div>
+            <div class="info-value">158cm</div>
           </div>
-          {% endfor %}
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">三围</div>
+            <div class="info-value">纤细匀称，整体线条轻盈</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">体态</div>
+            <div class="info-value">站姿端正，动作像跳舞一样轻快</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">皮肤</div>
+            <div class="info-value">细腻柔软，魔力流动时泛起微光</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">皮肤状态</div>
+            <div class="info-value">无明显瑕疵，战斗后会留下短暂星纹</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">肌肉</div>
+            <div class="info-value">薄而有韧性，爆发力隐藏在轻盈动作里</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✦</div>
+            <div class="info-label">肌肉线条</div>
+            <div class="info-value">肩颈与小腿线条清晰但不夸张</div>
+          </div>
         </div>
       </div>
 
@@ -495,13 +600,36 @@
           <div class="section-title">性器官特征</div>
         </div>
         <div class="rows">
-          {% for item in card.info if item.path.startswith('/主角/性器官特征/') %}
           <div class="info-row">
             <div class="info-icon">✧</div>
-            <div class="info-label">{{ item.field }}</div>
-            <div class="info-value">{{ item.description }}</div>
+            <div class="info-label">乳房</div>
+            <div class="info-value">设定项示例：请按你的实际生成内容替换</div>
           </div>
-          {% endfor %}
+          <div class="info-row">
+            <div class="info-icon">✧</div>
+            <div class="info-label">乳首</div>
+            <div class="info-value">设定项示例：固定两行，过长会自动裁切</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✧</div>
+            <div class="info-label">阴唇</div>
+            <div class="info-value">设定项示例：信息居中显示</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✧</div>
+            <div class="info-label">体毛</div>
+            <div class="info-value">设定项示例：保持卡片排版稳定</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✧</div>
+            <div class="info-label">敏感度</div>
+            <div class="info-value">设定项示例：右侧不会再撑破画布</div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon">✧</div>
+            <div class="info-label">阴道</div>
+            <div class="info-value">设定项示例：最长显示两行</div>
+          </div>
         </div>
       </div>
 
