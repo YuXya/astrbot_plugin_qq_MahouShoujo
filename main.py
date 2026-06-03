@@ -154,12 +154,7 @@ class QQMahouShoujo(Star):
                     "   性格特质：温柔内敛",
                     "   代表色：星空蓝",
                     "",
-                    "2. /魔法少女冒险",
-                    "   根据你的角色档案、当前状态和最近记录，生成一次冒险日记。",
-                    "   可以直接自由冒险，也可以在命令后写本次行动。",
-                    "   示例：/魔法少女冒险 去森林战斗爽",
-                    "",
-                    "3. /魔法少女存档删除",
+                    "2. /魔法少女存档删除",
                     "   删除你在当前群的魔法少女存档，并清理其他玩家记忆中由你产生的客串记录。",
                     "   为避免误删，需要输入：/魔法少女存档删除 确认",
                     "",
@@ -320,12 +315,13 @@ class QQMahouShoujo(Star):
             fallback_text=result.text,
         )
 
-    @filter.command("魔法少女冒险", alias={"adventure"})
+    # @filter.command("魔法少女冒险", alias={"adventure"})  # 暂时禁用，待正式开放
+    @filter.command("魔法少女战斗测试中")
     async def adventure_diary(
         self,
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
-        """根据玩家存档生成一次完整的魔法少女冒险日记卡。用法：/魔法少女冒险 我要到森林里冒险"""
+        """内测命令。用法：/魔法少女战斗测试中"""
         event.should_call_llm(True)
 
         if not self._is_group_event_allowed(event):
@@ -333,7 +329,7 @@ class QQMahouShoujo(Star):
 
         group_id = self._get_group_id_from_event(event)
         if not group_id:
-            yield event.plain_result("请在群聊中使用 /魔法少女冒险。")
+            yield event.plain_result("请在群聊中使用 /魔法少女战斗测试中。")
             return
 
         user_id = self._get_sender_id_from_event(event)
@@ -360,7 +356,7 @@ class QQMahouShoujo(Star):
             yield event.plain_result("还没有你的魔法少女转生存档，请先使用 /魔法少女转生 建档。")
             return
 
-        action_text = self._extract_command_tail(event, "魔法少女冒险")
+        action_text = self._extract_command_tail(event, "魔法少女战斗测试中")
         nickname = self._get_sender_name_from_event(event)
         umo = getattr(event, "unified_msg_origin", None)
         if not umo:
