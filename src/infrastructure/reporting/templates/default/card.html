@@ -2,204 +2,357 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=900, initial-scale=1.0">
+  <meta name="viewport" content="width=1080, initial-scale=1.0">
   <style>
     :root {
-      color-scheme: light;
-      --ink: #293241;
-      --muted: #6f6370;
-      --paper: #fff9fb;
-      --pink: #f08aa8;
-      --mint: #6cc5b8;
-      --violet: #8d7ae6;
+      --ink: #3d1f2e;
+      --muted: #8a6072;
+      --paper: #fff6f9;
+      --pink: #e8608a;
+      --pink-light: #ffd3df;
+      --pink-deep: #c94a73;
+      --gold: #d4a65a;
+      --gold-light: #f5e6c8;
+      --section-bg: rgba(255, 255, 255, 0.55);
+      --section-border: rgba(232, 96, 138, 0.3);
     }
 
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    html,
-    body {
-      margin: 0;
-      width: 900px;
-      min-width: 900px;
-      max-width: 900px;
+    html, body {
+      width: 1080px;
+      min-width: 1080px;
+      max-width: 1080px;
+      min-height: 1920px;
       overflow-x: hidden;
     }
 
     body {
-      min-height: 1180px;
       font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
-      background:
-        radial-gradient(circle at 16% 12%, rgba(240, 138, 168, 0.34), transparent 24%),
-        radial-gradient(circle at 82% 16%, rgba(108, 197, 184, 0.32), transparent 22%),
-        linear-gradient(145deg, #fff0f6 0%, #eefaf7 48%, #f4efff 100%);
       color: var(--ink);
-      padding: 38px;
+      background:
+        radial-gradient(ellipse at 20% 8%, rgba(255, 211, 223, 0.9), transparent 40%),
+        radial-gradient(ellipse at 80% 15%, rgba(212, 166, 90, 0.2), transparent 35%),
+        radial-gradient(ellipse at 50% 85%, rgba(255, 211, 223, 0.6), transparent 45%),
+        linear-gradient(170deg, #fff0f5 0%, #ffe8ef 30%, #ffd3df 60%, #ffc8d9 100%);
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── 装饰背景层 ── */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(circle at 15% 25%, rgba(212, 166, 90, 0.12) 0%, transparent 50%),
+        radial-gradient(circle at 85% 75%, rgba(232, 96, 138, 0.08) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
     }
 
     .card {
-      min-height: 1104px;
-      background: rgba(255, 249, 251, 0.96);
-      border: 3px solid rgba(255, 255, 255, 0.95);
-      box-shadow: 0 28px 70px rgba(84, 61, 88, 0.18);
-      padding: 40px;
       position: relative;
-      overflow: hidden;
+      width: 1080px;
+      min-height: 1920px;
+      padding: 60px 72px;
+      z-index: 1;
       display: flex;
       flex-direction: column;
     }
 
+    /* ── 外边框装饰 ── */
     .card::before {
       content: "";
       position: absolute;
-      inset: 18px;
-      border: 2px dashed rgba(240, 138, 168, 0.38);
+      inset: 28px;
+      border: 2px solid rgba(232, 96, 138, 0.25);
+      border-radius: 16px;
+      pointer-events: none;
+    }
+    .card::after {
+      content: "";
+      position: absolute;
+      inset: 36px;
+      border: 1px solid rgba(212, 166, 90, 0.2);
+      border-radius: 12px;
       pointer-events: none;
     }
 
-    .header {
+    /* ── 角落装饰 ── */
+    .corner {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border-color: var(--gold);
+      border-style: solid;
+      opacity: 0.45;
+      z-index: 2;
+    }
+    .corner.tl { top: 42px; left: 42px; border-width: 3px 0 0 3px; border-radius: 8px 0 0 0; }
+    .corner.tr { top: 42px; right: 42px; border-width: 3px 3px 0 0; border-radius: 0 8px 0 0; }
+    .corner.bl { bottom: 42px; left: 42px; border-width: 0 0 3px 3px; border-radius: 0 0 0 8px; }
+    .corner.br { bottom: 42px; right: 42px; border-width: 0 3px 3px 0; border-radius: 0 0 8px 0; }
+
+    /* ── 标题区 ── */
+    .title-area {
+      text-align: center;
+      padding: 40px 0 50px;
       position: relative;
-      display: grid;
-      grid-template-columns: 1fr 170px;
-      gap: 24px;
-      align-items: center;
-      padding-bottom: 26px;
-      border-bottom: 2px solid rgba(141, 122, 230, 0.18);
     }
 
-    .eyebrow {
-      font-size: 20px;
-      color: var(--pink);
-      font-weight: 800;
-      letter-spacing: 0;
+    .title-deco {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+
+    .title-deco .line {
+      width: 120px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    }
+
+    .title-deco .star {
+      font-size: 28px;
+      color: var(--gold);
+    }
+
+    .title-eyebrow {
+      font-size: 22px;
+      letter-spacing: 12px;
+      color: var(--muted);
+      font-weight: 400;
       margin-bottom: 12px;
+      text-transform: uppercase;
     }
 
     h1 {
-      margin: 0;
-      font-size: 52px;
-      line-height: 1.12;
-      letter-spacing: 0;
-      color: var(--violet);
-    }
-
-    .subtitle {
-      margin-top: 14px;
-      font-size: 24px;
-      line-height: 1.42;
-      color: var(--muted);
-    }
-
-    .avatar {
-      width: 164px;
-      height: 164px;
-      display: grid;
-      place-items: center;
-      border-radius: 50%;
-      background:
-        radial-gradient(circle at 50% 38%, #fff 0 23%, transparent 24%),
-        radial-gradient(circle at 38% 42%, #293241 0 3%, transparent 4%),
-        radial-gradient(circle at 62% 42%, #293241 0 3%, transparent 4%),
-        radial-gradient(circle at 50% 56%, #f08aa8 0 8%, transparent 9%),
-        linear-gradient(160deg, #ffd3df, #c8f1ea);
-      border: 8px solid #fff;
-      box-shadow: 0 14px 32px rgba(141, 122, 230, 0.22);
-      color: #fff;
-      font-size: 42px;
+      font-size: 72px;
       font-weight: 900;
-      overflow: hidden;
+      color: var(--pink-deep);
+      letter-spacing: 6px;
+      line-height: 1.2;
+      text-shadow: 0 2px 8px rgba(232, 96, 138, 0.15);
     }
 
-    .identity {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 14px;
-      margin-top: 28px;
+    .title-divider {
+      width: 360px;
+      height: 3px;
+      margin: 28px auto 0;
+      background: linear-gradient(90deg, transparent, var(--pink), var(--gold), var(--pink), transparent);
+      border-radius: 2px;
     }
 
-    .id-item, .section, .stat, .like {
-      border: 1px solid rgba(141, 122, 230, 0.18);
-      background: rgba(255, 255, 255, 0.62);
-    }
-
-    .id-item { padding: 16px 18px; }
-
-    .label {
-      font-size: 17px;
-      color: var(--muted);
-      margin-bottom: 6px;
-    }
-
-    .value {
-      font-size: 24px;
-      line-height: 1.25;
-      color: var(--ink);
-      font-weight: 800;
-    }
-
-    .section {
+    .player-name-line {
       margin-top: 20px;
-      padding: 22px 24px;
+      font-size: 26px;
+      color: var(--muted);
+      font-weight: 400;
+      letter-spacing: 2px;
+    }
+
+    /* ── 双列内容区 ── */
+    .columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 36px;
+      flex: 1;
+    }
+
+    .column {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    /* ── 分组区块 ── */
+    .section {
+      background: var(--section-bg);
+      border: 1px solid var(--section-border);
+      border-radius: 12px;
+      padding: 28px 30px;
+      backdrop-filter: blur(4px);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 22px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(232, 96, 138, 0.18);
+    }
+
+    .section-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--pink-light), var(--pink));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      color: #fff;
+      font-weight: 700;
+      flex-shrink: 0;
     }
 
     .section-title {
-      font-size: 21px;
+      font-size: 30px;
+      font-weight: 800;
       color: var(--pink);
-      font-weight: 900;
-      margin-bottom: 10px;
+      letter-spacing: 3px;
     }
 
-    .section-text {
-      font-size: 25px;
-      line-height: 1.52;
-      color: #2f3445;
+    /* ── 信息行 ── */
+    .info-row {
+      display: flex;
+      align-items: baseline;
+      padding: 10px 0;
+      border-bottom: 1px dashed rgba(232, 96, 138, 0.1);
     }
 
-    .footer {
-      margin-top: auto;
-      padding-top: 18px;
-      border-top: 1px solid rgba(141, 122, 230, 0.18);
+    .info-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .info-label {
+      flex-shrink: 0;
+      width: 140px;
+      font-size: 22px;
       color: var(--muted);
+      font-weight: 500;
+    }
+
+    .info-value {
+      font-size: 24px;
+      color: var(--ink);
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
+    /* ── 页脚 ── */
+    .footer-area {
+      text-align: center;
+      padding: 40px 0 20px;
+      position: relative;
+    }
+
+    .footer-divider {
+      width: 280px;
+      height: 1px;
+      margin: 0 auto 20px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    }
+
+    .footer-text {
       font-size: 20px;
-      line-height: 1.42;
+      color: var(--muted);
+      letter-spacing: 4px;
+      opacity: 0.7;
     }
   </style>
 </head>
 <body>
   <main class="card">
-    <section class="header">
-      <div>
-        <div class="eyebrow">ISEKAI REINCARNATION CARD</div>
-        <h1>魔法少女转生人物卡</h1>
-        <div class="subtitle">{{ card.target_name }} 的转生档案</div>
-      </div>
-      <div class="avatar">
-        転
-      </div>
-    </section>
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
 
-    <section class="identity">
-      <div class="id-item">
-        <div class="label">姓名</div>
-        <div class="value">{{ card.target_name }}</div>
+    <!-- 标题 -->
+    <div class="title-area">
+      <div class="title-deco">
+        <span class="line"></span>
+        <span class="star">✦</span>
+        <span class="line"></span>
       </div>
-      <div class="id-item">
-        <div class="label">职阶</div>
-        <div class="value">{{ card.class_name }}</div>
-      </div>
-      <div class="id-item">
-        <div class="label">核心能力</div>
-        <div class="value">{{ card.talent }}</div>
-      </div>
-    </section>
+      <div class="title-eyebrow">MAGICAL GIRL REINCARNATION</div>
+      <h1>魔法少女
+        {%- for item in card.info if item.path == '/主角/个人信息/魔法少女名' -%}
+          {{ item.description }}
+        {%- endfor -%}
+      </h1>
+      <div class="title-divider"></div>
+      <div class="player-name-line">{{ card.target_name }} 的转生档案</div>
+    </div>
 
-    {% for item in card.info %}
-    <section class="section">
-      <div class="section-title">{{ item.field }}</div>
-      <div class="section-text">{{ item.description }}</div>
-    </section>
-    {% endfor %}
+    <!-- 双列信息区 -->
+    <div class="columns">
+      <!-- 左列 -->
+      <div class="column">
+        <!-- 个人信息 -->
+        <div class="section">
+          <div class="section-header">
+            <div class="section-icon">P</div>
+            <div class="section-title">个人信息</div>
+          </div>
+          {% for item in card.info if item.path.startswith('/主角/个人信息/') and item.path != '/主角/个人信息/魔法少女名' %}
+          <div class="info-row">
+            <div class="info-label">{{ item.field }}</div>
+            <div class="info-value">{{ item.description }}</div>
+          </div>
+          {% endfor %}
+        </div>
 
-    <footer class="footer">魔法少女转生人物卡，仅供娱乐。</footer>
+        <!-- 相貌特征 -->
+        <div class="section">
+          <div class="section-header">
+            <div class="section-icon">A</div>
+            <div class="section-title">相貌特征</div>
+          </div>
+          {% for item in card.info if item.path.startswith('/主角/相貌特征/') %}
+          <div class="info-row">
+            <div class="info-label">{{ item.field }}</div>
+            <div class="info-value">{{ item.description }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- 右列 -->
+      <div class="column">
+        <!-- 身材细节 -->
+        <div class="section">
+          <div class="section-header">
+            <div class="section-icon">F</div>
+            <div class="section-title">身材细节</div>
+          </div>
+          {% for item in card.info if item.path.startswith('/主角/身材细节/') %}
+          <div class="info-row">
+            <div class="info-label">{{ item.field }}</div>
+            <div class="info-value">{{ item.description }}</div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- 性器官特征 -->
+        <div class="section">
+          <div class="section-header">
+            <div class="section-icon">S</div>
+            <div class="section-title">性器官特征</div>
+          </div>
+          {% for item in card.info if item.path.startswith('/主角/性器官特征/') %}
+          <div class="info-row">
+            <div class="info-label">{{ item.field }}</div>
+            <div class="info-value">{{ item.description }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- 页脚 -->
+    <div class="footer-area">
+      <div class="footer-divider"></div>
+      <div class="footer-text">魔法少女转生人物卡 · 仅供娱乐</div>
+    </div>
   </main>
 </body>
 </html>
