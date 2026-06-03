@@ -2,23 +2,21 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=1920, initial-scale=1.0">
+  <meta name="viewport" content="width=900, initial-scale=1.0">
   <style>
     :root {
+      color-scheme: light;
       --ink: #372032;
       --soft-ink: #79566f;
       --rose: #e94f86;
       --rose-deep: #b92f68;
-      --blush: #fff1f7;
       --lilac: #8f72de;
       --aqua: #64c8d6;
       --gold: #d9a84f;
       --gold-light: #fff0bb;
-      --glass: rgba(255, 255, 255, 0.68);
-      --glass-strong: rgba(255, 255, 255, 0.84);
-      --line: rgba(185, 47, 104, 0.18);
-      --row-h: 42px;
-      --profile-row-h: 44px;
+      --paper: rgba(255, 249, 252, 0.95);
+      --panel: rgba(255, 255, 255, 0.72);
+      --line: rgba(185, 47, 104, 0.16);
     }
 
     * {
@@ -29,216 +27,207 @@
 
     html,
     body {
-      width: 1920px;
-      min-width: 1920px;
-      max-width: 1920px;
-      height: 1080px;
-      overflow: hidden;
+      width: 900px;
+      min-width: 900px;
+      max-width: 900px;
+      overflow-x: hidden;
     }
 
     body {
+      min-height: 1280px;
+      padding: 34px;
       font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at 10% 12%, rgba(255, 255, 255, 0.9) 0 2px, transparent 3px),
-        radial-gradient(circle at 86% 18%, rgba(255, 255, 255, 0.85) 0 2px, transparent 3px),
-        radial-gradient(circle at 74% 84%, rgba(255, 255, 255, 0.78) 0 2px, transparent 3px),
-        radial-gradient(ellipse at 18% 18%, rgba(255, 222, 238, 0.95), transparent 36%),
-        radial-gradient(ellipse at 82% 20%, rgba(184, 232, 245, 0.62), transparent 38%),
-        radial-gradient(ellipse at 56% 96%, rgba(255, 231, 164, 0.55), transparent 42%),
-        linear-gradient(140deg, #fff8fb 0%, #ffe6f2 32%, #f0e8ff 64%, #ddf7fb 100%);
-    }
-
-    body::before,
-    body::after {
-      content: "";
-      position: fixed;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    body::before {
-      inset: 0;
-      background:
-        linear-gradient(115deg, transparent 0 12%, rgba(255, 255, 255, 0.24) 12.1% 12.5%, transparent 12.6% 100%),
-        linear-gradient(68deg, transparent 0 24%, rgba(217, 168, 79, 0.16) 24.1% 24.35%, transparent 24.45% 100%),
-        linear-gradient(155deg, transparent 0 72%, rgba(233, 79, 134, 0.14) 72.1% 72.35%, transparent 72.45% 100%);
-    }
-
-    body::after {
-      width: 760px;
-      height: 760px;
-      right: -210px;
-      top: -230px;
-      border: 1px solid rgba(217, 168, 79, 0.28);
-      border-radius: 50%;
-      box-shadow:
-        0 0 0 26px rgba(255, 255, 255, 0.18),
-        0 0 0 56px rgba(233, 79, 134, 0.08),
-        0 0 110px rgba(143, 114, 222, 0.18);
+        radial-gradient(circle at 14% 9%, rgba(255, 255, 255, 0.92) 0 2px, transparent 3px),
+        radial-gradient(circle at 88% 18%, rgba(255, 255, 255, 0.86) 0 2px, transparent 3px),
+        radial-gradient(ellipse at 16% 14%, rgba(255, 222, 238, 0.95), transparent 32%),
+        radial-gradient(ellipse at 84% 10%, rgba(184, 232, 245, 0.68), transparent 34%),
+        radial-gradient(ellipse at 52% 96%, rgba(255, 231, 164, 0.42), transparent 42%),
+        linear-gradient(145deg, #fff8fb 0%, #ffe8f3 32%, #f0e9ff 68%, #ddf7fb 100%);
     }
 
     .card {
       position: relative;
-      z-index: 1;
-      width: 1920px;
-      height: 1080px;
-      padding: 38px 62px 54px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .card-frame {
-      position: absolute;
-      inset: 28px;
+      width: 100%;
+      min-height: 1200px;
+      padding: 34px 34px 38px;
+      overflow: hidden;
       border: 2px solid rgba(217, 168, 79, 0.42);
       border-radius: 18px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.42)),
+        var(--paper);
       box-shadow:
-        inset 0 0 0 1px rgba(255, 255, 255, 0.82),
-        inset 0 0 42px rgba(255, 255, 255, 0.58),
-        0 18px 70px rgba(185, 47, 104, 0.12);
-      pointer-events: none;
+        inset 0 0 0 1px rgba(255, 255, 255, 0.85),
+        0 28px 70px rgba(84, 42, 82, 0.16);
     }
 
-    .card-frame::before,
-    .card-frame::after {
+    .card::before {
       content: "";
       position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 520px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(185, 47, 104, 0.42), rgba(217, 168, 79, 0.66), rgba(185, 47, 104, 0.42), transparent);
-    }
-
-    .card-frame::before { top: 18px; }
-    .card-frame::after { bottom: 18px; }
-
-    .corner {
-      position: absolute;
-      width: 86px;
-      height: 86px;
-      border-color: rgba(217, 168, 79, 0.72);
-      border-style: solid;
+      inset: 14px;
+      border: 1px solid rgba(217, 168, 79, 0.28);
+      border-radius: 13px;
       pointer-events: none;
     }
 
-    .corner.tl { top: 34px; left: 34px; border-width: 3px 0 0 3px; border-radius: 18px 0 0 0; }
-    .corner.tr { top: 34px; right: 34px; border-width: 3px 3px 0 0; border-radius: 0 18px 0 0; }
-    .corner.bl { bottom: 34px; left: 34px; border-width: 0 0 3px 3px; border-radius: 0 0 0 18px; }
-    .corner.br { bottom: 34px; right: 34px; border-width: 0 3px 3px 0; border-radius: 0 0 18px 0; }
-
-    .sparkles {
+    .card::after {
+      content: "";
       position: absolute;
-      inset: 0;
+      right: -150px;
+      top: -150px;
+      width: 420px;
+      height: 420px;
+      border-radius: 50%;
+      border: 26px solid rgba(233, 79, 134, 0.07);
+      box-shadow: 0 0 0 28px rgba(100, 200, 214, 0.08);
       pointer-events: none;
-      color: rgba(217, 168, 79, 0.72);
-      font-family: Georgia, serif;
-      font-size: 28px;
-      line-height: 1;
     }
-
-    .sparkles span {
-      position: absolute;
-      text-shadow: 0 0 18px rgba(255, 255, 255, 0.9);
-    }
-
-    .s1 { left: 148px; top: 126px; }
-    .s2 { right: 170px; top: 196px; color: rgba(233, 79, 134, 0.58); }
-    .s3 { left: 274px; bottom: 126px; color: rgba(100, 200, 214, 0.65); }
-    .s4 { right: 288px; bottom: 112px; }
-    .s5 { left: 52%; top: 86px; color: rgba(143, 114, 222, 0.54); }
 
     .header {
       position: relative;
-      height: 124px;
-      flex-shrink: 0;
-      display: flex;
-      flex-direction: column;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 150px;
+      gap: 22px;
       align-items: center;
-      justify-content: center;
+      min-height: 164px;
+      padding: 10px 6px 28px;
+      border-bottom: 1px solid rgba(185, 47, 104, 0.16);
+    }
+
+    .identity {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 24px;
+    }
+
+    .id-item {
+      min-height: 88px;
+      padding: 16px 18px;
+      border: 1px solid rgba(185, 47, 104, 0.13);
+      border-radius: 14px;
+      background:
+        radial-gradient(circle at 12% 10%, rgba(255, 240, 187, 0.44), transparent 42%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.5));
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.76),
+        0 12px 24px rgba(84, 42, 82, 0.07);
+    }
+
+    .id-label {
+      color: var(--soft-ink);
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.2;
       text-align: center;
     }
 
-    .crest {
-      width: 88px;
-      height: 88px;
-      position: absolute;
-      top: 6px;
-      right: 128px;
+    .id-value {
+      margin-top: 8px;
+      color: var(--rose-deep);
+      font-size: 22px;
+      font-weight: 900;
+      line-height: 1.25;
+      text-align: center;
+      word-break: break-word;
+    }
+
+    .eyebrow {
+      margin-bottom: 10px;
+      color: var(--soft-ink);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 580px;
+      color: var(--rose-deep);
+      font-size: 48px;
+      font-weight: 900;
+      line-height: 1.12;
+      letter-spacing: 0;
+      text-shadow:
+        0 2px 0 #fff,
+        0 10px 26px rgba(185, 47, 104, 0.18);
+      word-break: break-word;
+    }
+
+    .subtitle {
+      margin-top: 12px;
+      color: var(--soft-ink);
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
+    .avatar {
+      position: relative;
+      width: 142px;
+      height: 142px;
       display: grid;
       place-items: center;
+      justify-self: end;
+      border-radius: 50%;
       color: #fff;
       font-family: Georgia, serif;
-      font-size: 44px;
+      font-size: 56px;
       background:
         radial-gradient(circle at 50% 42%, #fff 0 10%, transparent 11%),
         conic-gradient(from 18deg, var(--rose), var(--gold-light), var(--aqua), var(--lilac), var(--rose));
       clip-path: polygon(50% 0, 61% 29%, 93% 20%, 72% 48%, 100% 67%, 64% 68%, 50% 100%, 36% 68%, 0 67%, 28% 48%, 7% 20%, 39% 29%);
-      filter: drop-shadow(0 14px 18px rgba(185, 47, 104, 0.24));
+      filter: drop-shadow(0 16px 20px rgba(185, 47, 104, 0.24));
     }
 
-    .eyebrow {
-      margin-bottom: 8px;
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--soft-ink);
-      letter-spacing: 7px;
-      text-transform: uppercase;
-      opacity: 0.82;
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      clip-path: inherit;
     }
 
-    h1 {
-      max-width: 1240px;
-      margin-top: 0;
-      font-size: 52px;
-      font-weight: 900;
-      line-height: 1.06;
-      letter-spacing: 0;
-      color: var(--rose-deep);
-      text-shadow:
-        0 2px 0 #fff,
-        0 10px 28px rgba(185, 47, 104, 0.2);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .layout {
+    .sections {
       position: relative;
-      flex: 1;
-      min-height: 0;
+      z-index: 1;
       display: grid;
-      grid-template-columns: 470px 760px 470px;
-      grid-template-rows: minmax(300px, auto) minmax(0, 1fr);
-      gap: 22px;
-      padding: 4px 8px 0;
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .duo {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      align-items: stretch;
     }
 
     .section {
       position: relative;
-      min-width: 0;
-      min-height: 0;
+      padding: 22px 24px 24px;
       overflow: hidden;
-      padding: 20px 22px 18px;
       border: 1px solid rgba(255, 255, 255, 0.86);
       border-radius: 16px;
       background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.58)),
-        radial-gradient(circle at 12% 0, rgba(255, 240, 187, 0.55), transparent 34%),
-        var(--glass);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.62)),
+        radial-gradient(circle at 10% 0, rgba(255, 240, 187, 0.46), transparent 36%),
+        var(--panel);
       box-shadow:
-        inset 0 0 0 1px rgba(185, 47, 104, 0.12),
-        0 18px 42px rgba(84, 42, 82, 0.09);
-      backdrop-filter: blur(6px);
+        inset 0 0 0 1px rgba(185, 47, 104, 0.1),
+        0 16px 36px rgba(84, 42, 82, 0.08);
     }
 
     .section::before {
       content: "";
       position: absolute;
       inset: 9px;
-      border: 1px solid rgba(217, 168, 79, 0.24);
+      border: 1px solid rgba(217, 168, 79, 0.22);
       border-radius: 12px;
       pointer-events: none;
     }
@@ -246,117 +235,43 @@
     .section::after {
       content: "";
       position: absolute;
-      right: -54px;
-      top: -54px;
-      width: 132px;
-      height: 132px;
+      right: -56px;
+      top: -58px;
+      width: 136px;
+      height: 136px;
       border-radius: 50%;
-      border: 18px solid rgba(233, 79, 134, 0.08);
+      border: 18px solid rgba(233, 79, 134, 0.07);
       pointer-events: none;
-    }
-
-    .profile {
-      grid-column: 2;
-      grid-row: 1 / 3;
-    }
-
-    .appearance {
-      grid-column: 1;
-      grid-row: 1;
-    }
-
-    .body-detail {
-      grid-column: 1;
-      grid-row: 2;
-    }
-
-    .intimate {
-      grid-column: 3;
-      grid-row: 1 / 3;
-    }
-
-    .intimate .seal {
-      position: absolute;
-      left: 50%;
-      bottom: 70px;
-      transform: translateX(-50%);
-      width: 286px;
-      height: 286px;
-      opacity: 0.92;
-    }
-
-    .seal-panel {
-      grid-column: 3;
-      grid-row: 2;
-      display: none;
-      min-height: 0;
-      background:
-        radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.36) 46%, transparent 47%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.42));
-    }
-
-    .seal {
-      position: relative;
-      width: 298px;
-      height: 298px;
-      border-radius: 50%;
-      border: 2px solid rgba(217, 168, 79, 0.62);
-      display: grid;
-      place-items: center;
-      color: rgba(185, 47, 104, 0.72);
-      font-family: Georgia, serif;
-      font-size: 108px;
-      background:
-        radial-gradient(circle, rgba(255, 255, 255, 0.94) 0 30%, rgba(255, 240, 187, 0.3) 31% 48%, transparent 49%),
-        conic-gradient(from 0deg, rgba(233, 79, 134, 0.18), rgba(100, 200, 214, 0.2), rgba(143, 114, 222, 0.18), rgba(217, 168, 79, 0.2), rgba(233, 79, 134, 0.18));
-      box-shadow:
-        inset 0 0 0 14px rgba(255, 255, 255, 0.54),
-        0 20px 46px rgba(185, 47, 104, 0.14);
-    }
-
-    .seal::before,
-    .seal::after {
-      content: "";
-      position: absolute;
-      inset: 34px;
-      border: 1px solid rgba(185, 47, 104, 0.22);
-      border-radius: 50%;
-    }
-
-    .seal::after {
-      inset: 72px;
-      border-color: rgba(100, 200, 214, 0.34);
     }
 
     .section-head {
       position: relative;
       z-index: 1;
-      height: 42px;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 10px;
-      margin-bottom: 10px;
+      margin-bottom: 18px;
     }
 
     .section-mark {
-      width: 34px;
-      height: 34px;
+      width: 36px;
+      height: 36px;
       display: grid;
       place-items: center;
       border-radius: 50%;
       color: #fff;
-      font-size: 18px;
       font-family: Georgia, serif;
+      font-size: 18px;
       background: linear-gradient(135deg, var(--rose), var(--lilac));
       box-shadow: 0 8px 18px rgba(185, 47, 104, 0.22);
     }
 
     .section-title {
-      font-size: 24px;
-      line-height: 1;
-      font-weight: 900;
       color: var(--rose-deep);
+      font-size: 26px;
+      font-weight: 900;
+      line-height: 1;
       letter-spacing: 0;
     }
 
@@ -364,43 +279,41 @@
       position: relative;
       z-index: 1;
       display: grid;
-      grid-auto-rows: minmax(var(--row-h), auto);
-      gap: 6px;
+      gap: 10px;
     }
 
     .info-row {
-      min-width: 0;
-      min-height: var(--row-h);
+      min-height: 56px;
       display: grid;
-      grid-template-columns: 30px 64px minmax(0, 1fr);
+      grid-template-columns: 34px 112px minmax(0, 1fr);
       align-items: center;
-      column-gap: 10px;
-      padding: 7px 12px;
+      column-gap: 14px;
+      padding: 12px 16px;
       border: 1px solid rgba(185, 47, 104, 0.12);
-      border-radius: 10px;
+      border-radius: 12px;
       background:
-        linear-gradient(90deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.48)),
-        linear-gradient(90deg, rgba(255, 230, 242, 0.58), transparent 42%);
+        linear-gradient(90deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.52)),
+        linear-gradient(90deg, rgba(255, 230, 242, 0.52), transparent 44%);
     }
 
     .info-icon {
-      width: 30px;
-      height: 30px;
+      width: 34px;
+      height: 34px;
       display: grid;
       place-items: center;
       border-radius: 50%;
       color: var(--rose-deep);
       font-family: Georgia, serif;
-      font-size: 17px;
-      background: rgba(255, 255, 255, 0.78);
-      box-shadow: inset 0 0 0 1px rgba(217, 168, 79, 0.34);
+      font-size: 18px;
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: inset 0 0 0 1px rgba(217, 168, 79, 0.36);
     }
 
     .info-label {
       min-width: 0;
       color: var(--soft-ink);
-      font-size: 15px;
-      font-weight: 800;
+      font-size: 17px;
+      font-weight: 900;
       line-height: 1.25;
       text-align: center;
       white-space: nowrap;
@@ -409,169 +322,170 @@
     .info-value {
       min-width: 0;
       color: var(--ink);
-      font-size: 14px;
+      font-size: 18px;
       font-weight: 700;
-      line-height: 1.45;
+      line-height: 1.58;
       text-align: center;
       word-break: break-word;
       overflow-wrap: anywhere;
     }
 
-    .profile .rows {
-      grid-auto-rows: minmax(var(--profile-row-h), auto);
-      gap: 5px;
-    }
-
     .profile .info-row {
-      min-height: var(--profile-row-h);
-      grid-template-columns: 30px 96px minmax(0, 1fr);
-      padding-top: 6px;
-      padding-bottom: 6px;
+      grid-template-columns: 34px 122px minmax(0, 1fr);
     }
 
     .profile .info-value {
-      font-size: 15px;
-      line-height: 1.38;
+      font-size: 18px;
+      line-height: 1.58;
     }
 
-    .profile .info-label {
-      font-size: 15px;
+    .mini-section {
+      padding: 20px 20px 22px;
+      height: 100%;
     }
 
-    .section.compact {
-      padding-top: 16px;
-      padding-bottom: 14px;
+    .mini-section .section-head {
+      justify-content: flex-start;
+      margin-bottom: 14px;
     }
 
-    .section.compact .section-head {
-      height: 36px;
-      margin-bottom: 7px;
-    }
-
-    .section.compact .section-title {
-      font-size: 22px;
-    }
-
-    .section.compact .rows {
-      gap: 3px;
-    }
-
-    .section.compact .info-row {
-      min-height: 34px;
-      padding-top: 4px;
-      padding-bottom: 4px;
-    }
-
-    .section.compact .info-icon {
-      width: 26px;
-      height: 26px;
-      font-size: 15px;
-    }
-
-    .section.compact .info-label {
-      font-size: 13px;
-    }
-
-    .section.compact .info-value {
-      font-size: 12px;
-      line-height: 1.32;
-    }
-
-    .profile.compact .info-value {
-      font-size: 12.5px;
-      line-height: 1.28;
-    }
-
-    .section.ultra-compact {
-      padding-top: 14px;
-      padding-bottom: 12px;
-    }
-
-    .section.ultra-compact .section-head {
+    .mini-section .section-mark {
+      width: 32px;
       height: 32px;
-      margin-bottom: 5px;
+      font-size: 16px;
     }
 
-    .section.ultra-compact .section-mark {
-      width: 28px;
-      height: 28px;
-      font-size: 15px;
+    .mini-section .section-title {
+      font-size: 23px;
     }
 
-    .section.ultra-compact .section-title {
-      font-size: 20px;
+    .mini-list {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 12px;
     }
 
-    .section.ultra-compact .rows {
-      gap: 2px;
+    .mini-item {
+      position: relative;
+      padding: 13px 14px 14px 42px;
+      min-height: 82px;
+      border: 1px solid rgba(185, 47, 104, 0.1);
+      border-radius: 12px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.48)),
+        radial-gradient(circle at 100% 0, rgba(255, 240, 187, 0.34), transparent 40%);
     }
 
-    .section.ultra-compact .info-row {
-      min-height: 30px;
-      padding-top: 3px;
-      padding-bottom: 3px;
-    }
-
-    .section.ultra-compact .info-icon {
+    .mini-icon {
+      position: absolute;
+      left: 12px;
+      top: 14px;
       width: 24px;
       height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--rose-deep);
+      font-family: Georgia, serif;
       font-size: 14px;
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: inset 0 0 0 1px rgba(217, 168, 79, 0.34);
     }
 
-    .section.ultra-compact .info-label {
-      font-size: 12px;
+    .mini-label {
+      color: var(--rose-deep);
+      font-size: 16px;
+      font-weight: 900;
+      line-height: 1.2;
     }
 
-    .section.ultra-compact .info-value {
-      font-size: 11px;
-      line-height: 1.24;
+    .mini-value {
+      margin-top: 7px;
+      color: var(--ink);
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.55;
+      word-break: break-word;
+      overflow-wrap: anywhere;
     }
 
-    .profile.ultra-compact .info-value {
-      font-size: 11.5px;
-      line-height: 1.22;
+    .seal-wrap {
+      display: flex;
+      justify-content: center;
+      padding: 20px 0 2px;
+    }
+
+    .seal {
+      position: relative;
+      width: 188px;
+      height: 188px;
+      display: grid;
+      place-items: center;
+      border: 2px solid rgba(217, 168, 79, 0.62);
+      border-radius: 50%;
+      color: rgba(185, 47, 104, 0.72);
+      font-family: Georgia, serif;
+      font-size: 72px;
+      background:
+        radial-gradient(circle, rgba(255, 255, 255, 0.96) 0 30%, rgba(255, 240, 187, 0.3) 31% 48%, transparent 49%),
+        conic-gradient(from 0deg, rgba(233, 79, 134, 0.18), rgba(100, 200, 214, 0.2), rgba(143, 114, 222, 0.18), rgba(217, 168, 79, 0.2), rgba(233, 79, 134, 0.18));
+      box-shadow:
+        inset 0 0 0 10px rgba(255, 255, 255, 0.54),
+        0 18px 38px rgba(185, 47, 104, 0.12);
+    }
+
+    .seal::before,
+    .seal::after {
+      content: "";
+      position: absolute;
+      inset: 24px;
+      border: 1px solid rgba(185, 47, 104, 0.22);
+      border-radius: 50%;
+    }
+
+    .seal::after {
+      inset: 48px;
+      border-color: rgba(100, 200, 214, 0.34);
     }
   </style>
 </head>
 <body>
   <main class="card">
-    <div class="card-frame"></div>
-    <div class="corner tl"></div>
-    <div class="corner tr"></div>
-    <div class="corner bl"></div>
-    <div class="corner br"></div>
-    <div class="sparkles" aria-hidden="true">
-      <span class="s1">✦</span>
-      <span class="s2">✧</span>
-      <span class="s3">✶</span>
-      <span class="s4">✦</span>
-      <span class="s5">✧</span>
-    </div>
-
     <header class="header">
-      <div class="crest">✦</div>
-      <div class="eyebrow">MAGICAL GIRL IDENTITY</div>
-      <h1>
-        魔法少女&nbsp;绯月琉璃</h1>
+      <div>
+        <div class="eyebrow">MAGICAL GIRL IDENTITY</div>
+        <h1>
+          魔法少女&nbsp;绯月琉璃</h1>
+        <div class="subtitle">星野铃音 的身份信息</div>
+      </div>
+      <div class="avatar" aria-hidden="true">
+        ✦
+      </div>
     </header>
 
-    <section class="layout">
+    <section class="identity">
+      <div class="id-item">
+        <div class="id-label">姓名</div>
+        <div class="id-value">星野铃音</div>
+      </div>
+      <div class="id-item">
+        <div class="id-label">年龄</div>
+        <div class="id-value">16岁</div>
+      </div>
+      <div class="id-item">
+        <div class="id-label">身高</div>
+        <div class="id-value">158cm</div>
+      </div>
+    </section>
+
+    <section class="sections">
       <div class="section profile">
         <div class="section-head">
           <div class="section-mark">✧</div>
           <div class="section-title">个人信息</div>
         </div>
         <div class="rows">
-          <div class="info-row">
-            <div class="info-icon">✒</div>
-            <div class="info-label">姓名</div>
-            <div class="info-value">星野铃音</div>
-          </div>
-          <div class="info-row">
-            <div class="info-icon">⌛</div>
-            <div class="info-label">年龄</div>
-            <div class="info-value">16岁，月辉学园二年级生，外表稚嫩但心智坚定</div>
-          </div>
           <div class="info-row">
             <div class="info-icon">♛</div>
             <div class="info-label">身份</div>
@@ -635,80 +549,77 @@
         </div>
       </div>
 
-      <div class="section appearance">
-        <div class="section-head">
-          <div class="section-mark">✿</div>
-          <div class="section-title">相貌特征</div>
+      <div class="duo">
+        <div class="section mini-section appearance">
+          <div class="section-head">
+            <div class="section-mark">✿</div>
+            <div class="section-title">相貌特征</div>
+          </div>
+          <div class="mini-list">
+            <div class="mini-item">
+              <div class="mini-icon">◌</div>
+              <div class="mini-label">脸型</div>
+              <div class="mini-value">小巧柔和的鹅蛋脸，笑起来有浅浅酒窝</div>
+            </div>
+            <div class="mini-item">
+              <div class="mini-icon">✣</div>
+              <div class="mini-label">五官</div>
+              <div class="mini-value">眉眼清亮，鼻梁秀气，唇色像淡樱果冻</div>
+            </div>
+            <div class="mini-item">
+              <div class="mini-icon">〰</div>
+              <div class="mini-label">发型</div>
+              <div class="mini-value">银粉渐变长发，变身后会浮起星屑发尾</div>
+            </div>
+            <div class="mini-item">
+              <div class="mini-icon">◉</div>
+              <div class="mini-label">眼睛</div>
+              <div class="mini-value">紫罗兰色瞳孔，虹膜里有月牙般高光</div>
+            </div>
+            <div class="mini-item">
+              <div class="mini-icon">◍</div>
+              <div class="mini-label">肤色</div>
+              <div class="mini-value">白皙透亮，带一点健康的玫瑰色</div>
+            </div>
+          </div>
         </div>
-        <div class="rows">
-          <div class="info-row">
-            <div class="info-icon">◌</div>
-            <div class="info-label">脸型</div>
-            <div class="info-value">小巧柔和的鹅蛋脸，笑起来有浅浅酒窝</div>
-          </div>
-          <div class="info-row">
-            <div class="info-icon">✣</div>
-            <div class="info-label">五官</div>
-            <div class="info-value">眉眼清亮，鼻梁秀气，唇色像淡樱果冻</div>
-          </div>
-          <div class="info-row">
-            <div class="info-icon">〰</div>
-            <div class="info-label">发型</div>
-            <div class="info-value">银粉渐变长发，变身后会浮起星屑发尾</div>
-          </div>
-          <div class="info-row">
-            <div class="info-icon">◉</div>
-            <div class="info-label">眼睛</div>
-            <div class="info-value">紫罗兰色瞳孔，虹膜里有月牙般高光</div>
-          </div>
-          <div class="info-row">
-            <div class="info-icon">◍</div>
-            <div class="info-label">肤色</div>
-            <div class="info-value">白皙透亮，带一点健康的玫瑰色</div>
-          </div>
-        </div>
-      </div>
 
-      <div class="section body-detail">
-        <div class="section-head">
-          <div class="section-mark">◇</div>
-          <div class="section-title">身材细节</div>
-        </div>
-        <div class="rows">
-          <div class="info-row">
-            <div class="info-icon">↕</div>
-            <div class="info-label">身高</div>
-            <div class="info-value">158cm，动作轻快，跳跃时像被月光托起</div>
+        <div class="section mini-section body-detail">
+          <div class="section-head">
+            <div class="section-mark">◇</div>
+            <div class="section-title">身材细节</div>
           </div>
-          <div class="info-row">
-            <div class="info-icon">◇</div>
-            <div class="info-label">三围</div>
-            <div class="info-value">纤细匀称，整体线条轻盈，礼服轮廓柔和</div>
-          </div>
-          <div class="info-row">
-            <div class="info-icon">⌁</div>
-            <div class="info-label">体态</div>
-            <div class="info-value">站姿端正，动作像跳舞一样轻快，战斗时很有节奏</div>
-          </div>
-          <div class="info-row">
-            <div class="info-icon">◌</div>
-            <div class="info-label">皮肤</div>
-            <div class="info-value">细腻柔软，魔力流动时会泛起很淡的星纹微光</div>
-          </div>
-          <div class="info-row">
-            <div class="info-icon">◍</div>
-            <div class="info-label">皮肤状态</div>
-            <div class="info-value">无明显瑕疵，战斗后会留下短暂星纹，片刻后消散</div>
-          </div>
-          <div class="info-row">
-            <div class="info-icon">△</div>
-            <div class="info-label">肌肉</div>
-            <div class="info-value">薄而有韧性，爆发力隐藏在轻盈动作里</div>
-          </div>
-          <div class="info-row">
-            <div class="info-icon">≋</div>
-            <div class="info-label">肌肉线条</div>
-            <div class="info-value">肩颈与小腿线条清晰但不夸张，整体偏灵巧</div>
+          <div class="mini-list">
+            <div class="mini-item">
+              <div class="mini-icon">◇</div>
+              <div class="mini-label">三围</div>
+              <div class="mini-value">纤细匀称，整体线条轻盈，礼服轮廓柔和</div>
+            </div>
+            <div class="mini-item">
+              <div class="mini-icon">⌁</div>
+              <div class="mini-label">体态</div>
+              <div class="mini-value">站姿端正，动作像跳舞一样轻快，战斗时很有节奏</div>
+            </div>
+            <div class="mini-item">
+              <div class="mini-icon">◌</div>
+              <div class="mini-label">皮肤</div>
+              <div class="mini-value">细腻柔软，魔力流动时会泛起很淡的星纹微光</div>
+            </div>
+            <div class="mini-item">
+              <div class="mini-icon">◍</div>
+              <div class="mini-label">皮肤状态</div>
+              <div class="mini-value">无明显瑕疵，战斗后会留下短暂星纹，片刻后消散</div>
+            </div>
+            <div class="mini-item">
+              <div class="mini-icon">△</div>
+              <div class="mini-label">肌肉</div>
+              <div class="mini-value">薄而有韧性，爆发力隐藏在轻盈动作里</div>
+            </div>
+            <div class="mini-item">
+              <div class="mini-icon">≋</div>
+              <div class="mini-label">肌肉线条</div>
+              <div class="mini-value">肩颈与小腿线条清晰但不夸张，整体偏灵巧</div>
+            </div>
           </div>
         </div>
       </div>
@@ -737,7 +648,7 @@
           <div class="info-row">
             <div class="info-icon">♧</div>
             <div class="info-label">体毛</div>
-            <div class="info-value">设定项示例：区域超高时会缩小字体而不是隐藏文字</div>
+            <div class="info-value">设定项示例：区域高度完全跟随内容，不再固定画布</div>
           </div>
           <div class="info-row">
             <div class="info-icon">✺</div>
@@ -750,34 +661,11 @@
             <div class="info-value">设定项示例：这块以后可以继续放额外内容或图章</div>
           </div>
         </div>
-        <div class="seal" aria-hidden="true">✦</div>
-      </div>
-
-      <div class="section seal-panel" aria-hidden="true">
-        <div class="seal">✦</div>
+        <div class="seal-wrap" aria-hidden="true">
+          <div class="seal">✦</div>
+        </div>
       </div>
     </section>
   </main>
-  <script>
-    (() => {
-      const fitSection = (section) => {
-        const isOverflowing = () => section.scrollHeight > section.clientHeight + 2;
-        if (!isOverflowing()) return;
-        section.classList.add("compact");
-        if (!isOverflowing()) return;
-        section.classList.add("ultra-compact");
-      };
-
-      const fitAll = () => {
-        document.querySelectorAll(".section").forEach(fitSection);
-      };
-
-      if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(() => requestAnimationFrame(fitAll));
-      } else {
-        requestAnimationFrame(fitAll);
-      }
-    })();
-  </script>
 </body>
 </html>
