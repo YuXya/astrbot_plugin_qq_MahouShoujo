@@ -18,7 +18,7 @@
       --glass-strong: rgba(255, 255, 255, 0.84);
       --line: rgba(185, 47, 104, 0.18);
       --row-h: 42px;
-      --profile-row-h: 46px;
+      --profile-row-h: 44px;
     }
 
     * {
@@ -83,7 +83,7 @@
       z-index: 1;
       width: 1920px;
       height: 1080px;
-      padding: 44px 62px 58px;
+      padding: 38px 62px 54px;
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -152,7 +152,7 @@
 
     .header {
       position: relative;
-      height: 136px;
+      height: 124px;
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
@@ -165,7 +165,7 @@
       width: 88px;
       height: 88px;
       position: absolute;
-      top: 10px;
+      top: 6px;
       right: 128px;
       display: grid;
       place-items: center;
@@ -192,7 +192,7 @@
     h1 {
       max-width: 1240px;
       margin-top: 0;
-      font-size: 54px;
+      font-size: 52px;
       font-weight: 900;
       line-height: 1.06;
       letter-spacing: 0;
@@ -211,7 +211,7 @@
       min-height: 0;
       display: grid;
       grid-template-columns: 470px 760px 470px;
-      grid-template-rows: minmax(310px, auto) minmax(0, 1fr);
+      grid-template-rows: minmax(300px, auto) minmax(0, 1fr);
       gap: 22px;
       padding: 4px 8px 0;
     }
@@ -365,7 +365,7 @@
       z-index: 1;
       display: grid;
       grid-auto-rows: minmax(var(--row-h), auto);
-      gap: 5px;
+      gap: 6px;
     }
 
     .info-row {
@@ -375,8 +375,7 @@
       grid-template-columns: 30px 64px minmax(0, 1fr);
       align-items: center;
       column-gap: 10px;
-      padding: 0 12px;
-      overflow: hidden;
+      padding: 7px 12px;
       border: 1px solid rgba(185, 47, 104, 0.12);
       border-radius: 10px;
       background:
@@ -402,47 +401,135 @@
       color: var(--soft-ink);
       font-size: 15px;
       font-weight: 800;
-      line-height: 1.1;
+      line-height: 1.25;
       text-align: center;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     .info-value {
       min-width: 0;
-      max-height: 36px;
       color: var(--ink);
       font-size: 14px;
       font-weight: 700;
-      line-height: 17px;
+      line-height: 1.45;
       text-align: center;
       word-break: break-word;
-      overflow: hidden;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
+      overflow-wrap: anywhere;
     }
 
     .profile .rows {
       grid-auto-rows: minmax(var(--profile-row-h), auto);
-      gap: 4px;
+      gap: 5px;
     }
 
     .profile .info-row {
       min-height: var(--profile-row-h);
       grid-template-columns: 30px 96px minmax(0, 1fr);
+      padding-top: 6px;
+      padding-bottom: 6px;
     }
 
     .profile .info-value {
-      max-height: 45px;
       font-size: 15px;
-      line-height: 15px;
-      -webkit-line-clamp: 3;
+      line-height: 1.38;
     }
 
     .profile .info-label {
       font-size: 15px;
+    }
+
+    .section.compact {
+      padding-top: 16px;
+      padding-bottom: 14px;
+    }
+
+    .section.compact .section-head {
+      height: 36px;
+      margin-bottom: 7px;
+    }
+
+    .section.compact .section-title {
+      font-size: 22px;
+    }
+
+    .section.compact .rows {
+      gap: 3px;
+    }
+
+    .section.compact .info-row {
+      min-height: 34px;
+      padding-top: 4px;
+      padding-bottom: 4px;
+    }
+
+    .section.compact .info-icon {
+      width: 26px;
+      height: 26px;
+      font-size: 15px;
+    }
+
+    .section.compact .info-label {
+      font-size: 13px;
+    }
+
+    .section.compact .info-value {
+      font-size: 12px;
+      line-height: 1.32;
+    }
+
+    .profile.compact .info-value {
+      font-size: 12.5px;
+      line-height: 1.28;
+    }
+
+    .section.ultra-compact {
+      padding-top: 14px;
+      padding-bottom: 12px;
+    }
+
+    .section.ultra-compact .section-head {
+      height: 32px;
+      margin-bottom: 5px;
+    }
+
+    .section.ultra-compact .section-mark {
+      width: 28px;
+      height: 28px;
+      font-size: 15px;
+    }
+
+    .section.ultra-compact .section-title {
+      font-size: 20px;
+    }
+
+    .section.ultra-compact .rows {
+      gap: 2px;
+    }
+
+    .section.ultra-compact .info-row {
+      min-height: 30px;
+      padding-top: 3px;
+      padding-bottom: 3px;
+    }
+
+    .section.ultra-compact .info-icon {
+      width: 24px;
+      height: 24px;
+      font-size: 14px;
+    }
+
+    .section.ultra-compact .info-label {
+      font-size: 12px;
+    }
+
+    .section.ultra-compact .info-value {
+      font-size: 11px;
+      line-height: 1.24;
+    }
+
+    .profile.ultra-compact .info-value {
+      font-size: 11.5px;
+      line-height: 1.22;
     }
   </style>
 </head>
@@ -483,67 +570,67 @@
           <div class="info-row">
             <div class="info-icon">⌛</div>
             <div class="info-label">年龄</div>
-            <div class="info-value">16岁</div>
+            <div class="info-value">16岁，月辉学园二年级生，外表稚嫩但心智坚定</div>
           </div>
           <div class="info-row">
             <div class="info-icon">♛</div>
             <div class="info-label">身份</div>
-            <div class="info-value">月辉学园二年级生，放学后守护街区结界，夜晚负责巡查旧城区</div>
+            <div class="info-value">白天是普通学生，夜晚负责巡查旧城区结界并守护迷路的灵光</div>
           </div>
           <div class="info-row">
             <div class="info-icon">☯</div>
             <div class="info-label">性格</div>
-            <div class="info-value">温柔坚定，遇到危机时会变得格外冷静，也会为了同伴逞强</div>
+            <div class="info-value">温柔坚定，遇到危机时会变得格外冷静，也会为了同伴稍微逞强</div>
           </div>
           <div class="info-row">
             <div class="info-icon">◈</div>
             <div class="info-label">代表色</div>
-            <div class="info-value">蔷薇粉与星尘金</div>
+            <div class="info-value">蔷薇粉与星尘金，变身后裙摆会浮出细碎月辉</div>
           </div>
           <div class="info-row">
             <div class="info-icon">♢</div>
             <div class="info-label">使魔</div>
-            <div class="info-value">会说话的水晶兔露娜，耳尖挂着小小月铃</div>
+            <div class="info-value">会说话的水晶兔露娜，耳尖挂着小小月铃，负责侦测魔力潮汐</div>
           </div>
           <div class="info-row">
             <div class="info-icon">✹</div>
             <div class="info-label">强度</div>
-            <div class="info-value">新星级，爆发时可短暂进入满月形态</div>
+            <div class="info-value">新星级，爆发时可短暂进入满月形态，防御与净化能力特别突出</div>
           </div>
           <div class="info-row">
             <div class="info-icon">⚔</div>
             <div class="info-label">武装</div>
-            <div class="info-value">月辉法杖，可展开星环护盾并折射净化光束</div>
+            <div class="info-value">月辉法杖，可展开星环护盾，并将净化光束折射成花瓣状</div>
           </div>
           <div class="info-row">
             <div class="info-icon">✧</div>
             <div class="info-label">变身服</div>
-            <div class="info-value">层叠纱裙、金色星扣、透明披肩与银白长靴</div>
+            <div class="info-value">层叠纱裙、金色星扣、透明披肩与银白长靴，整体轻盈明亮</div>
           </div>
           <div class="info-row">
             <div class="info-icon">✺</div>
             <div class="info-label">核心能力</div>
-            <div class="info-value">以月光净化污秽，将碎裂的情绪编成守护结晶</div>
+            <div class="info-value">以月光净化污秽，将碎裂的情绪编成守护结晶，为同伴抵挡侵蚀</div>
           </div>
           <div class="info-row">
             <div class="info-icon">§</div>
             <div class="info-label">契约</div>
-            <div class="info-value">守护重要之人的笑容</div>
+            <div class="info-value">守护重要之人的笑容，即使夜晚漫长也不放弃微光</div>
           </div>
           <div class="info-row">
             <div class="info-icon">☆</div>
             <div class="info-label">愿望</div>
-            <div class="info-value">让失去光芒的夜晚重新拥有星星</div>
+            <div class="info-value">让失去光芒的夜晚重新拥有星星，让哭泣的人能安心回家</div>
           </div>
           <div class="info-row">
             <div class="info-icon">✦</div>
             <div class="info-label">魔力</div>
-            <div class="info-value">柔和但延展性极强，适合防御与净化</div>
+            <div class="info-value">柔和但延展性极强，适合防御与净化，持续作战能力稳定</div>
           </div>
           <div class="info-row">
             <div class="info-icon">◆</div>
             <div class="info-label">属性</div>
-            <div class="info-value">月光、蔷薇、结晶</div>
+            <div class="info-value">月光、蔷薇、结晶，偏向守护与净化的复合属性</div>
           </div>
         </div>
       </div>
@@ -591,27 +678,27 @@
           <div class="info-row">
             <div class="info-icon">↕</div>
             <div class="info-label">身高</div>
-            <div class="info-value">158cm</div>
+            <div class="info-value">158cm，动作轻快，跳跃时像被月光托起</div>
           </div>
           <div class="info-row">
             <div class="info-icon">◇</div>
             <div class="info-label">三围</div>
-            <div class="info-value">纤细匀称，整体线条轻盈</div>
+            <div class="info-value">纤细匀称，整体线条轻盈，礼服轮廓柔和</div>
           </div>
           <div class="info-row">
             <div class="info-icon">⌁</div>
             <div class="info-label">体态</div>
-            <div class="info-value">站姿端正，动作像跳舞一样轻快</div>
+            <div class="info-value">站姿端正，动作像跳舞一样轻快，战斗时很有节奏</div>
           </div>
           <div class="info-row">
             <div class="info-icon">◌</div>
             <div class="info-label">皮肤</div>
-            <div class="info-value">细腻柔软，魔力流动时泛起微光</div>
+            <div class="info-value">细腻柔软，魔力流动时会泛起很淡的星纹微光</div>
           </div>
           <div class="info-row">
             <div class="info-icon">◍</div>
             <div class="info-label">皮肤状态</div>
-            <div class="info-value">无明显瑕疵，战斗后会留下短暂星纹</div>
+            <div class="info-value">无明显瑕疵，战斗后会留下短暂星纹，片刻后消散</div>
           </div>
           <div class="info-row">
             <div class="info-icon">△</div>
@@ -621,7 +708,7 @@
           <div class="info-row">
             <div class="info-icon">≋</div>
             <div class="info-label">肌肉线条</div>
-            <div class="info-value">肩颈与小腿线条清晰但不夸张</div>
+            <div class="info-value">肩颈与小腿线条清晰但不夸张，整体偏灵巧</div>
           </div>
         </div>
       </div>
@@ -635,32 +722,32 @@
           <div class="info-row">
             <div class="info-icon">♡</div>
             <div class="info-label">乳房</div>
-            <div class="info-value">设定项示例：请按你的实际生成内容替换</div>
+            <div class="info-value">设定项示例：默认约两行显示，内容更多时字段会自己长高</div>
           </div>
           <div class="info-row">
             <div class="info-icon">⊙</div>
             <div class="info-label">乳首</div>
-            <div class="info-value">设定项示例：固定两行，过长会自动裁切</div>
+            <div class="info-value">设定项示例：不会裁字，长文本会自然换到下一行</div>
           </div>
           <div class="info-row">
             <div class="info-icon">❧</div>
             <div class="info-label">阴唇</div>
-            <div class="info-value">设定项示例：信息居中显示</div>
+            <div class="info-value">设定项示例：信息保持居中，并保留适度上下行距</div>
           </div>
           <div class="info-row">
             <div class="info-icon">♧</div>
             <div class="info-label">体毛</div>
-            <div class="info-value">设定项示例：保持卡片排版稳定</div>
+            <div class="info-value">设定项示例：区域超高时会缩小字体而不是隐藏文字</div>
           </div>
           <div class="info-row">
             <div class="info-icon">✺</div>
             <div class="info-label">敏感度</div>
-            <div class="info-value">设定项示例：右侧不会再撑破画布</div>
+            <div class="info-value">设定项示例：多数情况两行，偶尔三行也能排开</div>
           </div>
           <div class="info-row">
             <div class="info-icon">◇</div>
             <div class="info-label">阴道</div>
-            <div class="info-value">设定项示例：最长显示两行</div>
+            <div class="info-value">设定项示例：这块以后可以继续放额外内容或图章</div>
           </div>
         </div>
         <div class="seal" aria-hidden="true">✦</div>
@@ -671,5 +758,26 @@
       </div>
     </section>
   </main>
+  <script>
+    (() => {
+      const fitSection = (section) => {
+        const isOverflowing = () => section.scrollHeight > section.clientHeight + 2;
+        if (!isOverflowing()) return;
+        section.classList.add("compact");
+        if (!isOverflowing()) return;
+        section.classList.add("ultra-compact");
+      };
+
+      const fitAll = () => {
+        document.querySelectorAll(".section").forEach(fitSection);
+      };
+
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => requestAnimationFrame(fitAll));
+      } else {
+        requestAnimationFrame(fitAll);
+      }
+    })();
+  </script>
 </body>
 </html>

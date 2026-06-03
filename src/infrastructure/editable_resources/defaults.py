@@ -37,3 +37,5 @@ REINCARNATION_PROMPT = _load_prompt("reincarnation_prompt.txt")
 ADVENTURE_DIARY_PROMPT = _load_prompt("adventure_diary_prompt.txt")
 
 DEFAULT_SYSTEM_PROMPT = _load_prompt("default_system_prompt.txt")
+
+CARD_SYSTEM_PROMPT = _load_prompt("card_system_prompt.txt")

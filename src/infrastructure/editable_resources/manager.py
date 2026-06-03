@@ -16,6 +16,7 @@ class EditableResourceManager:
         "reincarnation_prompt": "prompts/reincarnation_prompt.txt",
         "adventure_diary_prompt": "prompts/adventure_diary_prompt.txt",
         "default_system_prompt": "prompts/default_system_prompt.txt",
+        "card_system_prompt": "prompts/card_system_prompt.txt",
     }
 
     def __init__(self, plugin_name: str = "astrbot_plugin_qq_MahouShoujo"):
@@ -208,7 +209,13 @@ class EditableResourceManager:
             },
             {
                 "id": self.PROMPT_FILES["default_system_prompt"],
-                "label": "默认 System Prompt",
+                "label": "冒险 System Prompt",
+                "type": "text",
+                "category": "text_completion",
+            },
+            {
+                "id": self.PROMPT_FILES["card_system_prompt"],
+                "label": "卡片创建 System Prompt",
                 "type": "text",
                 "category": "text_completion",
             },
@@ -223,6 +230,7 @@ class EditableResourceManager:
             self.PROMPT_FILES["reincarnation_prompt"]: defaults.REINCARNATION_PROMPT,
             self.PROMPT_FILES["adventure_diary_prompt"]: defaults.ADVENTURE_DIARY_PROMPT,
             self.PROMPT_FILES["default_system_prompt"]: defaults.DEFAULT_SYSTEM_PROMPT,
+            self.PROMPT_FILES["card_system_prompt"]: defaults.CARD_SYSTEM_PROMPT,
         }
 
     def _default_note_map(self) -> dict[str, str]:
@@ -261,8 +269,12 @@ class EditableResourceManager:
                 "{{supplement_text}}（世界书+区域书+技能书+状态书命中的补充设定，未命中时为空）。"
             ),
             self.PROMPT_FILES["default_system_prompt"]: (
-                "用于 /魔法少女转生 和 /魔法少女冒险 的 system message。"
-                "你可以在这里定义 AI 的基础人格和行为准则。"
+                "用于 /魔法少女冒险 的 system message。"
+                "你可以在这里定义 AI 在冒险日记生成时的基础人格和行为准则。"
+            ),
+            self.PROMPT_FILES["card_system_prompt"]: (
+                "用于 /魔法少女转生 的 system message。"
+                "你可以在这里定义 AI 在角色卡创建时的基础人格和行为准则。"
             ),
         }
 
