@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=1080, initial-scale=1.0">
+  <meta name="viewport" content="width=1920, initial-scale=1.0">
   <style>
     :root {
       --ink: #3d1f2e;
@@ -20,9 +20,9 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
-      width: 1080px;
-      min-width: 1080px;
-      max-width: 1080px;
+      width: 1920px;
+      min-width: 1920px;
+      max-width: 1920px;
       min-height: 1920px;
       overflow-x: hidden;
     }
@@ -55,9 +55,9 @@
 
     .card {
       position: relative;
-      width: 1080px;
+      width: 1920px;
       min-height: 1920px;
-      padding: 60px 72px;
+      padding: 108px 128px;
       z-index: 1;
       display: flex;
       flex-direction: column;
@@ -67,39 +67,39 @@
     .card::before {
       content: "";
       position: absolute;
-      inset: 28px;
-      border: 2px solid rgba(232, 96, 138, 0.25);
-      border-radius: 16px;
+      inset: 50px;
+      border: 3px solid rgba(232, 96, 138, 0.25);
+      border-radius: 28px;
       pointer-events: none;
     }
     .card::after {
       content: "";
       position: absolute;
-      inset: 36px;
+      inset: 64px;
       border: 1px solid rgba(212, 166, 90, 0.2);
-      border-radius: 12px;
+      border-radius: 22px;
       pointer-events: none;
     }
 
     /* ── 角落装饰 ── */
     .corner {
       position: absolute;
-      width: 60px;
-      height: 60px;
+      width: 108px;
+      height: 108px;
       border-color: var(--gold);
       border-style: solid;
       opacity: 0.45;
       z-index: 2;
     }
-    .corner.tl { top: 42px; left: 42px; border-width: 3px 0 0 3px; border-radius: 8px 0 0 0; }
-    .corner.tr { top: 42px; right: 42px; border-width: 3px 3px 0 0; border-radius: 0 8px 0 0; }
-    .corner.bl { bottom: 42px; left: 42px; border-width: 0 0 3px 3px; border-radius: 0 0 0 8px; }
-    .corner.br { bottom: 42px; right: 42px; border-width: 0 3px 3px 0; border-radius: 0 0 8px 0; }
+    .corner.tl { top: 76px; left: 76px; border-width: 5px 0 0 5px; border-radius: 14px 0 0 0; }
+    .corner.tr { top: 76px; right: 76px; border-width: 5px 5px 0 0; border-radius: 0 14px 0 0; }
+    .corner.bl { bottom: 76px; left: 76px; border-width: 0 0 5px 5px; border-radius: 0 0 0 14px; }
+    .corner.br { bottom: 76px; right: 76px; border-width: 0 5px 5px 0; border-radius: 0 0 14px 0; }
 
     /* ── 标题区 ── */
     .title-area {
       text-align: center;
-      padding: 40px 0 50px;
+      padding: 72px 0 88px;
       position: relative;
     }
 
@@ -107,113 +107,113 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 24px;
-      margin-bottom: 16px;
+      gap: 44px;
+      margin-bottom: 28px;
     }
 
     .title-deco .line {
-      width: 120px;
-      height: 1px;
+      width: 216px;
+      height: 2px;
       background: linear-gradient(90deg, transparent, var(--gold), transparent);
     }
 
     .title-deco .star {
-      font-size: 28px;
+      font-size: 50px;
       color: var(--gold);
     }
 
     .title-eyebrow {
-      font-size: 22px;
-      letter-spacing: 12px;
+      font-size: 40px;
+      letter-spacing: 22px;
       color: var(--muted);
       font-weight: 400;
-      margin-bottom: 12px;
+      margin-bottom: 20px;
       text-transform: uppercase;
     }
 
     h1 {
-      font-size: 72px;
+      font-size: 128px;
       font-weight: 900;
       color: var(--pink-deep);
-      letter-spacing: 6px;
+      letter-spacing: 11px;
       line-height: 1.2;
-      text-shadow: 0 2px 8px rgba(232, 96, 138, 0.15);
+      text-shadow: 0 4px 14px rgba(232, 96, 138, 0.15);
     }
 
     .title-divider {
-      width: 360px;
-      height: 3px;
-      margin: 28px auto 0;
+      width: 640px;
+      height: 5px;
+      margin: 50px auto 0;
       background: linear-gradient(90deg, transparent, var(--pink), var(--gold), var(--pink), transparent);
-      border-radius: 2px;
+      border-radius: 3px;
     }
 
     .player-name-line {
-      margin-top: 20px;
-      font-size: 26px;
+      margin-top: 36px;
+      font-size: 46px;
       color: var(--muted);
       font-weight: 400;
-      letter-spacing: 2px;
+      letter-spacing: 4px;
     }
 
     /* ── 双列内容区 ── */
     .columns {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 36px;
+      gap: 64px;
       flex: 1;
     }
 
     .column {
       display: flex;
       flex-direction: column;
-      gap: 32px;
+      gap: 56px;
     }
 
     /* ── 分组区块 ── */
     .section {
       background: var(--section-bg);
       border: 1px solid var(--section-border);
-      border-radius: 12px;
-      padding: 28px 30px;
+      border-radius: 22px;
+      padding: 50px 54px;
       backdrop-filter: blur(4px);
     }
 
     .section-header {
       display: flex;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 22px;
-      padding-bottom: 14px;
+      gap: 22px;
+      margin-bottom: 40px;
+      padding-bottom: 24px;
       border-bottom: 1px solid rgba(232, 96, 138, 0.18);
     }
 
     .section-icon {
-      width: 36px;
-      height: 36px;
+      width: 64px;
+      height: 64px;
       border-radius: 50%;
       background: linear-gradient(135deg, var(--pink-light), var(--pink));
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
+      font-size: 28px;
       color: #fff;
       font-weight: 700;
       flex-shrink: 0;
     }
 
     .section-title {
-      font-size: 30px;
+      font-size: 54px;
       font-weight: 800;
       color: var(--pink);
-      letter-spacing: 3px;
+      letter-spacing: 5px;
     }
 
     /* ── 信息行 ── */
     .info-row {
       display: flex;
       align-items: baseline;
-      padding: 10px 0;
+      padding: 18px 0;
       border-bottom: 1px dashed rgba(232, 96, 138, 0.1);
     }
 
@@ -224,14 +224,14 @@
 
     .info-label {
       flex-shrink: 0;
-      width: 140px;
-      font-size: 22px;
+      width: 248px;
+      font-size: 40px;
       color: var(--muted);
       font-weight: 500;
     }
 
     .info-value {
-      font-size: 24px;
+      font-size: 42px;
       color: var(--ink);
       font-weight: 700;
       line-height: 1.5;
@@ -240,21 +240,21 @@
     /* ── 页脚 ── */
     .footer-area {
       text-align: center;
-      padding: 40px 0 20px;
+      padding: 72px 0 36px;
       position: relative;
     }
 
     .footer-divider {
-      width: 280px;
-      height: 1px;
-      margin: 0 auto 20px;
+      width: 500px;
+      height: 2px;
+      margin: 0 auto 36px;
       background: linear-gradient(90deg, transparent, var(--gold), transparent);
     }
 
     .footer-text {
-      font-size: 20px;
+      font-size: 36px;
       color: var(--muted);
-      letter-spacing: 4px;
+      letter-spacing: 7px;
       opacity: 0.7;
     }
   </style>
