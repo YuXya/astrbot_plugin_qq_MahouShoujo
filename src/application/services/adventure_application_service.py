@@ -29,6 +29,7 @@ class AdventureApplicationService:
         user_id: str | None = None,
         nickname: str | None = None,
         umo: str | None = None,
+        avatar_url: str | None = None,
     ) -> AdventureExecutionResult:
         theme = (theme or "/魔法少女转生").strip()
 
@@ -45,6 +46,9 @@ class AdventureApplicationService:
                 )
                 card = analysis.card
                 raw_response = analysis.raw_response
+
+            if avatar_url:
+                card.avatar_url = avatar_url
 
             image_path, _html = await self.card_generator.generate_image_card(
                 card,

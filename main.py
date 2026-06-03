@@ -24,6 +24,7 @@ from .src.infrastructure.analysis.llm_adventure_diary_analyzer import (
 )
 from .src.infrastructure.config.config_manager import ConfigManager
 from .src.infrastructure.editable_resources import EditableResourceManager
+from .src.infrastructure.messaging.avatar_service import QQAvatarService
 from .src.infrastructure.messaging.message_sender import MessageSender
 from .src.infrastructure.reporting.generators import ReportGenerator
 from .src.infrastructure.storage import PlayerSaveRepository, PlayerTaskQueue
@@ -60,6 +61,7 @@ class QQMahouShoujo(Star):
     report_generator: ReportGenerator
     adventure_service: AdventureApplicationService
     diary_service: AdventureDiaryApplicationService
+    avatar_service: QQAvatarService
     message_sender: MessageSender
     save_repository: PlayerSaveRepository
     player_queue: PlayerTaskQueue
@@ -91,6 +93,7 @@ class QQMahouShoujo(Star):
             self.llm_analyzer,
             self.report_generator,
         )
+        self.avatar_service = QQAvatarService()
         self.message_sender = MessageSender()
         self.save_repository = PlayerSaveRepository(
             editable_manager=self.editable_manager,
@@ -274,6 +277,7 @@ class QQMahouShoujo(Star):
         preference_text: str = "",
     ) -> AsyncGenerator:
         nickname = self._get_sender_name_from_event(event)
+        avatar_url = self.avatar_service.build_avatar_url(user_id)
         if preference_text:
             progress = "已读取转生自定义设定"
         else:
@@ -295,6 +299,7 @@ class QQMahouShoujo(Star):
             user_id=user_id,
             nickname=nickname,
             umo=umo,
+            avatar_url=avatar_url,
         )
 
         if result.error:
@@ -306,6 +311,7 @@ class QQMahouShoujo(Star):
                 user_id=user_id,
                 card=result.card,
                 nickname=nickname,
+                avatar_url=avatar_url,
             )
 
         yield await self.message_sender.send_image_or_text(
@@ -358,6 +364,7 @@ class QQMahouShoujo(Star):
 
         action_text = self._extract_command_tail(event, "魔法少女战斗测试中")
         nickname = self._get_sender_name_from_event(event)
+        avatar_url = self.avatar_service.build_avatar_url(user_id)
         umo = getattr(event, "unified_msg_origin", None)
         if not umo:
             platform_id = self._get_platform_id_from_event(event)
@@ -373,6 +380,7 @@ class QQMahouShoujo(Star):
             action_text=action_text,
             umo=umo,
             html_render_func=self.html_render,
+            avatar_url=avatar_url,
         )
 
         if result.error:

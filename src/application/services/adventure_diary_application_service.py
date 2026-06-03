@@ -31,6 +31,7 @@ class AdventureDiaryApplicationService:
         action_text: str,
         umo: str | None,
         html_render_func,
+        avatar_url: str | None = None,
     ) -> AdventureDiaryExecutionResult:
         try:
             save_data = self.save_repository.load_player_save(group_id, user_id)
@@ -65,6 +66,9 @@ class AdventureDiaryApplicationService:
                 current_world_date=current_world_date,
             )
             card = analysis.card
+
+            if avatar_url:
+                card.avatar_url = avatar_url
 
             protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
             current_level = self.domain_service.get_current_level(protagonist)

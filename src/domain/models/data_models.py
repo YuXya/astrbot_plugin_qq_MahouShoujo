@@ -20,6 +20,7 @@ class ReincarnationCard:
     属性访问器从树中提取关键值，供文本展示和图片渲染使用。
     """
     info: list[dict[str, Any]] = field(default_factory=list)
+    avatar_url: str = ""
 
     # ── 路径树构建 ──────────────────────────────────
 
@@ -110,6 +111,7 @@ class AdventureDiaryCard:
     update_changes: list[dict[str, Any]] = field(default_factory=list)
     state_snapshot: dict[str, Any] = field(default_factory=dict)
     footer: str = ""
+    avatar_url: str = ""
 
     def to_text(self) -> str:
         parts = [

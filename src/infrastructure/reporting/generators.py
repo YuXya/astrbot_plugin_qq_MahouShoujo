@@ -38,6 +38,7 @@ class ReportGenerator(ICardGenerator):
         html_content = self.html_templates.render_template(
             "card.html",
             card=card,
+            avatar_url=card.avatar_url,
         )
         if not html_content:
             return None, None
@@ -98,6 +99,7 @@ class ReportGenerator(ICardGenerator):
             state_items=build_state_display_items(card.state_snapshot, limit=9),
             level_label=level_display(card.state_snapshot),
             level_exp_percent=level_exp_percent(card.state_snapshot),
+            avatar_url=card.avatar_url,
         )
         if not html_content:
             return None, None
