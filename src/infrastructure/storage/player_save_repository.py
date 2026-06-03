@@ -43,6 +43,7 @@ def _now_date_str() -> str:
 class PlayerSaveRepository:
     SOURCE_FILE_NAMES = {
         "player_data.json",
+        "player_data_update.json",
         "cameo_memory.jsonl",
         "daily_memory.jsonl",
     }
@@ -217,6 +218,20 @@ class PlayerSaveRepository:
         tmp_path.write_text(text + ("\n" if text else ""), encoding="utf-8")
         tmp_path.replace(path)
 
+    # ── 玩家数据读取 ──────────────────────────────────
+
+    def _load_current_player_data(self, user_dir: Path) -> dict[str, Any]:
+        """读取当前玩家数据（优先 player_data_update.json，回退 player_data.json）。"""
+        update_data = self._read_json(user_dir / "player_data_update.json")
+        if update_data:
+            return update_data
+        return self._read_json(user_dir / "player_data.json")
+
+    def _save_current_player_data(self, user_dir: Path, data: dict[str, Any]) -> None:
+        """保存玩家数据变更到 player_data_update.json。"""
+        update_path = user_dir / "player_data_update.json"
+        self._atomic_write_json(update_path, data)
+
     # ── 转生存档 ──────────────────────────────────
 
     def save_reincarnation(
@@ -250,6 +265,11 @@ class PlayerSaveRepository:
         player_data_path = user_dir / "player_data.json"
         self._atomic_write_json(player_data_path, player_data)
 
+        # 同时创建 player_data_update.json（当前实时状态的副本）
+        update_data = dict(player_data)
+        update_data["updated_at"] = _now_date_str()
+        self._atomic_write_json(user_dir / "player_data_update.json", update_data)
+
         self.append_log(
             group_id,
             user_id,
@@ -276,7 +296,7 @@ class PlayerSaveRepository:
         if not player_data_path.exists():
             return None
 
-        player_data = self._read_json(player_data_path)
+        player_data = self._load_current_player_data(user_dir)
         if not player_data:
             return None
 
@@ -318,8 +338,7 @@ class PlayerSaveRepository:
         world_date = self.format_world_date(world_day_offset)
         card.date_label = world_date
 
-        player_data_path = user_dir / "player_data.json"
-        player_data = self._read_json(player_data_path)
+        player_data = self._load_current_player_data(user_dir)
         if not player_data:
             player_data = self._create_default_player_data(group_id, user_id)
 
@@ -342,7 +361,7 @@ class PlayerSaveRepository:
             teammate_names=teammate_names,
         )
         card.state_snapshot = dict(player_data)
-        self._atomic_write_json(player_data_path, player_data)
+        self._save_current_player_data(user_dir, player_data)
 
         # 应用队友状态变化
         if teammate_state_changes:
@@ -646,7 +665,7 @@ class PlayerSaveRepository:
             if not users_dir.exists():
                 continue
             for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
-                player_data = self._read_json(user_dir / "player_data.json")
+                player_data = self._load_current_player_data(user_dir)
                 if not player_data:
                     continue
                 protagonist = player_data.get("主角", {})
@@ -693,7 +712,7 @@ class PlayerSaveRepository:
             if user_dir.name == current_user:
                 continue
 
-            player_data = self._read_json(user_dir / "player_data.json")
+            player_data = self._load_current_player_data(user_dir)
             target_name = self._get_nested(
                 player_data.get("主角", {}) if isinstance(player_data, dict) else {},
                 ["个人信息", "姓名"],
@@ -711,8 +730,7 @@ class PlayerSaveRepository:
         if not user_dir.exists():
             return None
 
-        player_data_path = user_dir / "player_data.json"
-        player_data = self._read_json(player_data_path)
+        player_data = self._load_current_player_data(user_dir)
         if not player_data:
             return None
 
@@ -744,10 +762,9 @@ class PlayerSaveRepository:
         updates: dict[str, Any],
     ) -> None:
         user_dir = self.get_user_dir(group_id, user_id)
-        player_data_path = user_dir / "player_data.json"
-        player_data = self._read_json(player_data_path)
+        player_data = self._load_current_player_data(user_dir)
         if not player_data:
-            raise ValueError("玩家 player_data.json 不存在或无法读取")
+            raise ValueError("玩家存档不存在或无法读取")
 
         protagonist = player_data.setdefault("主角", {})
         # updates 是一个 { path_tail: value } 的扁平字典
@@ -764,7 +781,7 @@ class PlayerSaveRepository:
             player_data["nickname"] = name
 
         player_data["updated_at"] = _now_date_str()
-        self._atomic_write_json(player_data_path, player_data)
+        self._save_current_player_data(user_dir, player_data)
 
     # ── 源码文件管理 ──────────────────────────────────
 
@@ -846,10 +863,9 @@ class PlayerSaveRepository:
 
     def reset_player_state(self, group_id: str, user_id: str) -> None:
         user_dir = self.get_user_dir(group_id, user_id)
-        player_data_path = user_dir / "player_data.json"
-        player_data = self._read_json(player_data_path)
+        player_data = self._load_current_player_data(user_dir)
         if not player_data:
-            raise ValueError("玩家 player_data.json 不存在或无法读取")
+            raise ValueError("玩家存档不存在或无法读取")
 
         # 保留元信息和人物描述，只重置状态节点
         protagonist = player_data.setdefault("主角", {})
@@ -860,9 +876,7 @@ class PlayerSaveRepository:
         protagonist["等级"] = {"等级": 1, "经验": 0}
 
         player_data["updated_at"] = _now_date_str()
-        if player_data_path.exists():
-            self._backup_source_file(player_data_path)
-        self._atomic_write_json(player_data_path, player_data)
+        self._save_current_player_data(user_dir, player_data)
 
     def delete_player_save(self, group_id: str, user_id: str) -> bool:
         user_dir = self.get_user_dir(group_id, user_id)
@@ -1038,7 +1052,7 @@ class PlayerSaveRepository:
         *,
         source: str,
     ) -> dict[str, Any] | None:
-        player_data = self._read_json(user_dir / "player_data.json")
+        player_data = self._load_current_player_data(user_dir)
         if not player_data:
             return None
         protagonist = player_data.get("主角", {})
@@ -1191,17 +1205,14 @@ class PlayerSaveRepository:
             if not target_user_dir:
                 logger.debug(f"未找到队友 {teammate_name} 的存档，跳过状态变化")
                 continue
-            player_data_path = target_user_dir / "player_data.json"
-            if not player_data_path.exists():
-                continue
-            player_data = self._read_json(player_data_path)
+            player_data = self._load_current_player_data(target_user_dir)
             if not isinstance(player_data, dict):
                 continue
             self._remove_economy_state(player_data)
             self._remove_location_state(player_data)
             self._apply_state_changes(player_data, changes)
             player_data["updated_at"] = _now_date_str()
-            self._atomic_write_json(player_data_path, player_data)
+            self._save_current_player_data(target_user_dir, player_data)
             logger.info(f"已应用队友 {teammate_name} 的状态变化: {changes}")
 
     @staticmethod
@@ -1261,7 +1272,7 @@ class PlayerSaveRepository:
         protagonist = str(protagonist or "").strip()
         names: set[str] = set()
         for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
-            player_data = self._read_json(user_dir / "player_data.json")
+            player_data = self._load_current_player_data(user_dir)
             if not isinstance(player_data, dict):
                 continue
             name = self._get_nested(
@@ -1306,10 +1317,7 @@ class PlayerSaveRepository:
             if not target_user_dir:
                 logger.debug(f"未找到队友 {name} 的存档，跳过等级经验")
                 continue
-            player_data_path = target_user_dir / "player_data.json"
-            if not player_data_path.exists():
-                continue
-            player_data = self._read_json(player_data_path)
+            player_data = self._load_current_player_data(target_user_dir)
             if not isinstance(player_data, dict):
                 continue
             self._remove_economy_state(player_data)
@@ -1345,7 +1353,7 @@ class PlayerSaveRepository:
             if isinstance(protagonist, dict):
                 protagonist["等级"] = {"等级": level, "经验": max(0, min(new_exp, 99))}
             player_data["updated_at"] = _now_date_str()
-            self._atomic_write_json(player_data_path, player_data)
+            self._save_current_player_data(target_user_dir, player_data)
             logger.info(
                 f"已应用队友 {name} 的等级经验: "
                 f"base={level_exp_delta}, adjusted={adjusted}, "
@@ -1374,7 +1382,7 @@ class PlayerSaveRepository:
         protagonist_name = str(card.target_name or "").strip()
         matched: set[str] = set()
         for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
-            player_data = self._read_json(user_dir / "player_data.json")
+            player_data = self._load_current_player_data(user_dir)
             if not isinstance(player_data, dict):
                 continue
             name = self._get_nested(
@@ -1396,7 +1404,7 @@ class PlayerSaveRepository:
         if not users_dir.exists():
             return None
         for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
-            player_data = self._read_json(user_dir / "player_data.json")
+            player_data = self._load_current_player_data(user_dir)
             if isinstance(player_data, dict):
                 name = self._get_nested(
                     player_data.get("主角", {}),

@@ -254,9 +254,9 @@ class EditableResourceManager:
             ),
             self.PROMPT_FILES["adventure_diary_prompt"]: (
                 "用于 /魔法少女冒险 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
-                "可用变量：{{target_name}}、{{class_name}}、{{appearance}}、{{personality}}、{{talent}}"
-                "（来自玩家转生人物卡，用于第一人称人格设定）；"
-                "{{player_name}}、{{current_level}}、{{profile_card_json}}、{{state_json}}、"
+                "可用变量：{{player_data_update_json}}"
+                "（来自玩家当前人物卡，包含全部属性和状态，用于第一人称人格设定和状态参考）；"
+                "{{player_name}}、{{current_level}}、"
                 "{{logs_text}}、{{cameo_memories_text}}、{{current_world_date}}、{{action}}、"
                 "{{supplement_text}}（世界书+区域书+技能书+状态书命中的补充设定，未命中时为空）。"
             ),

@@ -1925,6 +1925,9 @@ class SaveWebViewer:
         player_data = detail.get("player_data", {})
         logs = detail.get("logs", [])
         cameo_memories = detail.get("cameo_memories", [])
+        # 读取初始状态用于对比展示
+        user_dir = self.repository.get_user_dir(group_id, user_id)
+        player_data_base = self.repository._read_json(user_dir / "player_data.json")
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
         title_name = self._get_nested(protagonist, ["个人信息", "姓名"], player_data.get("nickname", "")) or user_id
         summary = self._player_summary_html(
@@ -2033,8 +2036,12 @@ class SaveWebViewer:
             </section>
             <section class="detail-grid raw-grid">
               <details class="raw-panel">
-                <summary>查看 player_data.json</summary>
+                <summary>查看当前状态（player_data_update.json）</summary>
                 <pre>{self._e_json(player_data)}</pre>
+              </details>
+              <details class="raw-panel">
+                <summary>查看初始状态（player_data.json）</summary>
+                <pre>{self._e_json(player_data_base)}</pre>
               </details>
             </section>
             {state_overview}

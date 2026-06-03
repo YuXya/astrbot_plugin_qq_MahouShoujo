@@ -17,6 +17,7 @@ class ReincarnationCard:
 
     LLM 输出 info 数组，每项含 field/path/description。
     build_protagonist_tree() 将 info 数组转换为嵌套字典存入 player_data.json。
+    运行时所有变更写入 player_data_update.json，player_data.json 仅在转生时写入。
     属性访问器从树中提取关键值，供文本展示和图片渲染使用。
     """
     info: list[dict[str, Any]] = field(default_factory=list)

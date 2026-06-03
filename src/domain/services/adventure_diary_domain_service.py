@@ -15,7 +15,7 @@ class AdventureDiaryDomainService:
     ) -> AdventureDiaryCard:
         """规范化冒险日记卡。
 
-        player_data 是完整的 player_data.json 内容（含主角树）。
+        player_data 是完整的当前玩家数据（来自 player_data_update.json 或 player_data.json，含主角树）。
         """
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
         update_changes = self.normalize_update_changes(

@@ -171,21 +171,12 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         cameo_memories_text = self._format_cameo_memories(cameo_memories)
         logs_text = self._format_logs(logs)
 
-        # 从主角树提取 profile card 展示用字段
-        profile_card = self._build_profile_card_for_prompt(protagonist)
-
         return self.editable_manager.render_prompt(
             "adventure_diary_prompt",
             {
-                "target_name": self._get_nested(protagonist, ["个人信息", "姓名"], "无名冒险者"),
-                "class_name": self._get_nested(protagonist, ["个人信息", "身份&职业"], "新手冒险者"),
-                "appearance": self._get_nested(protagonist, ["相貌特征", "脸型"], "转生后的可爱魔法少女外貌"),
-                "personality": self._get_nested(protagonist, ["个人信息", "性格特质"], "保留转生卡中的性格"),
-                "talent": self._get_nested(protagonist, ["个人信息", "核心能力"], "尚未觉醒的天赋"),
+                "player_data_update_json": self._json_dump(player_data),
                 "player_name": nickname or self._get_nested(protagonist, ["个人信息", "姓名"], "") or user_id or "unknown",
                 "current_level": current_level,
-                "profile_card_json": self._json_dump(profile_card),
-                "state_json": self._json_dump(protagonist),
                 "logs_text": logs_text,
                 "cameo_memories_text": cameo_memories_text,
                 "action": action,
@@ -263,16 +254,6 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         if self.config_manager.get_debug_mode():
             self._save_debug_file("cameo_compress_response", result_text)
         return result_text.strip()
-
-    @staticmethod
-    def _build_profile_card_for_prompt(protagonist: dict) -> dict:
-        """从主角树构建 profile_card_json（个人信息 + 相貌 + 身材 + 性器官特征）。"""
-        card = {}
-        for section in ("个人信息", "相貌特征", "身材细节", "性器官特征"):
-            data = protagonist.get(section)
-            if isinstance(data, dict):
-                card[section] = data
-        return card
 
     @staticmethod
     def _get_nested(data: dict, keys: list[str], default: str = "") -> str:
