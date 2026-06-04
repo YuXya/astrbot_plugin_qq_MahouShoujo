@@ -1598,6 +1598,160 @@ class SaveWebViewer:
             .replace("\u2029", "\\u2029")
         )
 
+    async def _editable_source(self, request: web.Request) -> web.Response:
+        if not self._is_admin(request):
+            return self._forbidden()
+
+        file_id = request.query.get("id", "")
+        if not self._is_structured_book_file(file_id):
+            raise web.HTTPBadRequest(text="invalid editable source file")
+        category = self._editable_back_category(request.query.get("category"), file_id)
+        content = self.editable_manager.read_text(file_id)
+        return self._source_editor_response(
+            title=f"编辑源码 - {file_id}",
+            back_url=self._url(
+                f"/editable/file?id={quote(file_id, safe='')}&category={self._e(category)}"
+            ),
+            save_url=self._url("/editable/source/save"),
+            hidden_fields={
+                "id": file_id,
+                "category": category,
+            },
+            content=content,
+            file_name=file_id,
+            import_url=self._url("/editable/import"),
+            export_url=self._url(f"/editable/export?id={quote(file_id, safe='')}"),
+            accept=".json,application/json",
+        )
+
+    async def _editable_source_save(self, request: web.Request) -> web.Response:
+        if not self._is_admin(request):
+            return self._forbidden()
+
+        data = await request.post()
+        file_id = str(data.get("id", ""))
+        category = self._editable_back_category(str(data.get("category", "")), file_id)
+        content = str(data.get("content", ""))
+        if not self._is_structured_book_file(file_id):
+            raise web.HTTPBadRequest(text="invalid editable source file")
+        try:
+            self.editable_manager.write_json_book(file_id, content)
+        except Exception as exc:
+            return self._source_editor_response(
+                title=f"编辑源码 - {file_id}",
+                back_url=self._url(
+                    f"/editable/file?id={quote(file_id, safe='')}&category={self._e(category)}"
+                ),
+                save_url=self._url("/editable/source/save"),
+                hidden_fields={"id": file_id, "category": category},
+                content=content,
+                file_name=file_id,
+                import_url=self._url("/editable/import"),
+                export_url=self._url(f"/editable/export?id={quote(file_id, safe='')}"),
+                accept=".json,application/json",
+                warning=str(exc),
+            )
+        raise web.HTTPFound(
+            self._url(f"/editable/file?id={quote(file_id, safe='')}&category={self._e(category)}")
+        )
+
+    async def _editable_export(self, request: web.Request) -> web.Response:
+        if not self._is_admin(request):
+            return self._forbidden()
+
+        file_id = request.query.get("id", "")
+        if not self._is_structured_book_file(file_id):
+            raise web.HTTPBadRequest(text="invalid editable export file")
+        content = self.editable_manager.read_text(file_id)
+        return self._download_response(file_id.replace("/", "_"), content, "application/json")
+
+    async def _editable_export_key_info(self, request: web.Request) -> web.Response:
+        if not self._is_admin(request):
+            return self._forbidden()
+
+        file_id = request.query.get("id", "")
+        if not self._is_structured_book_file(file_id):
+            raise web.HTTPBadRequest(text="invalid editable key info export file")
+        content = self.editable_manager.read_text(file_id)
+        try:
+            key_info = self._format_book_key_info(json.loads(content), file_id=file_id)
+        except Exception as exc:
+            raise web.HTTPBadRequest(text=f"invalid editable book JSON: {exc}") from exc
+
+        filename = file_id.replace("/", "_").replace(".json", "_key_info.txt")
+        return self._download_response(filename, key_info, "text/plain")
+
+    async def _editable_import(self, request: web.Request) -> web.Response:
+        if not self._is_admin(request):
+            return self._forbidden()
+
+        data = await request.post()
+        file_id = str(data.get("id", ""))
+        category = self._editable_back_category(str(data.get("category", "")), file_id)
+        if not self._is_structured_book_file(file_id):
+            raise web.HTTPBadRequest(text="invalid editable import file")
+        content = await self._form_text_content(data)
+        try:
+            self.editable_manager.write_json_book(file_id, content)
+        except Exception as exc:
+            return self._source_editor_response(
+                title=f"导入失败 - {file_id}",
+                back_url=self._url(
+                    f"/editable/file?id={quote(file_id, safe='')}&category={self._e(category)}"
+                ),
+                save_url=self._url("/editable/source/save"),
+                hidden_fields={"id": file_id, "category": category},
+                content=content,
+                file_name=file_id,
+                import_url=self._url("/editable/import"),
+                export_url=self._url(f"/editable/export?id={quote(file_id, safe='')}"),
+                accept=".json,application/json",
+                warning=str(exc),
+            )
+        raise web.HTTPFound(
+            self._url(f"/editable/file?id={quote(file_id, safe='')}&category={self._e(category)}")
+        )
+
+    async def _editable_save(self, request: web.Request) -> web.Response:
+        if not self._is_admin(request):
+            return self._forbidden()
+
+        data = await request.post()
+        file_id = str(data.get("id", ""))
+        category = self._editable_back_category(str(data.get("category", "")), file_id)
+        note = str(data.get("note", ""))
+        content = str(data.get("content", ""))
+        if not self._is_editable_file(file_id):
+            raise web.HTTPBadRequest(text="invalid editable file")
+
+        try:
+            if file_id == "world_book/default.json":
+                json.loads(content)
+                self.editable_manager.write_world_book(content)
+            elif file_id in {
+                "skill_book/default.json",
+                "status_book/default.json",
+                "event_book/default.json",
+            }:
+                self.editable_manager.write_json_book(file_id, content)
+            else:
+                self.editable_manager.write_text(file_id, content)
+            self.editable_manager.write_note(file_id, note)
+        except Exception as exc:
+            return self._html_response(
+                "保存失败",
+                f"""
+                <h1>保存失败</h1>
+                <p class="error">{self._e(exc)}</p>
+                <p><a href="{self._url(f'/editable/file?id={quote(file_id, safe="")}&category={self._e(category)}')}">返回编辑</a></p>
+                """,
+                status=400,
+            )
+
+        raise web.HTTPFound(
+            self._url(f"/editable/file?id={quote(file_id, safe='')}&category={self._e(category)}")
+        )
+
     async def _editable_reset(self, request: web.Request) -> web.Response:
         if not self._is_admin(request):
             return self._forbidden()
