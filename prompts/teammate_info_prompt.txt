@@ -1,6 +1,0 @@
-【多人发送的队友信息】
-本次命中 {{teammate_count}} 名其他魔法少女；每名队友最多发送最近 {{recent_record_count}} 条事件记录。
-
-以下 JSON 只包含可用于本次战斗描写的队友公开信息。若让队友实际参与战斗，请在最终 JSON 的 participants 中写入对应“魔法少女名”；若队友发生技能、状态、特质等存档变化，请在 update.changes 中使用 /队友名/... 路径写入。
-
-{{teammates_json}}

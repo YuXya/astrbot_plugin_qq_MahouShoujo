@@ -172,7 +172,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         )
         cameo_memories_text = self._format_cameo_memories(cameo_memories)
         logs_text = self._format_logs(logs)
-        teammate_info_text = self._format_teammate_info(nearby_players)
+        teammate_info = self._format_teammate_info(nearby_players)
 
         return self.editable_manager.render_prompt(
             "adventure_diary_prompt",
@@ -185,7 +185,9 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
                 "action": action,
                 "current_world_date": current_world_date,
                 "supplement_text": supplement_text,
-                "teammate_info_text": teammate_info_text,
+                "teammate_count": teammate_info["count"],
+                "recent_record_count": teammate_info["recent_record_count"],
+                "teammates_json": teammate_info["json"],
             },
         )
 
@@ -393,9 +395,14 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
                 )
         return "\n\n".join(parts)
 
-    def _format_teammate_info(self, nearby_players: list[dict] | None) -> str:
+    def _format_teammate_info(self, nearby_players: list[dict] | None) -> dict[str, object]:
+        recent_record_count = self.config_manager.get_teammate_recent_record_count()
         if not nearby_players:
-            return ""
+            return {
+                "count": 0,
+                "recent_record_count": recent_record_count,
+                "json": "[]",
+            }
         fields = [
             "魔法少女名",
             "武装",
@@ -422,16 +429,16 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             public_item["魔法少女名"] = name
             teammates.append(public_item)
         if not teammates:
-            return ""
-        recent_record_count = self.config_manager.get_teammate_recent_record_count()
-        return self.editable_manager.render_prompt(
-            "teammate_info_prompt",
-            {
-                "teammates_json": self._json_dump(teammates),
-                "teammate_count": len(teammates),
+            return {
+                "count": 0,
                 "recent_record_count": recent_record_count,
-            },
-        ).strip()
+                "json": "[]",
+            }
+        return {
+            "count": len(teammates),
+            "recent_record_count": recent_record_count,
+            "json": self._json_dump(teammates),
+        }
 
     @staticmethod
     def _world_diary_title(item: dict) -> str:
