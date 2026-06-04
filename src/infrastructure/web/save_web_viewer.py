@@ -1950,7 +1950,7 @@ class SaveWebViewer:
         log_note = (
             "删除单条记录只会移除 daily_memory.jsonl 中对应一行，不会回滚当前状态。"
             if is_admin
-            else "这里展示该存档最近的冒险记录。"
+            else "这里展示该存档最近的战斗记录。"
         )
         cameo_note = (
             "删除单条记录只会移除 cameo_memory.jsonl 中对应一行。"
@@ -1962,8 +1962,8 @@ class SaveWebViewer:
                 group_id,
                 user_id,
                 "/player/log/clear",
-                "删除全部冒险记录",
-                "确定删除该玩家的全部冒险记录？当前状态不会自动回滚。",
+                "删除全部战斗记录",
+                "确定删除该玩家的全部战斗记录？当前状态不会自动回滚。",
             )
             if is_admin
             else ""
@@ -2017,7 +2017,7 @@ class SaveWebViewer:
             <section class="detail-panel">
               <div class="section-head">
                 <div>
-                  <h2>冒险记录</h2>
+                  <h2>战斗记录</h2>
                   <p class="muted">{self._e(log_note)}</p>
                 </div>
                 {log_clear_button}
@@ -2336,14 +2336,14 @@ class SaveWebViewer:
         allow_delete: bool = False,
     ) -> str:
         if not logs:
-            return "<p class=\"muted empty-state\">还没有冒险记录。</p>"
+            return "<p class=\"muted empty-state\">还没有战斗记录。</p>"
 
         cards: list[str] = []
         for display_index, log in enumerate(logs, start=1):
             log_index = int(log.get("_log_index", -1))
             raw_log_type = str(log.get("type", "log"))
             log_type = self._e(raw_log_type)
-            title = self._e(log.get("title") or log.get("message") or "冒险记录")
+            title = self._e(log.get("title") or log.get("message") or "战斗记录")
             action = self._e(log.get("action") or "")
             level_change = self._e(log.get("level_change") or "")
             diary = self._e(log.get("diary") or "")
@@ -2372,7 +2372,7 @@ class SaveWebViewer:
             delete_button = ""
             if allow_delete and log_index >= 0 and raw_log_type == "adventure_diary":
                 delete_button = f"""
-                  <form class="inline-form" method="post" action="{self._url('/player/log/delete')}" onsubmit="return confirm('确定删除这条冒险记录？当前 state 不会自动回滚。');">
+                  <form class="inline-form" method="post" action="{self._url('/player/log/delete')}" onsubmit="return confirm('确定删除这条战斗记录？当前 state 不会自动回滚。');">
                     <input type="hidden" name="group_id" value="{self._e(group_id)}">
                     <input type="hidden" name="user_id" value="{self._e(user_id)}">
                     <input type="hidden" name="log_index" value="{log_index}">

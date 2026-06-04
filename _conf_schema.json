@@ -65,9 +65,9 @@
     "items": {
       "diary_compress_interval": {
         "type": "int",
-        "description": "每 N 次冒险触发一次冒险记录压缩",
+        "description": "每 N 次战斗触发一次战斗记录压缩",
         "default": 10,
-        "hint": "普通未压缩冒险记录达到这个数量后，自动调用 AI 压缩更早的记录。填 0 表示关闭压缩。",
+        "hint": "普通未压缩战斗记录达到这个数量后，自动调用 AI 压缩更早的记录。填 0 表示关闭压缩。",
         "slider": {
           "min": 0,
           "max": 100,
@@ -76,9 +76,9 @@
       },
       "diary_compress_count": {
         "type": "int",
-        "description": "每次压缩 M 条旧冒险记录",
+        "description": "每次压缩 M 条旧战斗记录",
         "default": 6,
-        "hint": "触发压缩时，把最早的 M 条普通冒险日记压缩成一条范围摘要，例如第 1-6 次冒险。",
+        "hint": "触发压缩时，把最早的 M 条普通战斗日记压缩成一条范围摘要，例如第 1-6 次战斗。",
         "slider": {
           "min": 1,
           "max": 50,

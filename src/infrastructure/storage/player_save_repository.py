@@ -318,7 +318,7 @@ class PlayerSaveRepository:
             ),
         }
 
-    # ── 冒险日记结果保存 ──────────────────────────────────
+    # ── 战斗日记结果保存 ──────────────────────────────────
 
     def save_adventure_result(
         self,
@@ -429,7 +429,7 @@ class PlayerSaveRepository:
         try:
             raw_lines = log_path.read_text(encoding="utf-8").splitlines()
         except Exception as exc:
-            logger.warning(f"读取冒险日志失败，跳过压缩: {log_path} {exc}")
+            logger.warning(f"读取战斗日志失败，跳过压缩: {log_path} {exc}")
             return False
 
         parsed: list[dict[str, Any] | None] = []
@@ -1615,7 +1615,7 @@ class PlayerSaveRepository:
                 start_index = 0
                 lines = all_lines
         except Exception as exc:
-            logger.warning(f"读取冒险日志失败: {path} {exc}")
+            logger.warning(f"读取战斗日志失败: {path} {exc}")
             return []
 
         logs: list[dict[str, Any]] = []

@@ -56,7 +56,7 @@ class ReincarnationCard:
 
     @property
     def class_name(self) -> str:
-        return self._get_path_value("/主角/个人信息/身份&职业", "见习冒险者")
+        return self._get_path_value("/主角/个人信息/身份&职业", "见习战斗者")
 
     @property
     def appearance(self) -> str:
@@ -117,7 +117,7 @@ class AdventureDiaryCard:
     def to_text(self) -> str:
         parts = [
             f"{self.title} - {self.subtitle}".strip(" -"),
-            f"冒险者：{self.target_name}",
+            f"战斗者：{self.target_name}",
             f"时间：{self.date_label}",
             f"行动：{self.action}",
             f"等级：{self.level_change}",

@@ -157,13 +157,18 @@ class QQMahouShoujo(Star):
                     "   性格特质：温柔内敛",
                     "   代表色：星空蓝",
                     "",
-                    "2. /魔法少女存档删除",
+                    "2. /魔法少女战斗",
+                    "   根据你的角色档案、当前状态和最近记录，生成一次战斗日记。",
+                    "   可以直接自由战斗，也可以在命令后写本次行动。",
+                    "   示例：/魔法少女战斗 去森林战斗爽",
+                    "",
+                    "3. /魔法少女存档删除",
                     "   删除你在当前群的魔法少女存档，并清理其他玩家记忆中由你产生的客串记录。",
                     "   为避免误删，需要输入：/魔法少女存档删除 确认",
                     "",
                     "角色档案面板：",
                     "https://www.youxiajiang.com/Games/AIBot/",
-                    "创建完角色后，可以在这里查看自己的角色档案、状态和冒险记录。",
+                    "创建完角色后，可以在这里查看自己的角色档案、状态和战斗记录。",
                 ]
             )
         )
@@ -321,13 +326,12 @@ class QQMahouShoujo(Star):
             fallback_text=result.text,
         )
 
-    # @filter.command("魔法少女冒险", alias={"adventure"})  # 暂时禁用，待正式开放
-    @filter.command("魔法少女战斗测试中")
+    @filter.command("魔法少女战斗", alias={"adventure"})
     async def adventure_diary(
         self,
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
-        """内测命令。用法：/魔法少女战斗测试中"""
+        """根据玩家存档生成一次完整的魔法少女战斗日记卡。用法：/魔法少女战斗"""
         event.should_call_llm(True)
 
         if not self._is_group_event_allowed(event):
@@ -335,7 +339,7 @@ class QQMahouShoujo(Star):
 
         group_id = self._get_group_id_from_event(event)
         if not group_id:
-            yield event.plain_result("请在群聊中使用 /魔法少女战斗测试中。")
+            yield event.plain_result("请在群聊中使用 /魔法少女战斗。")
             return
 
         user_id = self._get_sender_id_from_event(event)
@@ -362,7 +366,7 @@ class QQMahouShoujo(Star):
             yield event.plain_result("还没有你的魔法少女转生存档，请先使用 /魔法少女转生 建档。")
             return
 
-        action_text = self._extract_command_tail(event, "魔法少女战斗测试中")
+        action_text = self._extract_command_tail(event, "魔法少女战斗")
         nickname = self._get_sender_name_from_event(event)
         avatar_url = self.avatar_service.build_avatar_url(user_id)
         umo = getattr(event, "unified_msg_origin", None)
@@ -370,8 +374,8 @@ class QQMahouShoujo(Star):
             platform_id = self._get_platform_id_from_event(event)
             umo = f"{platform_id}:GroupMessage:{group_id}"
 
-        display_action = action_text or "自由冒险"
-        yield event.plain_result(f"正在记录本次冒险：{display_action}，准备生成冒险日记卡...")
+        display_action = action_text or "自由战斗"
+        yield event.plain_result(f"正在记录本次战斗：{display_action}，准备生成战斗日记卡...")
 
         result = await self.diary_service.execute_diary(
             group_id=group_id,
@@ -384,7 +388,7 @@ class QQMahouShoujo(Star):
         )
 
         if result.error:
-            logger.warning(f"魔法少女冒险日记流程结束但存在错误: {result.error}")
+            logger.warning(f"魔法少女战斗日记流程结束但存在错误: {result.error}")
 
         yield await self.message_sender.send_image_or_text(
             event,

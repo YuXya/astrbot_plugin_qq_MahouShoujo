@@ -202,7 +202,7 @@ class EditableResourceManager:
             },
             {
                 "id": self.PROMPT_FILES["adventure_diary_prompt"],
-                "label": "冒险日记 Prompt",
+                "label": "战斗日记 Prompt",
                 "type": "text",
                 "category": "text_completion",
             },
@@ -228,12 +228,12 @@ class EditableResourceManager:
     def _default_note_map(self) -> dict[str, str]:
         return {
             "world_book/default.json": (
-                "世界书公共设定文件。转生卡和冒险日记生成前会扫描玩家偏好、玩家行动、"
+                "世界书公共设定文件。转生卡和战斗日记生成前会扫描玩家偏好、玩家行动、"
                 "日志等文本，命中 always 或 keyword 条目后，把条目内容注入主任务 Prompt。"
                 "这个说明文件只用于网页提示，不会发送给 AI。"
             ),
             "skill_book/default.json": (
-                "技能书文件。结构与世界书一致，冒险日记生成前会扫描玩家行动和日志，"
+                "技能书文件。结构与世界书一致，战斗日记生成前会扫描玩家行动和日志，"
                 "命中条目后把技能说明注入 Prompt。base_path 是给 AI 输出 update.changes 的路径提示。"
             ),
             "status_book/default.json": (
@@ -253,7 +253,7 @@ class EditableResourceManager:
                 "{{supplement_text}}（世界书+区域书命中的补充设定，未命中时为空）。"
             ),
             self.PROMPT_FILES["adventure_diary_prompt"]: (
-                "用于 /魔法少女冒险 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
+                "用于 /魔法少女战斗 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
                 "可用变量：{{player_data_update_json}}"
                 "（来自玩家当前人物卡，包含全部属性和状态，用于第一人称人格设定和状态参考）；"
                 "{{player_name}}、{{current_level}}、"
@@ -261,7 +261,7 @@ class EditableResourceManager:
                 "{{supplement_text}}（世界书+区域书+技能书+状态书命中的补充设定，未命中时为空）。"
             ),
             self.PROMPT_FILES["default_system_prompt"]: (
-                "用于 /魔法少女转生 和 /魔法少女冒险 的 system message。"
+                "用于 /魔法少女转生 和 /魔法少女战斗 的 system message。"
                 "你可以在这里定义 AI 的基础人格和行为准则。"
             ),
         }

@@ -120,10 +120,10 @@ class AdventureDiaryApplicationService:
                 raw_response=analysis.raw_response,
             )
         except Exception as exc:
-            logger.error(f"执行魔法少女冒险日记流程失败: {exc}", exc_info=True)
+            logger.error(f"执行魔法少女战斗日记流程失败: {exc}", exc_info=True)
             return AdventureDiaryExecutionResult(
                 success=False,
-                text=f"魔法少女冒险日记生成失败：{exc}",
+                text=f"魔法少女战斗日记生成失败：{exc}",
                 error=str(exc),
             )
 
@@ -203,7 +203,7 @@ class AdventureDiaryApplicationService:
                 summary_text=summary_text,
             )
         except Exception as exc:
-            logger.warning(f"压缩冒险日志失败，保留原始日志: {user_id} {exc}")
+            logger.warning(f"压缩战斗日志失败，保留原始日志: {user_id} {exc}")
 
     async def _maybe_compress_cameo_memories(
         self,

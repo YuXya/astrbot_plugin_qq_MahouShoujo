@@ -124,7 +124,7 @@ class ReportGenerator(ICardGenerator):
                     if image_path:
                         return image_path, html_content
                 except Exception as exc:
-                    logger.warning(f"冒险日记 HTML 转图片失败，尝试下一轮策略: {exc}")
+                    logger.warning(f"战斗日记 HTML 转图片失败，尝试下一轮策略: {exc}")
 
         return None, html_content
 

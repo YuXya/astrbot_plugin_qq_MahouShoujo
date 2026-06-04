@@ -32,7 +32,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         self.change_book_engine = ChangeBookEngine(editable_manager=self.editable_manager)
 
     def get_data_type(self) -> str:
-        return "魔法少女冒险日记卡"
+        return "魔法少女战斗日记卡"
 
     def build_prompt(
         self,
@@ -120,10 +120,10 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
     ) -> str:
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
         current_level = self.domain_service.get_current_level(protagonist)
-        action = action_text.strip() or "玩家没有指定行动，请根据当前状态自由生成一次小冒险。"
+        action = action_text.strip() or "玩家没有指定行动，请根据当前状态自由生成一次小战斗。"
         scan_parts = [
-            "/魔法少女冒险",
-            "魔法少女冒险",
+            "/魔法少女战斗",
+            "魔法少女战斗",
             action,
             self._format_logs_for_scan(logs),
         ]
@@ -195,14 +195,14 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             return ""
         prompt = "\n".join(
             [
-                "请把以下多次魔法少女冒险日记压缩成\u201c一次冒险记录\u201d的文字量。",
+                "请把以下多次魔法少女战斗日记压缩成\u201c一次战斗记录\u201d的文字量。",
                 "要求：",
                 "1. 只输出压缩后的正文，不要输出 JSON，不要加解释。",
                 "2. 保留关键人物、地点、事件、收获、损失、关系变化和长期影响。",
                 "3. 不要创造原文没有的新事实。",
-                "4. 文字量约等于一条普通冒险日记，适合后续继续作为历史记录参考。",
+                "4. 文字量约等于一条普通战斗日记，适合后续继续作为历史记录参考。",
                 "",
-                "待压缩冒险记录：",
+                "待压缩战斗记录：",
                 self._format_logs_for_compression(logs),
             ]
         )
@@ -213,7 +213,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             self.config_manager,
             prompt=prompt,
             umo=umo,
-            purpose="冒险记录压缩",
+            purpose="战斗记录压缩",
         )
         result_text = extract_response_text(response)
         if self.config_manager.get_debug_mode():
@@ -287,7 +287,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
     @staticmethod
     def _format_logs(logs: list[dict]) -> str:
         if not logs:
-            return "（暂无冒险日志。）"
+            return "（暂无战斗日志。）"
         lines = []
         for index, item in enumerate(logs, start=1):
             title = AdventureDiaryAnalyzer._world_diary_title(item)

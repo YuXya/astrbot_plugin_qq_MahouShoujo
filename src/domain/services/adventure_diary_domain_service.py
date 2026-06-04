@@ -13,7 +13,7 @@ class AdventureDiaryDomainService:
         player_data: dict,
         action_text: str,
     ) -> AdventureDiaryCard:
-        """规范化冒险日记卡。
+        """规范化战斗日记卡。
 
         player_data 是完整的当前玩家数据（来自 player_data_update.json 或 player_data.json，含主角树）。
         """
@@ -28,19 +28,19 @@ class AdventureDiaryDomainService:
             update_changes,
         )
         # 从主角树获取默认 target_name
-        default_name = self._get_nested(protagonist, ["个人信息", "姓名"], "神秘冒险者")
+        default_name = self._get_nested(protagonist, ["个人信息", "姓名"], "神秘战斗者")
         target_name = self._clean_text(
             raw.get("target_name"),
             default_name,
         )
-        action = self._clean_text(raw.get("action"), action_text or "自由冒险")
+        action = self._clean_text(raw.get("action"), action_text or "自由战斗")
         return AdventureDiaryCard(
-            title=self._clean_text(raw.get("title"), "魔法少女冒险日记")[:32],
+            title=self._clean_text(raw.get("title"), "魔法少女战斗日记")[:32],
             subtitle=self._clean_text(raw.get("subtitle"), "新的旅途被写进日记")[:64],
             target_name=target_name[:32],
             action=action[:120],
-            date_label=self._clean_text(raw.get("date_label"), "第 1 次冒险")[:32],
-            diary=self._clean_text(raw.get("diary"), "今天的冒险平稳结束，旅途留下了新的脚印。"),
+            date_label=self._clean_text(raw.get("date_label"), "第 1 次战斗")[:32],
+            diary=self._clean_text(raw.get("diary"), "今天的战斗平稳结束，旅途留下了新的脚印。"),
             encounter=self._clean_text(raw.get("encounter"), "遇到了一些值得记录的小事件。")[:220],
             result=self._clean_text(raw.get("result"), "安全归来，并整理了新的见闻。")[:220],
             level_change=level_change,
@@ -51,7 +51,7 @@ class AdventureDiaryDomainService:
                 else None
             ),
             update_changes=update_changes,
-            footer=self._clean_text(raw.get("footer"), "冒险记录已写入存档。")[:120],
+            footer=self._clean_text(raw.get("footer"), "战斗记录已写入存档。")[:120],
         )
 
     def calculate_level_progression(
