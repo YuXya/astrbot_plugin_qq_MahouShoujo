@@ -2,7 +2,9 @@
 触发命令与玩家自定义设定：{{theme}}
 {{player_text}}
 
+补充设定：
 {{supplement_text}}
+---
 
 内容要求：
 1. 只输出一个合法 JSON 对象，不要 Markdown，不要解释。
