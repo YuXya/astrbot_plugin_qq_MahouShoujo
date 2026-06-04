@@ -390,6 +390,8 @@ class PlayerSaveRepository:
                 "world_day_offset": world_day_offset,
                 "world_date": world_date,
                 "action": card.action,
+                "participants": card.participants,
+                "monster_name": card.monster_name,
                 "diary": card.diary,
                 "encounter": card.encounter,
                 "level_change": card.level_change,
@@ -696,9 +698,14 @@ class PlayerSaveRepository:
         self,
         group_id: str,
         user_id: str,
-        action_text: str,
+        scan_texts: str | list[str],
+        *,
+        recent_record_count: int = 1,
     ) -> list[dict[str, Any]]:
-        text = str(action_text or "").strip()
+        if isinstance(scan_texts, list):
+            text = "\n".join(str(item or "") for item in scan_texts).strip()
+        else:
+            text = str(scan_texts or "").strip()
         if not text:
             return []
 
@@ -713,14 +720,15 @@ class PlayerSaveRepository:
                 continue
 
             player_data = self._load_current_player_data(user_dir)
-            target_name = self._get_nested(
-                player_data.get("主角", {}) if isinstance(player_data, dict) else {},
-                ["个人信息", "姓名"],
-                "",
-            )
-            if not target_name or target_name not in text:
+            protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+            matched = any(name and name in text for name in self._player_public_names(protagonist))
+            if not matched:
                 continue
-            npc = self._build_npc_package(user_dir, source="mentioned_by_action")
+            npc = self._build_npc_package(
+                user_dir,
+                source="mentioned_by_action",
+                recent_record_count=recent_record_count,
+            )
             if npc:
                 npcs.append(npc)
         return npcs
@@ -1051,6 +1059,7 @@ class PlayerSaveRepository:
         user_dir: Path,
         *,
         source: str,
+        recent_record_count: int = 1,
     ) -> dict[str, Any] | None:
         player_data = self._load_current_player_data(user_dir)
         if not player_data:
@@ -1060,10 +1069,9 @@ class PlayerSaveRepository:
             return None
 
         target_name = self._get_nested(protagonist, ["个人信息", "姓名"], user_dir.name)
-        # 将主角键替换为角色名，给其他玩家看到
-        state = self._replace_protagonist_key(protagonist, target_name)
-        self._remove_economy_state(state)
-        self._remove_location_state(state)
+        magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], target_name)
+        level_node = protagonist.get("等级", {})
+        level = level_node.get("等级", 1) if isinstance(level_node, dict) else 1
 
         log_path = user_dir / "daily_memory.jsonl"
         if not log_path.exists():
@@ -1073,16 +1081,19 @@ class PlayerSaveRepository:
             "_user_id": user_dir.name,
             "_source": source,
             "target_name": target_name,
-            "class_name": self._get_nested(protagonist, ["个人信息", "身份&职业"], ""),
-            "appearance": self._get_nested(protagonist, ["相貌特征", "脸型"], ""),
-            "personality": self._get_nested(protagonist, ["个人信息", "性格特质"], ""),
-            "talent": self._get_nested(protagonist, ["个人信息", "核心能力"], ""),
-            "likes": [],
-            "state": state,
-            "last_adventure": self._read_last_adventure_summary(log_path),
-            "cameo_memories": self._read_recent_cameo_memories(
-                user_dir / "cameo_memory.jsonl",
-                limit=5,
+            "魔法少女名": magical_name,
+            "武装": self._get_nested(protagonist, ["个人信息", "武装"], ""),
+            "变身服": self._get_nested(protagonist, ["个人信息", "变身服"], ""),
+            "性格特质": self._get_nested(protagonist, ["个人信息", "性格特质"], ""),
+            "代表色": self._get_nested(protagonist, ["个人信息", "代表色"], ""),
+            "核心能力": self._get_nested(protagonist, ["个人信息", "核心能力"], ""),
+            "相貌特征": self._public_nested_value(protagonist.get("相貌特征")),
+            "身材细节": self._public_nested_value(protagonist.get("身材细节")),
+            "性器官特征": self._public_nested_value(protagonist.get("性器官特征")),
+            "等级": level,
+            "最近记录": self._read_recent_adventure_summaries(
+                log_path,
+                limit=recent_record_count,
             ),
         }
 
@@ -1096,6 +1107,54 @@ class PlayerSaveRepository:
         if isinstance(value, list):
             return [self._replace_protagonist_key(item, target_name) for item in value]
         return value
+
+    def _read_recent_adventure_summaries(
+        self,
+        path: Path,
+        *,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        count = max(1, min(int(limit or 1), 5))
+        records: list[dict[str, Any]] = []
+        for item in reversed(self._read_recent_logs(path, limit=0)):
+            if item.get("type") != "adventure_diary":
+                continue
+            records.append(
+                {
+                    "world_day_offset": item.get("world_day_offset"),
+                    "world_date": item.get("world_date", ""),
+                    "title": item.get("title", ""),
+                    "participants": item.get("participants", []),
+                    "monster_name": item.get("monster_name", ""),
+                    "action": item.get("action", ""),
+                    "encounter": item.get("encounter", ""),
+                    "result": item.get("result", ""),
+                }
+            )
+            if len(records) >= count:
+                break
+        return records
+
+    @classmethod
+    def _public_nested_value(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            cleaned = {
+                str(key): cls._public_nested_value(child)
+                for key, child in value.items()
+                if child not in (None, "")
+            }
+            return cleaned
+        if isinstance(value, list):
+            return [cls._public_nested_value(item) for item in value if item not in (None, "")]
+        return value if value is not None else ""
+
+    def _player_public_names(self, protagonist: dict[str, Any]) -> list[str]:
+        names: list[str] = []
+        for keys in (["个人信息", "姓名"], ["个人信息", "魔法少女名"]):
+            name = self._get_nested(protagonist, keys, "").strip()
+            if name and name not in names:
+                names.append(name)
+        return names
 
     def _player_source_path(self, group_id: str, user_id: str, file_name: str) -> Path:
         if file_name not in self.SOURCE_FILE_NAMES:
@@ -1275,13 +1334,14 @@ class PlayerSaveRepository:
             player_data = self._load_current_player_data(user_dir)
             if not isinstance(player_data, dict):
                 continue
-            name = self._get_nested(
-                player_data.get("主角", {}),
+            protagonist_tree = player_data.get("主角", {})
+            primary_name = self._get_nested(
+                protagonist_tree,
                 ["个人信息", "姓名"],
                 "",
             )
-            if name and name != protagonist:
-                names.add(name)
+            if primary_name and primary_name != protagonist:
+                names.update(self._player_public_names(protagonist_tree))
         return names
 
     LEVEL_EXP_PATHS = {"/level/经验", "/等级/经验", "/主角/等级/经验"}
@@ -1385,15 +1445,14 @@ class PlayerSaveRepository:
             player_data = self._load_current_player_data(user_dir)
             if not isinstance(player_data, dict):
                 continue
-            name = self._get_nested(
-                player_data.get("主角", {}),
-                ["个人信息", "姓名"],
-                "",
-            )
-            if not name or name == protagonist_name:
+            protagonist_tree = player_data.get("主角", {})
+            names = self._player_public_names(protagonist_tree)
+            primary_name = self._get_nested(protagonist_tree, ["个人信息", "姓名"], "")
+            if not names or primary_name == protagonist_name:
                 continue
-            if name in mention_text:
-                matched.add(name)
+            for name in names:
+                if name in mention_text:
+                    matched.add(name)
         return matched
 
     def _find_user_dir_by_target_name(
@@ -1406,12 +1465,8 @@ class PlayerSaveRepository:
         for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
             player_data = self._load_current_player_data(user_dir)
             if isinstance(player_data, dict):
-                name = self._get_nested(
-                    player_data.get("主角", {}),
-                    ["个人信息", "姓名"],
-                    "",
-                )
-                if name == target_name:
+                names = self._player_public_names(player_data.get("主角", {}))
+                if target_name in names:
                     return user_dir
         return None
 

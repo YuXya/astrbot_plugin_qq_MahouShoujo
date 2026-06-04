@@ -51,7 +51,8 @@ class AdventureDiaryApplicationService:
             mentioned_players = self.save_repository.find_mentioned_npcs(
                 group_id,
                 user_id,
-                action_text,
+                [action_text, self._logs_text_for_teammate_scan(logs)],
+                recent_record_count=self.config_manager.get_teammate_recent_record_count(),
             )
             nearby_players = self._merge_nearby_players(mentioned_players)
             analysis = await self.llm_analyzer.analyze_diary(
@@ -145,9 +146,11 @@ class AdventureDiaryApplicationService:
                 continue
             npc_user_id = str(npc.get("_user_id") or "").strip()
             npc_target_name = str(npc.get("target_name") or "").strip()
-            if not npc_user_id or not npc_target_name:
+            npc_magical_name = str(npc.get("魔法少女名") or "").strip()
+            mention_names = [name for name in (npc_target_name, npc_magical_name) if name]
+            if not npc_user_id or not mention_names:
                 continue
-            if npc_target_name not in mention_text:
+            if not any(name in mention_text for name in mention_names):
                 continue
             try:
                 self.save_repository.append_cameo_memory(
@@ -157,7 +160,7 @@ class AdventureDiaryApplicationService:
                         "source_group_id": str(group_id),
                         "source_user_id": str(user_id),
                         "source_target_name": source_target_name,
-                        "npc_target_name": npc_target_name,
+                        "npc_target_name": npc_magical_name or npc_target_name,
                         "encounter": card.encounter,
                         "result": card.result,
                         "title": card.title,
@@ -263,3 +266,15 @@ class AdventureDiaryApplicationService:
                 if source == "mentioned_by_action":
                     existing["_source"] = source
         return merged
+
+    @staticmethod
+    def _logs_text_for_teammate_scan(logs: list[dict]) -> str:
+        parts: list[str] = []
+        for item in logs or []:
+            if not isinstance(item, dict):
+                continue
+            for key in ("action", "encounter", "result", "title"):
+                value = str(item.get(key) or "").strip()
+                if value:
+                    parts.append(value)
+        return "\n".join(parts)

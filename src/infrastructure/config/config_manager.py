@@ -115,6 +115,10 @@ class ConfigManager:
         value = int(self._get_group("adventure").get("cameo_compress_count", 6) or 0)
         return max(0, value)
 
+    def get_teammate_recent_record_count(self) -> int:
+        value = int(self._get_group("adventure").get("teammate_recent_record_count", 1) or 1)
+        return max(1, min(value, 5))
+
     def get_debug_mode(self) -> bool:
         return bool(self._get_group("adventure").get("debug_mode", False))
 

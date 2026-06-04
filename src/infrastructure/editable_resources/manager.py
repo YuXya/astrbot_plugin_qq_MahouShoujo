@@ -15,6 +15,7 @@ class EditableResourceManager:
     PROMPT_FILES = {
         "reincarnation_prompt": "prompts/reincarnation_prompt.txt",
         "adventure_diary_prompt": "prompts/adventure_diary_prompt.txt",
+        "teammate_info_prompt": "prompts/teammate_info_prompt.txt",
         "default_system_prompt": "prompts/default_system_prompt.txt",
     }
 
@@ -207,6 +208,12 @@ class EditableResourceManager:
                 "category": "text_completion",
             },
             {
+                "id": self.PROMPT_FILES["teammate_info_prompt"],
+                "label": "多人发送的队友信息",
+                "type": "text",
+                "category": "text_completion",
+            },
+            {
                 "id": self.PROMPT_FILES["default_system_prompt"],
                 "label": "默认 System Prompt",
                 "type": "text",
@@ -222,6 +229,7 @@ class EditableResourceManager:
             "event_book/default.json": defaults.EVENT_BOOK_DEFAULT,
             self.PROMPT_FILES["reincarnation_prompt"]: defaults.REINCARNATION_PROMPT,
             self.PROMPT_FILES["adventure_diary_prompt"]: defaults.ADVENTURE_DIARY_PROMPT,
+            self.PROMPT_FILES["teammate_info_prompt"]: defaults.TEAMMATE_INFO_PROMPT,
             self.PROMPT_FILES["default_system_prompt"]: defaults.DEFAULT_SYSTEM_PROMPT,
         }
 
@@ -258,7 +266,13 @@ class EditableResourceManager:
                 "（来自玩家当前人物卡，包含全部属性和状态，用于第一人称人格设定和状态参考）；"
                 "{{player_name}}、{{current_level}}（字母等级 F/E/D/C/B/A/S）、"
                 "{{logs_text}}、{{cameo_memories_text}}、{{current_world_date}}、{{action}}、"
-                "{{supplement_text}}（世界书+事件书+技能书+状态书命中的补充设定，未命中时为空）。"
+                "{{supplement_text}}（世界书+事件书+技能书+状态书命中的补充设定，未命中时为空）、"
+                "{{teammate_info_text}}（命中其他存档角色名时，由“多人发送的队友信息”模板渲染，未命中时为空）。"
+            ),
+            self.PROMPT_FILES["teammate_info_prompt"]: (
+                "用于 /魔法少女战斗 的队友信息片段。只有本次行动或主角近期日志提到同群其他存档角色名时才会注入。"
+                "可用变量：{{teammates_json}}（队友公开字段和最近记录 JSON）、"
+                "{{teammate_count}}（队友数量）、{{recent_record_count}}（每名队友最近记录条数）。"
             ),
             self.PROMPT_FILES["default_system_prompt"]: (
                 "用于 /魔法少女转生 和 /魔法少女战斗 的 system message。"

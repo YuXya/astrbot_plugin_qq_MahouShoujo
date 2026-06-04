@@ -108,6 +108,8 @@ class AdventureDiaryCard:
     result: str
     level_change: str
     level_exp_after: int = 0
+    participants: list[str] = field(default_factory=list)
+    monster_name: str = ""
     reason: list[str] = field(default_factory=list)
     update_changes: list[dict[str, Any]] = field(default_factory=list)
     state_snapshot: dict[str, Any] = field(default_factory=dict)

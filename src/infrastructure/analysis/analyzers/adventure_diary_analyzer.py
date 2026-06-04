@@ -168,23 +168,24 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
                 self.change_book_engine.build_status_prompt_text(
                     protagonist, player_level=current_level,
                 ),
-                self._format_nearby_players(nearby_players),
             ]
         )
         cameo_memories_text = self._format_cameo_memories(cameo_memories)
         logs_text = self._format_logs(logs)
+        teammate_info_text = self._format_teammate_info(nearby_players)
 
         return self.editable_manager.render_prompt(
             "adventure_diary_prompt",
             {
                 "player_data_update_json": self._json_dump(player_data),
-                "player_name": nickname or self._get_nested(protagonist, ["个人信息", "姓名"], "") or user_id or "unknown",
+                "player_name": self._get_nested(protagonist, ["个人信息", "姓名"], "") or "主角",
                 "current_level": level_label(current_level),
                 "logs_text": logs_text,
                 "cameo_memories_text": cameo_memories_text,
                 "action": action,
                 "current_world_date": current_world_date,
                 "supplement_text": supplement_text,
+                "teammate_info_text": teammate_info_text,
             },
         )
 
@@ -391,6 +392,46 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
                     )
                 )
         return "\n\n".join(parts)
+
+    def _format_teammate_info(self, nearby_players: list[dict] | None) -> str:
+        if not nearby_players:
+            return ""
+        fields = [
+            "魔法少女名",
+            "武装",
+            "变身服",
+            "性格特质",
+            "代表色",
+            "核心能力",
+            "相貌特征",
+            "身材细节",
+            "性器官特征",
+            "等级",
+            "最近记录",
+        ]
+        teammates: list[dict[str, object]] = []
+        seen: set[str] = set()
+        for item in nearby_players:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("魔法少女名") or item.get("target_name") or "").strip()
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            public_item = {key: item.get(key, "") for key in fields}
+            public_item["魔法少女名"] = name
+            teammates.append(public_item)
+        if not teammates:
+            return ""
+        recent_record_count = self.config_manager.get_teammate_recent_record_count()
+        return self.editable_manager.render_prompt(
+            "teammate_info_prompt",
+            {
+                "teammates_json": self._json_dump(teammates),
+                "teammate_count": len(teammates),
+                "recent_record_count": recent_record_count,
+            },
+        ).strip()
 
     @staticmethod
     def _world_diary_title(item: dict) -> str:

@@ -35,6 +35,12 @@ class AdventureDiaryDomainService:
             default_name,
         )
         action = self._clean_text(raw.get("action"), action_text or "自由战斗")
+        default_participant = self._get_nested(
+            protagonist,
+            ["个人信息", "魔法少女名"],
+            target_name,
+        )
+        participants = self.normalize_participants(raw.get("participants"), default_participant)
         return AdventureDiaryCard(
             title=self._clean_text(raw.get("title"), "魔法少女战斗日记")[:32],
             subtitle=self._clean_text(raw.get("subtitle"), "新的旅途被写进日记")[:64],
@@ -46,6 +52,8 @@ class AdventureDiaryDomainService:
             result=self._clean_text(raw.get("result"), "安全归来，并整理了新的见闻。")[:220],
             level_change=level_change,
             level_exp_after=level_exp_after,
+            participants=participants,
+            monster_name=self._clean_text(raw.get("monster_name"), "未知魔物")[:32],
             reason=self.normalize_reason(
                 raw.get("update", {}).get("reason")
                 if isinstance(raw.get("update"), dict)
@@ -145,6 +153,21 @@ class AdventureDiaryDomainService:
             if text:
                 reason.append(text[:120])
         return reason[:6]
+
+    @staticmethod
+    def normalize_participants(raw_participants: object, target_name: str) -> list[str]:
+        names: list[str] = []
+        if isinstance(raw_participants, list):
+            candidates = raw_participants
+        else:
+            text = str(raw_participants or "").strip()
+            candidates = re.split(r"[、,，/|；;\s]+", text) if text else []
+
+        for candidate in [target_name, *candidates]:
+            text = str(candidate or "").strip()
+            if text and text not in names:
+                names.append(text[:32])
+        return names or [target_name[:32]]
 
     @staticmethod
     def normalize_update_changes(raw_changes: object) -> list[dict[str, Any]]:

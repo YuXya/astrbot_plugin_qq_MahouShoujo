@@ -100,7 +100,7 @@
 
     .meta {
       display: grid;
-      grid-template-columns: 1.15fr 1fr;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 12px;
       margin-top: 24px;
     }
@@ -123,6 +123,7 @@
       line-height: 1.28;
       font-weight: 900;
       color: var(--ink);
+      overflow-wrap: anywhere;
     }
 
     .section {
@@ -312,11 +313,19 @@
 
     <section class="meta">
       <div class="box">
-        <div class="label">战斗者</div>
-        <div class="value">{{ card.target_name }}</div>
+        <div class="label">魔法少女</div>
+        <div class="value">{{ battle_magical_girl_label }}</div>
       </div>
       <div class="box">
-        <div class="label">等级</div>
+        <div class="label">行动类型</div>
+        <div class="value">{{ battle_mode_label }}</div>
+      </div>
+      <div class="box">
+        <div class="label">魔物</div>
+        <div class="value">{{ monster_name }}</div>
+      </div>
+      <div class="box">
+        <div class="label">玩家等级</div>
         <div class="value">{{ level_label }}</div>
         <div class="label">{{ level_exp_percent }}%</div>
       </div>

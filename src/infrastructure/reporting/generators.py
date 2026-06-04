@@ -88,10 +88,18 @@ class ReportGenerator(ICardGenerator):
             "status_book/default.json",
             "特殊状态",
         )
+        participants = [str(name).strip() for name in card.participants if str(name).strip()]
+        if not participants:
+            participants = [card.target_name]
+        battle_magical_girl_label = "魔法少女 " + "、".join(participants)
+        battle_mode_label = "多人行动" if len(participants) > 1 else "单独行动"
         html_content = self.html_templates.render_template(
             "adventure_diary.html",
             card=card,
             reason=card.reason,
+            battle_magical_girl_label=battle_magical_girl_label,
+            battle_mode_label=battle_mode_label,
+            monster_name=card.monster_name or "未知魔物",
             skill_progress_title=skill_progress_title,
             skill_progress_items=progress_sections.skill_items,
             status_progress_title=status_progress_title,
