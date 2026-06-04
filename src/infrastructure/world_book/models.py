@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from ...shared.levels import ALL_VISIBLE_LEVELS, normalize_visible_levels
+
 
 @dataclass(frozen=True)
 class WorldBookEntry:
@@ -10,8 +12,7 @@ class WorldBookEntry:
     enabled: bool = True
     strategy: str = "keyword"
     keys: list[str] = field(default_factory=list)
-    min_level: int = 1
-    max_level: int = 100
+    visible_levels: tuple[int, ...] = ALL_VISIBLE_LEVELS
     recursive: bool = True
     content: str = ""
     level_descriptions: dict[str, str] = field(default_factory=dict)
@@ -24,24 +25,17 @@ class WorldBookEntry:
         if not isinstance(keys, list):
             keys = []
 
-        try:
-            min_level = int(raw.get("min_level", 1))
-        except (TypeError, ValueError):
-            min_level = 1
-
-        try:
-            max_level = int(raw.get("max_level", 100))
-        except (TypeError, ValueError):
-            max_level = 100
-
         return cls(
             id=str(raw.get("id") or fallback_id).strip(),
             title=str(raw.get("title") or "").strip(),
             enabled=bool(raw.get("enabled", True)),
             strategy=str(raw.get("strategy") or "keyword").strip().lower(),
             keys=[str(key).strip() for key in keys if str(key).strip()],
-            min_level=max(1, min_level),
-            max_level=max(min_level, max_level),
+            visible_levels=normalize_visible_levels(
+                raw.get("visible_levels"),
+                min_level=raw.get("min_level", 1),
+                max_level=raw.get("max_level", 7),
+            ),
             recursive=raw.get("recursive", True) is not False,
             content=str(raw.get("content") or "").strip(),
             level_descriptions={

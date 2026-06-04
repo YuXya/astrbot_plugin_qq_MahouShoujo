@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from ...shared.levels import level_label
+
 
 PROGRESS_KEYS = {"经验", "熟练度", "proficiency"}
 LEVEL_KEYS = ("等级", "level", "Lv", "lv")
@@ -79,7 +81,7 @@ def level_display(state: dict[str, Any]) -> str:
     protagonist = state.get("主角", state)
     level_node = protagonist.get("等级", {}) if isinstance(protagonist, dict) else {}
     level = level_node.get("等级", state.get("level", 1)) if isinstance(level_node, dict) else state.get("level", 1)
-    return f"{_int_value(level, 1)}级"
+    return level_label(level)
 
 
 def level_exp_percent(state: dict[str, Any]) -> int:

@@ -54,7 +54,7 @@ class WorldBookEngine:
 
         activated = sorted(
             first_round + second_round,
-            key=lambda item: (item.min_level, item.id),
+            key=lambda item: (min(item.visible_levels), item.id),
         )
         return WorldBookMatchResult(
             entries=activated,
@@ -106,10 +106,7 @@ class WorldBookEngine:
             if entry.id in activated_ids or not entry.enabled:
                 continue
 
-            if entry.min_level > player_level:
-                continue
-
-            if entry.max_level < player_level:
+            if player_level not in entry.visible_levels:
                 continue
 
             if entry.strategy == "always":

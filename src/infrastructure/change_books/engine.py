@@ -44,7 +44,7 @@ class ChangeBookEngine:
 
         matched = sorted(
             first_round + second_round,
-            key=lambda item: (item.min_level, item.id),
+            key=lambda item: (min(item.visible_levels), item.id),
         )
         if not matched:
             return ""
@@ -71,7 +71,11 @@ class ChangeBookEngine:
     ) -> str:
         book = self._load_book(self.editable_manager.status_book_path, "状态书")
         entries = self._entries_from_book(book)
-        enabled_entries = [entry for entry in entries if entry.enabled and entry.min_level <= player_level]
+        enabled_entries = [
+            entry
+            for entry in entries
+            if entry.enabled and player_level in entry.visible_levels
+        ]
         if not enabled_entries:
             return ""
 
@@ -212,7 +216,7 @@ class ChangeBookEngine:
         for entry in entries:
             if entry.id in activated_ids or not entry.enabled:
                 continue
-            if entry.min_level > player_level:
+            if player_level not in entry.visible_levels:
                 continue
             if entry.strategy == "always":
                 if include_always:
@@ -225,7 +229,7 @@ class ChangeBookEngine:
                 matched.append(entry)
                 activated_ids.add(entry.id)
 
-        return sorted(matched, key=lambda item: (item.min_level, item.id))
+        return sorted(matched, key=lambda item: (min(item.visible_levels), item.id))
 
     @staticmethod
     def _contains_any_key(text: str, keys: list[str]) -> bool:

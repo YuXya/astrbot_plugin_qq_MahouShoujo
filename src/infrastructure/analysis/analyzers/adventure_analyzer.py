@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ....domain.models.data_models import ReincarnationCard
 from ....domain.services.adventure_domain_service import AdventureDomainService
-from ...region_book import RegionBookEngine
+from ...event_book import EventBookEngine
 from ...world_book import WorldBookEngine
 from .base_analyzer import BaseAnalyzer
 
@@ -18,7 +18,7 @@ class AdventureAnalyzer(BaseAnalyzer[ReincarnationCard]):
         super().__init__(context, config_manager, editable_manager)
         self.domain_service = domain_service
         self.world_book_engine = WorldBookEngine(editable_manager=self.editable_manager)
-        self.region_book_engine = RegionBookEngine(editable_manager=self.editable_manager)
+        self.event_book_engine = EventBookEngine(editable_manager=self.editable_manager)
 
     def get_data_type(self) -> str:
         return "魔法少女转生人物卡"
@@ -38,19 +38,20 @@ class AdventureAnalyzer(BaseAnalyzer[ReincarnationCard]):
             theme,
             str(theme or "").lstrip("/／"),
         ]
-        # --- 世界书与区域书交叉递归 ---
+        # --- 世界书与事件书交叉递归 ---
         world_book_result = self.world_book_engine.build_prompt_text(
             world_book_scan_parts, player_level=1,
         )
-        region_book_result = self.region_book_engine.build_prompt_text(
+        event_book_result = self.event_book_engine.build_prompt_text(
             world_book_scan_parts,
+            current_event="/魔法少女转生",
             player_level=1,
         )
         cross_hit_parts: list[str] = []
         for entry in world_book_result.entries:
             if entry.recursive and entry.content:
                 cross_hit_parts.append(entry.content)
-        for entry in region_book_result.local_entries + region_book_result.remote_entries:
+        for entry in event_book_result.local_entries + event_book_result.remote_entries:
             if entry.recursive and entry.content:
                 cross_hit_parts.append(entry.content)
         if cross_hit_parts:
@@ -58,14 +59,15 @@ class AdventureAnalyzer(BaseAnalyzer[ReincarnationCard]):
             world_book_result = self.world_book_engine.build_prompt_text(
                 enriched_scan_parts, player_level=1,
             )
-            region_book_result = self.region_book_engine.build_prompt_text(
+            event_book_result = self.event_book_engine.build_prompt_text(
                 enriched_scan_parts,
+                current_event="/魔法少女转生",
                 player_level=1,
             )
 
         supplement_text = self._join_optional_prompt_parts([
             world_book_result.prompt_text,
-            region_book_result.prompt_text,
+            event_book_result.prompt_text,
         ])
 
         return self.editable_manager.render_prompt(

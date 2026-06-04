@@ -30,7 +30,7 @@ SKILL_BOOK_DEFAULT = _load_book("skill_book.json")
 
 STATUS_BOOK_DEFAULT = _load_book("status_book.json")
 
-REGION_BOOK_DEFAULT = _load_book("region_book.json")
+EVENT_BOOK_DEFAULT = _load_book("event_book.json")
 
 REINCARNATION_PROMPT = _load_prompt("reincarnation_prompt.txt")
 

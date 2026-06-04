@@ -36,8 +36,8 @@ class EditableResourceManager:
         return self.root_dir / "status_book" / "default.json"
 
     @property
-    def region_book_path(self) -> Path:
-        return self.root_dir / "region_book" / "default.json"
+    def event_book_path(self) -> Path:
+        return self.root_dir / "event_book" / "default.json"
 
     def get_prompt(self, name: str) -> str:
         relative = self.PROMPT_FILES[name]
@@ -131,7 +131,7 @@ class EditableResourceManager:
             "world_book/default.json",
             "skill_book/default.json",
             "status_book/default.json",
-            "region_book/default.json",
+            "event_book/default.json",
         }:
             json.loads(content)
         self.write_text(relative_path, content)
@@ -189,8 +189,8 @@ class EditableResourceManager:
                 "category": "world_background",
             },
             {
-                "id": "region_book/default.json",
-                "label": "区域书 default.json",
+                "id": "event_book/default.json",
+                "label": "事件书 default.json",
                 "type": "json",
                 "category": "world_background",
             },
@@ -219,7 +219,7 @@ class EditableResourceManager:
             "world_book/default.json": defaults.WORLD_BOOK_DEFAULT,
             "skill_book/default.json": defaults.SKILL_BOOK_DEFAULT,
             "status_book/default.json": defaults.STATUS_BOOK_DEFAULT,
-            "region_book/default.json": defaults.REGION_BOOK_DEFAULT,
+            "event_book/default.json": defaults.EVENT_BOOK_DEFAULT,
             self.PROMPT_FILES["reincarnation_prompt"]: defaults.REINCARNATION_PROMPT,
             self.PROMPT_FILES["adventure_diary_prompt"]: defaults.ADVENTURE_DIARY_PROMPT,
             self.PROMPT_FILES["default_system_prompt"]: defaults.DEFAULT_SYSTEM_PROMPT,
@@ -242,23 +242,23 @@ class EditableResourceManager:
                 "未拥有时会在待觉醒列表附带简单介绍。"
                 "状态最高 Lv.5；base_path 是给 AI 输出 update.changes 的路径提示。"
             ),
-            "region_book/default.json": (
-                "区域书文件。暂时按世界书方式匹配：扫描文本命中条目后注入详细介绍。"
-                "简略介绍暂时保留在文件中，但不会参与匹配或注入。"
-                "min_level 为等级门槛，max_level 为等级上限，玩家等级不足或超过上限时不命中。排序由网页上的上下位置决定。"
+            "event_book/default.json": (
+                "事件书文件。按 /魔法少女转生、/魔法少女战斗、/魔法少女日常 分组。"
+                "当前事件内关键词命中或 always 条目会注入详细介绍；其他事件只在关键词命中且简略介绍不为空时注入简略介绍。"
+                "visible_levels 为可见主角等级，数字 1-7 对应 F、E、D、C、B、A、S；未填写时默认全部可见。排序由网页上的上下位置决定。"
             ),
             self.PROMPT_FILES["reincarnation_prompt"]: (
                 "用于 /魔法少女转生 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
                 "可用变量：{{theme}}（触发命令+玩家偏好）、{{player_text}}（目标群友昵称或ID）、"
-                "{{supplement_text}}（世界书+区域书命中的补充设定，未命中时为空）。"
+                "{{supplement_text}}（世界书+事件书命中的补充设定，未命中时为空）。"
             ),
             self.PROMPT_FILES["adventure_diary_prompt"]: (
                 "用于 /魔法少女战斗 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
                 "可用变量：{{player_data_update_json}}"
                 "（来自玩家当前人物卡，包含全部属性和状态，用于第一人称人格设定和状态参考）；"
-                "{{player_name}}、{{current_level}}、"
+                "{{player_name}}、{{current_level}}（字母等级 F/E/D/C/B/A/S）、"
                 "{{logs_text}}、{{cameo_memories_text}}、{{current_world_date}}、{{action}}、"
-                "{{supplement_text}}（世界书+区域书+技能书+状态书命中的补充设定，未命中时为空）。"
+                "{{supplement_text}}（世界书+事件书+技能书+状态书命中的补充设定，未命中时为空）。"
             ),
             self.PROMPT_FILES["default_system_prompt"]: (
                 "用于 /魔法少女转生 和 /魔法少女战斗 的 system message。"

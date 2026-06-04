@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from ..models.data_models import AdventureDiaryCard
+from ...shared.levels import clamp_level, level_change_label, parse_level_label
 
 
 class AdventureDiaryDomainService:
@@ -74,25 +75,25 @@ class AdventureDiaryDomainService:
         if level >= 7:
             level = 7
             level_exp = 0
-        return f"Lv.{start_level}->Lv.{level}", level_exp
+        return level_change_label(start_level, level), level_exp
 
     def normalize_level_change(self, raw: object, current_level: int) -> str:
         start_level = self.clamp_level(current_level)
         text = str(raw or "").strip()
-        match = re.search(r"Lv\.?\s*(\d+)\s*[-=]>\s*Lv\.?\s*(\d+)", text, re.I)
+        match = re.search(r"(?:Lv\.?\s*)?([1-7]|[FEDCBAS])\s*[-=]>\s*(?:Lv\.?\s*)?([1-7]|[FEDCBAS])", text, re.I)
         if match:
-            end_level = self.clamp_level(int(match.group(2)))
+            end_level = parse_level_label(match.group(2), default=start_level)
         else:
             end_level = start_level
         if end_level < start_level:
             end_level = start_level
-        return f"Lv.{start_level}->Lv.{end_level}"
+        return level_change_label(start_level, end_level)
 
     def parse_level_after(self, level_change: str, fallback: int) -> int:
-        match = re.search(r"->\s*Lv\.?\s*(\d+)", str(level_change), re.I)
+        match = re.search(r"->\s*(?:Lv\.?\s*)?([1-7]|[FEDCBAS])", str(level_change), re.I)
         if not match:
             return self.clamp_level(fallback)
-        return self.clamp_level(int(match.group(1)))
+        return parse_level_label(match.group(1), default=fallback)
 
     def get_current_level(self, protagonist: dict) -> int:
         """从主角树获取当前等级。"""
@@ -132,7 +133,7 @@ class AdventureDiaryDomainService:
 
     @classmethod
     def clamp_level(cls, value: int) -> int:
-        return max(1, min(int(value), 7))
+        return clamp_level(value)
 
     @staticmethod
     def normalize_reason(raw_reason: object) -> list[str]:

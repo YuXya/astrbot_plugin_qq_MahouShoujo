@@ -10,6 +10,13 @@ from urllib.parse import quote
 
 from aiohttp import web
 
+from ...shared.levels import (
+    ALL_VISIBLE_LEVELS,
+    LEVEL_LABELS,
+    level_label,
+    normalize_visible_levels,
+    visible_levels_label,
+)
 from ...utils.logger import logger
 from ..storage.recent_llm_message_repository import RecentLLMMessageRepository
 from ..storage.state_progress import (
@@ -341,7 +348,7 @@ class SaveWebViewer:
             "user_id": user_id,
             "nickname": self._e(item.get("nickname") or item.get("target_name") or "未命名"),
             "class_name": self._e(item.get("class_name", "")),
-            "level": self._e(f"{item.get('level', 1)}级"),
+            "level": self._e(level_label(item.get("level", 1))),
             "updated_at": self._format_time(item.get("updated_at")),
             "href": href,
         }
@@ -391,8 +398,8 @@ class SaveWebViewer:
         label = meta.get("label", file_id) if meta else file_id
         title = f"编辑 {label}"
         if self._is_structured_book_file(file_id):
-            if file_id == "region_book/default.json":
-                return self._region_book_file_response(
+            if file_id == "event_book/default.json":
+                return self._event_book_file_response(
                     title,
                     file_id,
                     back_category,
@@ -502,11 +509,11 @@ class SaveWebViewer:
             else "世界书条目"
         )
         book_hint = (
-            "每个条目会在命中后作为技能说明注入 Prompt。min_level 为等级门槛，max_level 为等级上限，不到门槛或超过上限的玩家无法看到该条目。"
+            "每个条目会在命中后作为技能说明注入 Prompt。可见等级用 F、E、D、C、B、A、S 多选控制，默认全部可见。"
             if file_id == "skill_book/default.json"
-            else '条目标题代表可觉醒状态；content 是简单介绍，Lv.1 到 Lv.Max 分别填写当前等级效果。已拥有状态只注入简介和当前等级效果；"总是注入"的已拥有状态每次都会注入，未拥有时会在待觉醒列表附带简单介绍。状态最高 Lv.5；min_level 与 max_level 仍是玩家等级门槛。'
+            else '条目标题代表可觉醒状态；content 是简单介绍，Lv.1 到 Lv.Max 分别填写当前等级效果。已拥有状态只注入简介和当前等级效果；"总是注入"的已拥有状态每次都会注入，未拥有时会在待觉醒列表附带简单介绍。状态最高 Lv.5；可见等级用 F、E、D、C、B、A、S 多选控制。'
             if file_id == "status_book/default.json"
-            else "每个条目会在命中后作为世界背景补充注入 Prompt。min_level 为等级门槛，max_level 为等级上限，不到门槛或超过上限的玩家无法看到该条目。"
+            else "每个条目会在命中后作为世界背景补充注入 Prompt。可见等级用 F、E、D、C、B、A、S 多选控制，默认全部可见。"
         )
         storage_key = "qq_mahoushoujo:book:open_entries:" + file_id.replace("/", ":")
         source_url = self._url(
@@ -567,6 +574,15 @@ class SaveWebViewer:
               const displayNameInput = document.getElementById("book-display-name");
               const basePathInput = document.getElementById("book-base-path");
               const isStatusBook = {str(file_id == "status_book/default.json").lower()};
+              const levelOptions = [
+                {{ value: 1, label: "F" }},
+                {{ value: 2, label: "E" }},
+                {{ value: 3, label: "D" }},
+                {{ value: 4, label: "C" }},
+                {{ value: 5, label: "B" }},
+                {{ value: 6, label: "A" }},
+                {{ value: 7, label: "S" }},
+              ];
               const openStateStorageKey = "{self._e(storage_key)}";
               let draggingIndex = null;
               let openEntryKeys = new Set();
@@ -591,8 +607,7 @@ class SaveWebViewer:
                   recursive: true,
                   strategy: "keyword",
                   keys: [],
-                  min_level: 1,
-                  max_level: 100,
+                  visible_levels: levelOptions.map((item) => item.value),
                   content: "",
                   level_descriptions: {{}},
                 }};
@@ -602,9 +617,6 @@ class SaveWebViewer:
                 const keys = Array.isArray(entry.keys)
                   ? entry.keys
                   : (typeof entry.keys === "string" ? [entry.keys] : []);
-                const minLevel = Number.parseInt(entry.min_level, 10);
-                const maxLevel = Number.parseInt(entry.max_level, 10);
-                const safeMin = Number.isFinite(minLevel) && minLevel >= 1 ? minLevel : 1;
                 const rawLevelDescriptions = entry.level_descriptions && typeof entry.level_descriptions === "object"
                   ? entry.level_descriptions
                   : {{}};
@@ -615,8 +627,7 @@ class SaveWebViewer:
                   recursive: entry.recursive !== false,
                   strategy: entry.strategy === "always" ? "always" : "keyword",
                   keys: keys.map((key) => String(key).trim()).filter(Boolean),
-                  min_level: safeMin,
-                  max_level: Number.isFinite(maxLevel) && maxLevel >= safeMin ? maxLevel : 100,
+                  visible_levels: normalizeVisibleLevels(entry.visible_levels, entry.min_level, entry.max_level),
                   content: String(entry.content || ""),
                   ...(isStatusBook ? {{
                     level_descriptions: Object.fromEntries(
@@ -633,6 +644,46 @@ class SaveWebViewer:
                   .filter(Boolean);
               }}
 
+              function normalizeVisibleLevels(raw, minLevel, maxLevel) {{
+                let selected = [];
+                if (Array.isArray(raw)) {{
+                  selected = raw.map((level) => Number.parseInt(level, 10));
+                }} else if (typeof raw === "string" && raw.trim()) {{
+                  selected = raw.split(/[,，\\s]+/).map((level) => {{
+                    const trimmed = String(level).trim().toUpperCase();
+                    const byLabel = levelOptions.find((item) => item.label === trimmed);
+                    return byLabel ? byLabel.value : Number.parseInt(trimmed, 10);
+                  }});
+                }} else {{
+                  const minValue = Number.parseInt(minLevel, 10);
+                  const maxValue = Number.parseInt(maxLevel, 10);
+                  const low = Number.isFinite(minValue) ? Math.max(1, Math.min(7, minValue)) : 1;
+                  const high = Number.isFinite(maxValue) ? Math.max(low, Math.min(7, maxValue)) : 7;
+                  selected = levelOptions.map((item) => item.value).filter((level) => level >= low && level <= high);
+                }}
+                const clean = levelOptions
+                  .map((item) => item.value)
+                  .filter((level) => selected.includes(level));
+                return clean.length ? clean : levelOptions.map((item) => item.value);
+              }}
+
+              function visibleLevelsLabel(levels) {{
+                const normalized = normalizeVisibleLevels(levels);
+                if (normalized.length === levelOptions.length) return "F-S";
+                return normalized
+                  .map((level) => levelOptions.find((item) => item.value === level)?.label || String(level))
+                  .join("/");
+              }}
+
+              function visibleLevelInputs(levels) {{
+                const selected = new Set(normalizeVisibleLevels(levels));
+                return levelOptions.map((item) => `
+                  <label class="summary-check level-choice">
+                    <input data-field="visible_level" type="checkbox" value="${{item.value}}"${{selected.has(item.value) ? " checked" : ""}}> ${{item.label}}
+                  </label>
+                `).join("");
+              }}
+
               function syncFromDom() {{
                 if (displayNameInput) {{
                   state.display_name = displayNameInput.value;
@@ -647,8 +698,7 @@ class SaveWebViewer:
                   recursive: card.querySelector("[data-field='recursive']").checked,
                   strategy: card.querySelector("[data-field='strategy']").value,
                   keys: splitKeys(card.querySelector("[data-field='keys']").value),
-                  min_level: card.querySelector("[data-field='min_level']").value,
-                  max_level: card.querySelector("[data-field='max_level']").value,
+                  visible_levels: Array.from(card.querySelectorAll("[data-field='visible_level']:checked")).map((input) => Number.parseInt(input.value, 10)),
                   content: card.querySelector("[data-field='content']").value,
                   level_descriptions: isStatusBook
                     ? Object.fromEntries(
@@ -731,7 +781,7 @@ class SaveWebViewer:
                       <summary class="world-entry-head">
                         <button class="drag-handle" type="button" data-action="drag" draggable="true" title="拖动排序" aria-label="拖动排序">☰</button>
                         <span class="entry-title">${{escapeHtml(summaryTitle)}}</span>
-                        <span class="muted" style="margin-left:4px">Lv.${{normalized.min_level}}${{normalized.max_level < 100 ? "~" + normalized.max_level : ""}}</span>
+                        <span class="muted" style="margin-left:4px">${{visibleLevelsLabel(normalized.visible_levels)}}</span>
                         <label class="summary-check"><input data-field="enabled" type="checkbox"${{normalized.enabled ? " checked" : ""}}> 启用</label>
                         <label class="summary-check"><input data-field="recursive" type="checkbox"${{normalized.recursive ? " checked" : ""}}> 允许递归</label>
                         <button class="danger" type="button" data-action="delete">删除</button>
@@ -740,8 +790,7 @@ class SaveWebViewer:
                         <div class="world-entry-grid">
                           <label class="compact-field"><span>ID</span><input data-field="id" type="text" value="${{escapeAttr(normalized.id)}}"></label>
                           <label class="compact-field"><span>标题</span><input data-field="title" type="text" value="${{escapeAttr(normalized.title)}}"></label>
-                          <label class="compact-field"><span>等级门槛</span><input data-field="min_level" type="number" step="1" min="1" value="${{normalized.min_level}}"></label>
-                          <label class="compact-field"><span>等级上限</span><input data-field="max_level" type="number" step="1" min="1" value="${{normalized.max_level}}"></label>
+                          <label class="compact-field level-field"><span>可见等级</span><div class="level-choice-row">${{visibleLevelInputs(normalized.visible_levels)}}</div></label>
                           <label class="compact-field"><span>触发方式</span>
                             <select data-field="strategy">
                               <option value="keyword"${{normalized.strategy === "keyword" ? " selected" : ""}}>关键词命中</option>
@@ -879,7 +928,7 @@ class SaveWebViewer:
             """,
         )
 
-    def _region_book_file_response(
+    def _event_book_file_response(
         self,
         title: str,
         file_id: str,
@@ -888,7 +937,7 @@ class SaveWebViewer:
         content: str,
     ) -> web.Response:
         try:
-            book = self._normalize_region_book(json.loads(content))
+            book = self._normalize_event_book(json.loads(content))
         except Exception as exc:
             return self._plain_editable_file_response(
                 title,
@@ -896,11 +945,11 @@ class SaveWebViewer:
                 back_category,
                 note,
                 content,
-                warning=f"区域书 JSON 解析失败，请先修复原始 JSON：{exc}",
+                warning=f"事件书 JSON 解析失败，请先修复原始 JSON：{exc}",
             )
 
         book_json = self._json_script_data(book)
-        storage_key = "qq_mahoushoujo:region_book:open_state"
+        storage_key = "qq_mahoushoujo:event_book:open_state"
         source_url = self._url(
             f"/editable/source?id={quote(file_id, safe='')}&category={self._e(back_category)}"
         )
@@ -914,7 +963,7 @@ class SaveWebViewer:
             <h1>{self._e(title)}</h1>
             <p><a href="{self._url(f'/editable?category={self._e(back_category)}')}">返回{self._e(self._editable_category_title(back_category))}</a></p>
             <p class="muted">{self._e(file_id)}</p>
-            <p class="muted">区域书暂时按世界书方式匹配：命中关键词后注入详细介绍。简略介绍暂时保留，但永远不会触发。min_level 为等级门槛，max_level 为等级上限。排序由网页上下位置决定。</p>
+            <p class="muted">事件书按当前命令分组。当前事件内关键词命中或 always 条目会注入详细介绍；其他事件只在关键词命中且简略介绍不为空时注入简略介绍。可见等级用 F、E、D、C、B、A、S 多选控制，默认全部可见。</p>
             <div class="source-actions">
               <a class="button-link secondary-link" href="{source_url}">编辑源码</a>
               <a class="button-link secondary-link" href="{export_url}">导出 JSON</a>
@@ -926,20 +975,19 @@ class SaveWebViewer:
                 <button class="secondary compact-button" type="submit">导入 JSON</button>
               </form>
             </div>
-            <form id="region-book-form" method="post" action="{self._url('/editable/save')}">
+            <form id="event-book-form" method="post" action="{self._url('/editable/save')}">
               <input type="hidden" name="id" value="{self._e(file_id)}">
               <input type="hidden" name="category" value="{self._e(back_category)}">
-              <input id="region-book-content" type="hidden" name="content" value="">
+              <input id="event-book-content" type="hidden" name="content" value="">
               <label for="note">资源说明 / 注释</label>
               <textarea id="note" class="note-editor" name="note" spellcheck="false">{self._e(note)}</textarea>
 
               <div class="world-book-toolbar">
                 <div>
-                  <h2>区域列表</h2>
+                  <h2>事件列表</h2>
                 </div>
-                <button id="add-region" type="button">+ 添加区域</button>
               </div>
-              <div id="region-book-regions"></div>
+              <div id="event-book-events"></div>
               <div class="actions">
                 <button type="submit">保存</button>
               </div>
@@ -950,33 +998,35 @@ class SaveWebViewer:
               <button class="secondary" type="submit">恢复当前默认内容</button>
             </form>
             <script>
-              const initialRegionBook = {book_json};
-              const regionsEl = document.getElementById("region-book-regions");
-              const addRegionButton = document.getElementById("add-region");
-              const rbForm = document.getElementById("region-book-form");
-              const rbContentInput = document.getElementById("region-book-content");
-              const rbStorageKey = "{self._e(storage_key)}";
+              const initialEventBook = {book_json};
+              const eventsEl = document.getElementById("event-book-events");
+              const ebForm = document.getElementById("event-book-form");
+              const ebContentInput = document.getElementById("event-book-content");
+              const ebStorageKey = "{self._e(storage_key)}";
+              const requiredEvents = [
+                {{ id: "reincarnation", command: "/魔法少女转生", name: "魔法少女转生" }},
+                {{ id: "battle", command: "/魔法少女战斗", name: "魔法少女战斗" }},
+                {{ id: "daily", command: "/魔法少女日常", name: "魔法少女日常" }},
+              ];
+              const ebLevelOptions = [
+                {{ value: 1, label: "F" }},
+                {{ value: 2, label: "E" }},
+                {{ value: 3, label: "D" }},
+                {{ value: 4, label: "C" }},
+                {{ value: 5, label: "B" }},
+                {{ value: 6, label: "A" }},
+                {{ value: 7, label: "S" }},
+              ];
 
-              const rbState = {{
-                ...initialRegionBook,
-                regions: Array.isArray(initialRegionBook.regions) ? initialRegionBook.regions : [],
+              const ebState = {{
+                ...initialEventBook,
+                events: ebNormalizeEvents(initialEventBook.events),
               }};
 
-              let rbDraggingRegionIdx = null;
-              let rbDraggingEntryIdx = null;
-              let rbDraggingRegionForEntry = null;
-              let rbOpenState = {{ regions: new Set(), entries: new Set() }};
-              let rbHasCapturedOpenState = false;
+              let ebOpenState = {{ events: new Set(), entries: new Set() }};
+              let ebHasCapturedOpenState = false;
 
-              function rbRegionDefaults(index) {{
-                return {{
-                  id: `region_${{index + 1}}`,
-                  name: "",
-                  entries: [],
-                }};
-              }}
-
-              function rbEntryDefaults(index) {{
+              function ebEntryDefaults(index) {{
                 return {{
                   id: `entry_${{index + 1}}`,
                   title: "",
@@ -984,28 +1034,33 @@ class SaveWebViewer:
                   recursive: true,
                   strategy: "keyword",
                   keys: [],
-                  min_level: 1,
-                  max_level: 100,
+                  visible_levels: ebLevelOptions.map((item) => item.value),
                   brief: "",
                   content: "",
                 }};
               }}
 
-              function rbNormalizeRegion(region, index) {{
+              function ebNormalizeEvents(events) {{
+                const source = Array.isArray(events) ? events : [];
+                return requiredEvents.map((required) => {{
+                  const found = source.find((event) => event && (event.id === required.id || event.command === required.command));
+                  return ebNormalizeEvent({{ ...required, ...(found || {{}}), id: required.id, command: required.command, name: required.name }});
+                }});
+              }}
+
+              function ebNormalizeEvent(event) {{
                 return {{
-                  id: String(region.id || `region_${{index + 1}}`).trim(),
-                  name: String(region.name || ""),
-                  entries: Array.isArray(region.entries) ? region.entries.map((e, ei) => rbNormalizeEntry(e, ei)) : [],
+                  id: String(event.id || "").trim(),
+                  command: String(event.command || "").trim(),
+                  name: String(event.name || ""),
+                  entries: Array.isArray(event.entries) ? event.entries.map((e, ei) => ebNormalizeEntry(e, ei)) : [],
                 }};
               }}
 
-              function rbNormalizeEntry(entry, index) {{
+              function ebNormalizeEntry(entry, index) {{
                 const keys = Array.isArray(entry.keys)
                   ? entry.keys
                   : (typeof entry.keys === "string" ? [entry.keys] : []);
-                const minLevel = Number.parseInt(entry.min_level, 10);
-                const maxLevel = Number.parseInt(entry.max_level, 10);
-                const safeMin = Number.isFinite(minLevel) && minLevel >= 1 ? minLevel : 1;
                 return {{
                   id: String(entry.id || `entry_${{index + 1}}`).trim(),
                   title: String(entry.title || ""),
@@ -1013,156 +1068,183 @@ class SaveWebViewer:
                   recursive: entry.recursive !== false,
                   strategy: entry.strategy === "always" ? "always" : "keyword",
                   keys: keys.map((key) => String(key).trim()).filter(Boolean),
-                  min_level: safeMin,
-                  max_level: Number.isFinite(maxLevel) && maxLevel >= safeMin ? maxLevel : 100,
+                  visible_levels: ebNormalizeVisibleLevels(entry.visible_levels, entry.min_level, entry.max_level),
                   brief: String(entry.brief || ""),
                   content: String(entry.content || ""),
                 }};
               }}
 
-              function rbSplitKeys(value) {{
+              function ebSplitKeys(value) {{
                 return String(value || "")
                   .split(/[\\n,，]/)
                   .map((key) => key.trim())
                   .filter(Boolean);
               }}
 
-              function rbEscapeHtml(value) {{
+              function ebNormalizeVisibleLevels(raw, minLevel, maxLevel) {{
+                let selected = [];
+                if (Array.isArray(raw)) {{
+                  selected = raw.map((level) => Number.parseInt(level, 10));
+                }} else if (typeof raw === "string" && raw.trim()) {{
+                  selected = raw.split(/[,，\\s]+/).map((level) => {{
+                    const trimmed = String(level).trim().toUpperCase();
+                    const byLabel = ebLevelOptions.find((item) => item.label === trimmed);
+                    return byLabel ? byLabel.value : Number.parseInt(trimmed, 10);
+                  }});
+                }} else {{
+                  const minValue = Number.parseInt(minLevel, 10);
+                  const maxValue = Number.parseInt(maxLevel, 10);
+                  const low = Number.isFinite(minValue) ? Math.max(1, Math.min(7, minValue)) : 1;
+                  const high = Number.isFinite(maxValue) ? Math.max(low, Math.min(7, maxValue)) : 7;
+                  selected = ebLevelOptions.map((item) => item.value).filter((level) => level >= low && level <= high);
+                }}
+                const clean = ebLevelOptions
+                  .map((item) => item.value)
+                  .filter((level) => selected.includes(level));
+                return clean.length ? clean : ebLevelOptions.map((item) => item.value);
+              }}
+
+              function ebVisibleLevelsLabel(levels) {{
+                const normalized = ebNormalizeVisibleLevels(levels);
+                if (normalized.length === ebLevelOptions.length) return "F-S";
+                return normalized
+                  .map((level) => ebLevelOptions.find((item) => item.value === level)?.label || String(level))
+                  .join("/");
+              }}
+
+              function ebVisibleLevelInputs(levels) {{
+                const selected = new Set(ebNormalizeVisibleLevels(levels));
+                return ebLevelOptions.map((item) => `
+                  <label class="summary-check level-choice">
+                    <input data-field="visible_level" type="checkbox" value="${{item.value}}"${{selected.has(item.value) ? " checked" : ""}}> ${{item.label}}
+                  </label>
+                `).join("");
+              }}
+
+              function ebEscapeHtml(value) {{
                 return String(value)
                   .replace(/&/g, "&amp;")
                   .replace(/</g, "&lt;")
                   .replace(/>/g, "&gt;");
               }}
 
-              function rbEscapeAttr(value) {{
-                return rbEscapeHtml(value)
+              function ebEscapeAttr(value) {{
+                return ebEscapeHtml(value)
                   .replace(/"/g, "&quot;")
                   .replace(/'/g, "&#39;");
               }}
 
-              function rbRegionKey(region, index) {{
-                return String(region.id || region.name || `region_${{index + 1}}`).trim();
+              function ebEntryKey(entry, eventIdx, entryIdx) {{
+                return `${{eventIdx}}_${{String(entry.id || entry.title || `entry_${{entryIdx + 1}}`).trim()}}`;
               }}
 
-              function rbEntryKey(entry, rIdx, eIdx) {{
-                return `${{rIdx}}_${{String(entry.id || entry.title || `entry_${{eIdx + 1}}`).trim()}}`;
-              }}
-
-              function rbCaptureOpenState() {{
-                rbHasCapturedOpenState = true;
-                rbOpenState.regions = new Set();
-                rbOpenState.entries = new Set();
-                regionsEl.querySelectorAll(".region-block").forEach((block, rIdx) => {{
-                  const rKey = block.dataset.regionKey;
-                  const rDetails = block.querySelector(":scope > details");
-                  if (rKey && rDetails && rDetails.open) rbOpenState.regions.add(rKey);
-                  block.querySelectorAll(".rb-entry").forEach((card, eIdx) => {{
-                    const eKey = card.dataset.entryKey;
-                    const eDetails = card.querySelector("details");
-                    if (eKey && eDetails && eDetails.open) rbOpenState.entries.add(eKey);
+              function ebCaptureOpenState() {{
+                ebHasCapturedOpenState = true;
+                ebOpenState.events = new Set();
+                ebOpenState.entries = new Set();
+                eventsEl.querySelectorAll(".event-block").forEach((block) => {{
+                  const eventKey = block.dataset.eventKey;
+                  const eventDetails = block.querySelector(":scope > details");
+                  if (eventKey && eventDetails && eventDetails.open) ebOpenState.events.add(eventKey);
+                  block.querySelectorAll(".eb-entry").forEach((card) => {{
+                    const entryKey = card.dataset.entryKey;
+                    const entryDetails = card.querySelector("details");
+                    if (entryKey && entryDetails && entryDetails.open) ebOpenState.entries.add(entryKey);
                   }});
                 }});
-                rbPersistOpenState();
+                ebPersistOpenState();
               }}
 
-              function rbLoadOpenState() {{
+              function ebLoadOpenState() {{
                 try {{
-                  const raw = localStorage.getItem(rbStorageKey);
+                  const raw = localStorage.getItem(ebStorageKey);
                   if (!raw) return;
                   const data = JSON.parse(raw);
                   if (!data) return;
-                  if (Array.isArray(data.openRegions)) rbOpenState.regions = new Set(data.openRegions.map(String));
-                  if (Array.isArray(data.openEntries)) rbOpenState.entries = new Set(data.openEntries.map(String));
-                  rbHasCapturedOpenState = true;
+                  if (Array.isArray(data.openEvents)) ebOpenState.events = new Set(data.openEvents.map(String));
+                  if (Array.isArray(data.openEntries)) ebOpenState.entries = new Set(data.openEntries.map(String));
+                  ebHasCapturedOpenState = true;
                 }} catch (error) {{
-                  console.warn("failed to load region book open state", error);
+                  console.warn("failed to load event book open state", error);
                 }}
               }}
 
-              function rbPersistOpenState() {{
+              function ebPersistOpenState() {{
                 try {{
-                  localStorage.setItem(rbStorageKey, JSON.stringify({{
-                    openRegions: Array.from(rbOpenState.regions),
-                    openEntries: Array.from(rbOpenState.entries),
+                  localStorage.setItem(ebStorageKey, JSON.stringify({{
+                    openEvents: Array.from(ebOpenState.events),
+                    openEntries: Array.from(ebOpenState.entries),
                   }}));
                 }} catch (error) {{
-                  console.warn("failed to save region book open state", error);
+                  console.warn("failed to save event book open state", error);
                 }}
               }}
 
-              function rbSyncFromDom() {{
-                rbState.regions = Array.from(regionsEl.querySelectorAll(".region-block")).map((block, rIdx) => {{
-                  const region = rbNormalizeRegion(rbState.regions[rIdx] || {{}}, rIdx);
-                  region.id = block.querySelector("[data-field='region-id']").value;
-                  region.name = block.querySelector("[data-field='region-name']").value;
-                  region.entries = Array.from(block.querySelectorAll(".rb-entry")).map((card, eIdx) => rbNormalizeEntry({{
+              function ebSyncFromDom() {{
+                ebState.events = Array.from(eventsEl.querySelectorAll(".event-block")).map((block, eventIdx) => {{
+                  const current = ebNormalizeEvent(ebState.events[eventIdx] || requiredEvents[eventIdx]);
+                  current.entries = Array.from(block.querySelectorAll(".eb-entry")).map((card, entryIdx) => ebNormalizeEntry({{
                     id: card.querySelector("[data-field='id']").value,
                     title: card.querySelector("[data-field='title']").value,
                     enabled: card.querySelector("[data-field='enabled']").checked,
                     recursive: card.querySelector("[data-field='recursive']").checked,
                     strategy: card.querySelector("[data-field='strategy']").value,
-                    keys: rbSplitKeys(card.querySelector("[data-field='keys']").value),
-                    min_level: card.querySelector("[data-field='min_level']").value,
-                    max_level: card.querySelector("[data-field='max_level']").value,
+                    keys: ebSplitKeys(card.querySelector("[data-field='keys']").value),
+                    visible_levels: Array.from(card.querySelectorAll("[data-field='visible_level']:checked")).map((input) => Number.parseInt(input.value, 10)),
                     brief: card.querySelector("[data-field='brief']").value,
                     content: card.querySelector("[data-field='content']").value,
-                  }}, eIdx));
-                  return region;
+                  }}, entryIdx));
+                  return current;
                 }});
               }}
 
-              function rbRenderRegions() {{
-                regionsEl.innerHTML = "";
-                rbState.regions.forEach((region, rIdx) => {{
-                  const norm = rbNormalizeRegion(region, rIdx);
-                  const rKey = rbRegionKey(norm, rIdx);
-                  const rIsOpen = rbHasCapturedOpenState && rbOpenState.regions.has(rKey);
-                  const regionEl = document.createElement("section");
-                  regionEl.className = "region-block";
-                  regionEl.dataset.regionKey = rKey;
-                  regionEl.dataset.regionIndex = rIdx;
-
+              function ebRenderEvents() {{
+                eventsEl.innerHTML = "";
+                ebState.events.forEach((eventItem, eventIdx) => {{
+                  const norm = ebNormalizeEvent(eventItem);
+                  const eventKey = norm.command || norm.id;
+                  const eventIsOpen = ebHasCapturedOpenState && ebOpenState.events.has(eventKey);
+                  const eventEl = document.createElement("section");
+                  eventEl.className = "event-block";
+                  eventEl.dataset.eventKey = eventKey;
                   const entryCount = norm.entries.length;
-                  const summaryText = norm.name || norm.id || `区域 ${{rIdx + 1}}`;
 
                   let entriesHtml = "";
-                  norm.entries.forEach((entry, eIdx) => {{
-                    const eNorm = rbNormalizeEntry(entry, eIdx);
-                    const eKey = rbEntryKey(eNorm, rIdx, eIdx);
-                    const eIsOpen = rbHasCapturedOpenState && rbOpenState.entries.has(eKey);
-                    const entrySummary = eNorm.title || eNorm.id || `条目 ${{eIdx + 1}}`;
+                  norm.entries.forEach((entry, entryIdx) => {{
+                    const eNorm = ebNormalizeEntry(entry, entryIdx);
+                    const entryKey = ebEntryKey(eNorm, eventIdx, entryIdx);
+                    const entryIsOpen = ebHasCapturedOpenState && ebOpenState.entries.has(entryKey);
+                    const entrySummary = eNorm.title || eNorm.id || `条目 ${{entryIdx + 1}}`;
                     entriesHtml += `
-                      <div class="rb-entry" data-entry-key="${{rbEscapeAttr(eKey)}}" data-entry-index="${{eIdx}}">
-                        <details${{eIsOpen ? " open" : ""}}>
+                      <div class="eb-entry rb-entry" data-entry-key="${{ebEscapeAttr(entryKey)}}" data-entry-index="${{entryIdx}}">
+                        <details${{entryIsOpen ? " open" : ""}}>
                           <summary class="world-entry-head">
-                            <button class="drag-handle" type="button" data-action="drag-entry" draggable="true" title="拖动排序" aria-label="拖动排序">☰</button>
-                            <span class="entry-title">${{rbEscapeHtml(entrySummary)}}</span>
+                            <span class="entry-title">${{ebEscapeHtml(entrySummary)}}</span>
                             <label class="summary-check"><input data-field="enabled" type="checkbox"${{eNorm.enabled ? " checked" : ""}}> 启用</label>
                             <label class="summary-check"><input data-field="recursive" type="checkbox"${{eNorm.recursive ? " checked" : ""}}> 允许递归</label>
-                            <span class="muted" style="margin-left:4px">Lv.${{eNorm.min_level}}${{eNorm.max_level < 100 ? "~" + eNorm.max_level : ""}}</span>
+                            <span class="muted" style="margin-left:4px">${{ebVisibleLevelsLabel(eNorm.visible_levels)}}</span>
                             <button class="danger" type="button" data-action="delete-entry">删除</button>
                           </summary>
                           <div class="world-entry-body">
                             <div class="world-entry-grid">
-                              <label class="compact-field"><span>ID</span><input data-field="id" type="text" value="${{rbEscapeAttr(eNorm.id)}}"></label>
-                              <label class="compact-field"><span>标题</span><input data-field="title" type="text" value="${{rbEscapeAttr(eNorm.title)}}"></label>
-                              <label class="compact-field"><span>等级门槛</span><input data-field="min_level" type="number" step="1" min="1" value="${{eNorm.min_level}}"></label>
-                              <label class="compact-field"><span>等级上限</span><input data-field="max_level" type="number" step="1" min="1" value="${{eNorm.max_level}}"></label>
+                              <label class="compact-field"><span>ID</span><input data-field="id" type="text" value="${{ebEscapeAttr(eNorm.id)}}"></label>
+                              <label class="compact-field"><span>标题</span><input data-field="title" type="text" value="${{ebEscapeAttr(eNorm.title)}}"></label>
+                              <label class="compact-field level-field"><span>可见等级</span><div class="level-choice-row">${{ebVisibleLevelInputs(eNorm.visible_levels)}}</div></label>
                               <label class="compact-field"><span>触发方式</span>
                                 <select data-field="strategy">
                                   <option value="keyword"${{eNorm.strategy === "keyword" ? " selected" : ""}}>关键词命中</option>
-                                  <option value="always"${{eNorm.strategy === "always" ? " selected" : ""}}>总是注入</option>
+                                  <option value="always"${{eNorm.strategy === "always" ? " selected" : ""}}>总是注入（仅当前事件）</option>
                                 </select>
                               </label>
                             </div>
-                            <label class="block-field">关键词（支持中文逗号、英文逗号或换行分隔；触发方式为"总是注入"时可留空）
-                              <textarea data-field="keys" class="keys-editor" spellcheck="false">${{rbEscapeHtml(eNorm.keys.join("\\n"))}}</textarea>
+                            <label class="block-field">关键词（支持中文逗号、英文逗号或换行分隔；always 只在本事件生效，其他事件不会因 always 命中）
+                              <textarea data-field="keys" class="keys-editor" spellcheck="false">${{ebEscapeHtml(eNorm.keys.join("\\n"))}}</textarea>
                             </label>
-                            <label class="block-field">简略介绍（暂不触发，仅保留备用）
-                              <textarea data-field="brief" class="entry-content-editor" spellcheck="false" style="height:60px">${{rbEscapeHtml(eNorm.brief)}}</textarea>
+                            <label class="block-field">简略介绍（其他事件关键词命中时注入；为空则视为未命中）
+                              <textarea data-field="brief" class="entry-content-editor" spellcheck="false" style="height:60px">${{ebEscapeHtml(eNorm.brief)}}</textarea>
                             </label>
-                            <label class="block-field">详细介绍（关键词命中时注入）
-                              <textarea data-field="content" class="entry-content-editor" spellcheck="false">${{rbEscapeHtml(eNorm.content)}}</textarea>
+                            <label class="block-field">详细介绍（当前事件关键词命中或当前事件 always 时注入）
+                              <textarea data-field="content" class="entry-content-editor" spellcheck="false">${{ebEscapeHtml(eNorm.content)}}</textarea>
                             </label>
                           </div>
                         </details>
@@ -1170,18 +1252,17 @@ class SaveWebViewer:
                     `;
                   }});
 
-                  regionEl.innerHTML = `
-                    <details${{rIsOpen ? " open" : ""}}>
+                  eventEl.innerHTML = `
+                    <details${{eventIsOpen ? " open" : ""}}>
                       <summary class="world-entry-head region-head">
-                        <button class="drag-handle" type="button" data-action="drag-region" draggable="true" title="拖动排序" aria-label="拖动排序">☰</button>
-                        <span class="entry-title">${{rbEscapeHtml(summaryText)}}</span>
+                        <span class="entry-title">${{ebEscapeHtml(norm.command)}} · ${{ebEscapeHtml(norm.name)}}</span>
                         <span class="muted" style="margin-left:4px">(${{entryCount}} 个条目)</span>
-                        <button class="danger" type="button" data-action="delete-region">删除区域</button>
                       </summary>
                       <div class="region-body">
                         <div class="world-entry-grid">
-                          <label class="compact-field"><span>区域 ID</span><input data-field="region-id" type="text" value="${{rbEscapeAttr(norm.id)}}"></label>
-                          <label class="compact-field"><span>区域名称</span><input data-field="region-name" type="text" value="${{rbEscapeAttr(norm.name)}}" placeholder="如：艾尔森林、碧叶镇、德尔地下城"></label>
+                          <label class="compact-field"><span>事件 ID</span><input type="text" value="${{ebEscapeAttr(norm.id)}}" disabled></label>
+                          <label class="compact-field"><span>命令</span><input type="text" value="${{ebEscapeAttr(norm.command)}}" disabled></label>
+                          <label class="compact-field"><span>事件名称</span><input type="text" value="${{ebEscapeAttr(norm.name)}}" disabled></label>
                         </div>
                         <div class="world-book-toolbar" style="margin-top:8px">
                           <button class="secondary" type="button" data-action="add-entry">+ 添加条目</button>
@@ -1191,221 +1272,121 @@ class SaveWebViewer:
                     </details>
                   `;
 
-                  // Region details toggle
-                  const rDetails = regionEl.querySelector(":scope > details");
-                  rDetails.addEventListener("toggle", () => {{
-                    if (rDetails.open) rbOpenState.regions.add(rKey);
-                    else rbOpenState.regions.delete(rKey);
-                    rbHasCapturedOpenState = true;
-                    rbPersistOpenState();
+                  const eventDetails = eventEl.querySelector(":scope > details");
+                  eventDetails.addEventListener("toggle", () => {{
+                    if (eventDetails.open) ebOpenState.events.add(eventKey);
+                    else ebOpenState.events.delete(eventKey);
+                    ebHasCapturedOpenState = true;
+                    ebPersistOpenState();
                   }});
 
-                  // Region name/id sync to summary
-                  const nameInput = regionEl.querySelector("[data-field='region-name']");
-                  const idInput = regionEl.querySelector("[data-field='region-id']");
-                  const titleEl = regionEl.querySelector(".region-head .entry-title");
-                  const refreshRegionTitle = () => {{
-                    titleEl.textContent = nameInput.value.trim() || idInput.value.trim() || `区域 ${{rIdx + 1}}`;
-                  }};
-                  nameInput.addEventListener("input", refreshRegionTitle);
-                  idInput.addEventListener("input", refreshRegionTitle);
-
-                  // Delete region
-                  regionEl.querySelector("[data-action='delete-region']").addEventListener("click", (event) => {{
-                    event.preventDefault();
-                    event.stopPropagation();
-                    if (!confirm("确定删除整个区域及其所有条目？")) return;
-                    rbCaptureOpenState();
-                    rbSyncFromDom();
-                    rbState.regions.splice(rIdx, 1);
-                    rbOpenState.regions.delete(rKey);
-                    rbPersistOpenState();
-                    rbRenderRegions();
+                  eventEl.querySelector("[data-action='add-entry']").addEventListener("click", (clickEvent) => {{
+                    clickEvent.preventDefault();
+                    clickEvent.stopPropagation();
+                    ebCaptureOpenState();
+                    ebSyncFromDom();
+                    const newEntry = ebEntryDefaults(ebState.events[eventIdx].entries.length);
+                    ebState.events[eventIdx].entries.push(newEntry);
+                    const entryKey = ebEntryKey(newEntry, eventIdx, ebState.events[eventIdx].entries.length - 1);
+                    ebOpenState.entries.add(entryKey);
+                    ebOpenState.events.add(eventKey);
+                    ebPersistOpenState();
+                    ebRenderEvents();
                   }});
 
-                  // Add entry
-                  regionEl.querySelector("[data-action='add-entry']").addEventListener("click", (event) => {{
-                    event.preventDefault();
-                    event.stopPropagation();
-                    rbCaptureOpenState();
-                    rbSyncFromDom();
-                    const newEntry = rbEntryDefaults(rbState.regions[rIdx].entries.length);
-                    rbState.regions[rIdx].entries.push(newEntry);
-                    // Auto-open the new entry
-                    const eKey = rbEntryKey(newEntry, rIdx, rbState.regions[rIdx].entries.length - 1);
-                    rbOpenState.entries.add(eKey);
-                    // Also open the region
-                    rbOpenState.regions.add(rKey);
-                    rbPersistOpenState();
-                    rbRenderRegions();
-                  }});
-
-                  // Region drag
-                  const regionDragHandle = regionEl.querySelector("[data-action='drag-region']");
-                  regionDragHandle.addEventListener("click", (event) => {{
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }});
-                  regionDragHandle.addEventListener("dragstart", (event) => {{
-                    rbSyncFromDom();
-                    rbDraggingRegionIdx = rIdx;
-                    regionEl.classList.add("dragging");
-                    event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData("text/plain", `region:${{rIdx}}`);
-                  }});
-                  regionDragHandle.addEventListener("dragend", () => {{
-                    rbDraggingRegionIdx = null;
-                    regionEl.classList.remove("dragging");
-                    regionsEl.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over"));
-                  }});
-                  regionEl.addEventListener("dragover", (event) => {{
-                    if (rbDraggingRegionIdx === null || rbDraggingRegionIdx === rIdx) return;
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = "move";
-                    regionEl.classList.add("drag-over");
-                  }});
-                  regionEl.addEventListener("dragleave", () => {{
-                    regionEl.classList.remove("drag-over");
-                  }});
-                  regionEl.addEventListener("drop", (event) => {{
-                    event.preventDefault();
-                    regionEl.classList.remove("drag-over");
-                    if (rbDraggingRegionIdx === null || rbDraggingRegionIdx === rIdx) return;
-                    rbCaptureOpenState();
-                    rbSyncFromDom();
-                    const moved = rbState.regions.splice(rbDraggingRegionIdx, 1)[0];
-                    rbState.regions.splice(rIdx, 0, moved);
-                    rbDraggingRegionIdx = null;
-                    rbRenderRegions();
-                  }});
-
-                  // Entry events
-                  regionEl.querySelectorAll(".rb-entry").forEach((entryCard, eIdx) => {{
-                    const eDetails = entryCard.querySelector("details");
-                    const eKey = entryCard.dataset.entryKey;
-
-                    eDetails.addEventListener("toggle", () => {{
-                      if (eDetails.open) rbOpenState.entries.add(eKey);
-                      else rbOpenState.entries.delete(eKey);
-                      rbHasCapturedOpenState = true;
-                      rbPersistOpenState();
+                  eventEl.querySelectorAll(".eb-entry").forEach((entryCard, entryIdx) => {{
+                    const entryDetails = entryCard.querySelector("details");
+                    const entryKey = entryCard.dataset.entryKey;
+                    entryDetails.addEventListener("toggle", () => {{
+                      if (entryDetails.open) ebOpenState.entries.add(entryKey);
+                      else ebOpenState.entries.delete(entryKey);
+                      ebHasCapturedOpenState = true;
+                      ebPersistOpenState();
                     }});
 
-                    entryCard.querySelector(".summary-check").addEventListener("click", (event) => {{
-                      event.stopPropagation();
+                    entryCard.querySelector(".summary-check").addEventListener("click", (clickEvent) => {{
+                      clickEvent.stopPropagation();
                     }});
 
-                    // Delete entry
-                    entryCard.querySelector("[data-action='delete-entry']").addEventListener("click", (event) => {{
-                      event.preventDefault();
-                      event.stopPropagation();
+                    entryCard.querySelector("[data-action='delete-entry']").addEventListener("click", (clickEvent) => {{
+                      clickEvent.preventDefault();
+                      clickEvent.stopPropagation();
                       if (!confirm("确定删除这个条目？")) return;
-                      rbCaptureOpenState();
-                      rbSyncFromDom();
-                      rbState.regions[rIdx].entries.splice(eIdx, 1);
-                      rbOpenState.entries.delete(eKey);
-                      rbPersistOpenState();
-                      rbRenderRegions();
+                      ebCaptureOpenState();
+                      ebSyncFromDom();
+                      ebState.events[eventIdx].entries.splice(entryIdx, 1);
+                      ebOpenState.entries.delete(entryKey);
+                      ebPersistOpenState();
+                      ebRenderEvents();
                     }});
 
-                    // Entry title sync
                     const titleInput = entryCard.querySelector("[data-field='title']");
                     const idInput = entryCard.querySelector("[data-field='id']");
                     const entryTitleEl = entryCard.querySelector(".entry-title");
                     const refreshEntryTitle = () => {{
-                      entryTitleEl.textContent = titleInput.value.trim() || idInput.value.trim() || `条目 ${{eIdx + 1}}`;
+                      entryTitleEl.textContent = titleInput.value.trim() || idInput.value.trim() || `条目 ${{entryIdx + 1}}`;
                     }};
                     titleInput.addEventListener("input", refreshEntryTitle);
                     idInput.addEventListener("input", refreshEntryTitle);
-
-                    // Entry drag
-                    const entryDragHandle = entryCard.querySelector("[data-action='drag-entry']");
-                    entryDragHandle.addEventListener("click", (event) => {{
-                      event.preventDefault();
-                      event.stopPropagation();
-                    }});
-                    entryDragHandle.addEventListener("dragstart", (event) => {{
-                      rbSyncFromDom();
-                      rbDraggingEntryIdx = eIdx;
-                      rbDraggingRegionForEntry = rIdx;
-                      entryCard.classList.add("dragging");
-                      event.dataTransfer.effectAllowed = "move";
-                      event.dataTransfer.setData("text/plain", `entry:${{rIdx}}:${{eIdx}}`);
-                    }});
-                    entryDragHandle.addEventListener("dragend", () => {{
-                      rbDraggingEntryIdx = null;
-                      rbDraggingRegionForEntry = null;
-                      entryCard.classList.remove("dragging");
-                      regionsEl.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over"));
-                    }});
-                    entryCard.addEventListener("dragover", (event) => {{
-                      // Only allow drop within same region
-                      if (rbDraggingRegionForEntry !== rIdx || rbDraggingEntryIdx === null || rbDraggingEntryIdx === eIdx) return;
-                      event.preventDefault();
-                      event.dataTransfer.dropEffect = "move";
-                      entryCard.classList.add("drag-over");
-                    }});
-                    entryCard.addEventListener("dragleave", () => {{
-                      entryCard.classList.remove("drag-over");
-                    }});
-                    entryCard.addEventListener("drop", (event) => {{
-                      event.preventDefault();
-                      entryCard.classList.remove("drag-over");
-                      if (rbDraggingRegionForEntry !== rIdx || rbDraggingEntryIdx === null || rbDraggingEntryIdx === eIdx) return;
-                      rbCaptureOpenState();
-                      rbSyncFromDom();
-                      const entries = rbState.regions[rIdx].entries;
-                      const movedEntry = entries.splice(rbDraggingEntryIdx, 1)[0];
-                      const targetIdx = rbDraggingEntryIdx < eIdx ? eIdx - 1 : eIdx;
-                      entries.splice(targetIdx, 0, movedEntry);
-                      rbDraggingEntryIdx = null;
-                      rbDraggingRegionForEntry = null;
-                      rbRenderRegions();
-                    }});
                   }});
 
-                  regionsEl.appendChild(regionEl);
+                  eventsEl.appendChild(eventEl);
                 }});
               }}
 
-              addRegionButton.addEventListener("click", () => {{
-                rbCaptureOpenState();
-                rbSyncFromDom();
-                const newRegion = rbRegionDefaults(rbState.regions.length);
-                rbState.regions.push(newRegion);
-                const rKey = rbRegionKey(newRegion, rbState.regions.length - 1);
-                rbOpenState.regions.add(rKey);
-                rbPersistOpenState();
-                rbRenderRegions();
+              ebForm.addEventListener("submit", () => {{
+                ebSyncFromDom();
+                ebState.events = ebNormalizeEvents(ebState.events);
+                ebContentInput.value = JSON.stringify(ebState, null, 2);
               }});
 
-              rbForm.addEventListener("submit", () => {{
-                rbSyncFromDom();
-                rbContentInput.value = JSON.stringify(rbState, null, 2);
-              }});
-
-              rbState.regions = rbState.regions.map((r, i) => rbNormalizeRegion(r, i));
-              rbLoadOpenState();
-              rbRenderRegions();
+              ebLoadOpenState();
+              ebRenderEvents();
             </script>
             """,
         )
 
-    @staticmethod
-    def _normalize_region_book(raw: object) -> dict:
+    @classmethod
+    def _normalize_event_book(cls, raw: object) -> dict:
         book = dict(raw) if isinstance(raw, dict) else {}
-        raw_regions = book.get("regions", [])
-        if not isinstance(raw_regions, list):
-            raw_regions = []
+        required_events = [
+            {
+                "id": "reincarnation",
+                "command": "/魔法少女转生",
+                "name": "魔法少女转生",
+            },
+            {
+                "id": "battle",
+                "command": "/魔法少女战斗",
+                "name": "魔法少女战斗",
+            },
+            {
+                "id": "daily",
+                "command": "/魔法少女日常",
+                "name": "魔法少女日常",
+            },
+        ]
+        raw_events = book.get("events", [])
+        if not isinstance(raw_events, list):
+            raw_events = []
 
-        normalized_regions = []
-        for r_idx, raw_region in enumerate(raw_regions):
-            if not isinstance(raw_region, dict):
-                continue
-            region_id = str(raw_region.get("id") or f"region_{r_idx + 1}").strip()
-            region_name = str(raw_region.get("name") or "").strip()
+        normalized_events = []
+        for required in required_events:
+            raw_event = next(
+                (
+                    event
+                    for event in raw_events
+                    if isinstance(event, dict)
+                    and (
+                        str(event.get("id") or "").strip() == required["id"]
+                        or str(event.get("command") or "").strip()
+                        == required["command"]
+                    )
+                ),
+                {},
+            )
 
-            raw_entries = raw_region.get("entries", [])
+            raw_entries = raw_event.get("entries", []) if isinstance(raw_event, dict) else []
             if not isinstance(raw_entries, list):
                 raw_entries = []
 
@@ -1418,16 +1399,6 @@ class SaveWebViewer:
                     keys = [keys]
                 if not isinstance(keys, list):
                     keys = []
-                try:
-                    min_level = int(raw_entry.get("min_level", 1))
-                except (TypeError, ValueError):
-                    min_level = 1
-                try:
-                    max_level = int(raw_entry.get("max_level", 100))
-                except (TypeError, ValueError):
-                    max_level = 100
-                if max_level < min_level:
-                    max_level = min_level
                 normalized_entries.append({
                     "id": str(raw_entry.get("id") or f"entry_{e_idx + 1}").strip(),
                     "title": str(raw_entry.get("title") or ""),
@@ -1435,180 +1406,27 @@ class SaveWebViewer:
                     "recursive": raw_entry.get("recursive", True) is not False,
                     "strategy": (
                         "always"
-                        if str(raw_entry.get("strategy") or "keyword").strip().lower() == "always"
+                        if str(raw_entry.get("strategy") or "keyword").strip().lower()
+                        == "always"
                         else "keyword"
                     ),
                     "keys": [str(key).strip() for key in keys if str(key).strip()],
-                    "min_level": max(1, min_level),
-                    "max_level": max(max(1, min_level), max_level),
+                    "visible_levels": list(cls._normalize_visible_levels(raw_entry)),
                     "brief": str(raw_entry.get("brief") or ""),
                     "content": str(raw_entry.get("content") or ""),
                 })
 
-            normalized_regions.append({
-                "id": region_id,
-                "name": region_name,
+            normalized_events.append({
+                **required,
                 "entries": normalized_entries,
             })
 
         book["version"] = book.get("version", 1)
-        book["regions"] = normalized_regions
+        book["events"] = normalized_events
         return book
 
-    async def _editable_source(self, request: web.Request) -> web.Response:
-        if not self._is_admin(request):
-            return self._forbidden()
-
-        file_id = request.query.get("id", "")
-        if not self._is_structured_book_file(file_id):
-            raise web.HTTPBadRequest(text="invalid editable source file")
-        category = self._editable_back_category(request.query.get("category"), file_id)
-        content = self.editable_manager.read_text(file_id)
-        return self._source_editor_response(
-            title=f"编辑源码 - {file_id}",
-            back_url=self._url(
-                f"/editable/file?id={quote(file_id, safe='')}&category={self._e(category)}"
-            ),
-            save_url=self._url("/editable/source/save"),
-            hidden_fields={
-                "id": file_id,
-                "category": category,
-            },
-            content=content,
-            file_name=file_id,
-            import_url=self._url("/editable/import"),
-            export_url=self._url(f"/editable/export?id={quote(file_id, safe='')}"),
-            accept=".json,application/json",
-        )
-
-    async def _editable_source_save(self, request: web.Request) -> web.Response:
-        if not self._is_admin(request):
-            return self._forbidden()
-
-        data = await request.post()
-        file_id = str(data.get("id", ""))
-        category = self._editable_back_category(str(data.get("category", "")), file_id)
-        content = str(data.get("content", ""))
-        if not self._is_structured_book_file(file_id):
-            raise web.HTTPBadRequest(text="invalid editable source file")
-        try:
-            self.editable_manager.write_json_book(file_id, content)
-        except Exception as exc:
-            return self._source_editor_response(
-                title=f"编辑源码 - {file_id}",
-                back_url=self._url(
-                    f"/editable/file?id={quote(file_id, safe='')}&category={self._e(category)}"
-                ),
-                save_url=self._url("/editable/source/save"),
-                hidden_fields={"id": file_id, "category": category},
-                content=content,
-                file_name=file_id,
-                import_url=self._url("/editable/import"),
-                export_url=self._url(f"/editable/export?id={quote(file_id, safe='')}"),
-                accept=".json,application/json",
-                warning=str(exc),
-            )
-        raise web.HTTPFound(
-            self._url(f"/editable/file?id={quote(file_id, safe='')}&category={self._e(category)}")
-        )
-
-    async def _editable_export(self, request: web.Request) -> web.Response:
-        if not self._is_admin(request):
-            return self._forbidden()
-
-        file_id = request.query.get("id", "")
-        if not self._is_structured_book_file(file_id):
-            raise web.HTTPBadRequest(text="invalid editable export file")
-        content = self.editable_manager.read_text(file_id)
-        return self._download_response(file_id.replace("/", "_"), content, "application/json")
-
-    async def _editable_export_key_info(self, request: web.Request) -> web.Response:
-        if not self._is_admin(request):
-            return self._forbidden()
-
-        file_id = request.query.get("id", "")
-        if not self._is_structured_book_file(file_id):
-            raise web.HTTPBadRequest(text="invalid editable key info export file")
-        content = self.editable_manager.read_text(file_id)
-        try:
-            key_info = self._format_book_key_info(json.loads(content), file_id=file_id)
-        except Exception as exc:
-            raise web.HTTPBadRequest(text=f"invalid editable book JSON: {exc}") from exc
-
-        filename = file_id.replace("/", "_").replace(".json", "_key_info.txt")
-        return self._download_response(filename, key_info, "text/plain")
-
-    async def _editable_import(self, request: web.Request) -> web.Response:
-        if not self._is_admin(request):
-            return self._forbidden()
-
-        data = await request.post()
-        file_id = str(data.get("id", ""))
-        category = self._editable_back_category(str(data.get("category", "")), file_id)
-        if not self._is_structured_book_file(file_id):
-            raise web.HTTPBadRequest(text="invalid editable import file")
-        content = await self._form_text_content(data)
-        try:
-            self.editable_manager.write_json_book(file_id, content)
-        except Exception as exc:
-            return self._source_editor_response(
-                title=f"导入失败 - {file_id}",
-                back_url=self._url(
-                    f"/editable/file?id={quote(file_id, safe='')}&category={self._e(category)}"
-                ),
-                save_url=self._url("/editable/source/save"),
-                hidden_fields={"id": file_id, "category": category},
-                content=content,
-                file_name=file_id,
-                import_url=self._url("/editable/import"),
-                export_url=self._url(f"/editable/export?id={quote(file_id, safe='')}"),
-                accept=".json,application/json",
-                warning=str(exc),
-            )
-        raise web.HTTPFound(
-            self._url(f"/editable/file?id={quote(file_id, safe='')}&category={self._e(category)}")
-        )
-
-    async def _editable_save(self, request: web.Request) -> web.Response:
-        if not self._is_admin(request):
-            return self._forbidden()
-
-        data = await request.post()
-        file_id = str(data.get("id", ""))
-        category = self._editable_back_category(str(data.get("category", "")), file_id)
-        note = str(data.get("note", ""))
-        content = str(data.get("content", ""))
-        if not self._is_editable_file(file_id):
-            raise web.HTTPBadRequest(text="invalid editable file")
-
-        try:
-            if file_id == "world_book/default.json":
-                json.loads(content)
-                self.editable_manager.write_world_book(content)
-            elif file_id in {"skill_book/default.json", "status_book/default.json"}:
-                self.editable_manager.write_json_book(file_id, content)
-            elif file_id == "region_book/default.json":
-                self.editable_manager.write_json_book(file_id, content)
-            else:
-                self.editable_manager.write_text(file_id, content)
-            self.editable_manager.write_note(file_id, note)
-        except Exception as exc:
-            return self._html_response(
-                "保存失败",
-                f"""
-                <h1>保存失败</h1>
-                <p class="error">{self._e(exc)}</p>
-                <p><a href="{self._url(f'/editable/file?id={quote(file_id, safe="")}&category={self._e(category)}')}">返回编辑</a></p>
-                """,
-                status=400,
-            )
-
-        raise web.HTTPFound(
-            self._url(f"/editable/file?id={quote(file_id, safe='')}&category={self._e(category)}")
-        )
-
-    @staticmethod
-    def _normalize_world_book(raw: object) -> dict:
+    @classmethod
+    def _normalize_world_book(cls, raw: object) -> dict:
         book = dict(raw) if isinstance(raw, dict) else {}
         entries = book.get("entries", [])
         if isinstance(entries, dict):
@@ -1627,16 +1445,6 @@ class SaveWebViewer:
                 keys = [keys]
             if not isinstance(keys, list):
                 keys = []
-            try:
-                min_level = int(entry.get("min_level", 1))
-            except (TypeError, ValueError):
-                min_level = 1
-            try:
-                max_level = int(entry.get("max_level", 100))
-            except (TypeError, ValueError):
-                max_level = 100
-            if max_level < min_level:
-                max_level = min_level
             normalized_entry = {
                     "id": str(entry.get("id") or fallback_id).strip(),
                     "title": str(entry.get("title") or ""),
@@ -1649,8 +1457,7 @@ class SaveWebViewer:
                         else "keyword"
                     ),
                     "keys": [str(key).strip() for key in keys if str(key).strip()],
-                    "min_level": max(1, min_level),
-                    "max_level": max(max(1, min_level), max_level),
+                    "visible_levels": list(cls._normalize_visible_levels(entry)),
                     "content": str(entry.get("content") or ""),
                 }
             if isinstance(entry.get("level_descriptions"), dict):
@@ -1672,9 +1479,10 @@ class SaveWebViewer:
 
     @classmethod
     def _format_book_key_info(cls, raw: object, *, file_id: str = "") -> str:
-        # Check if this is a region book format
-        if isinstance(raw, dict) and "regions" in raw:
-            return cls._format_region_book_key_info(raw)
+        if file_id == "event_book/default.json" or (
+            isinstance(raw, dict) and "events" in raw
+        ):
+            return cls._format_event_book_key_info(raw)
 
         book = cls._normalize_world_book(raw)
         entries = book.get("entries", [])
@@ -1689,7 +1497,7 @@ class SaveWebViewer:
         ]
         for index, entry in sorted(
             indexed_entries,
-            key=lambda item: (int(item[1].get("min_level", 1)), item[0]),
+            key=lambda item: (min(cls._normalize_visible_levels(item[1])), item[0]),
         ):
             title = cls._single_line_text(
                 entry.get("title") or entry.get("id") or f"条目{index + 1}"
@@ -1720,18 +1528,20 @@ class SaveWebViewer:
         return "\n\n-----------------------------------------------\n\n".join(blocks) + ("\n" if blocks else "")
 
     @classmethod
-    def _format_region_book_key_info(cls, raw: object) -> str:
-        book = cls._normalize_region_book(raw)
-        regions = book.get("regions", [])
-        if not isinstance(regions, list):
+    def _format_event_book_key_info(cls, raw: object) -> str:
+        book = cls._normalize_event_book(raw)
+        events = book.get("events", [])
+        if not isinstance(events, list):
             return ""
 
-        region_blocks: list[str] = []
-        for region in regions:
-            if not isinstance(region, dict):
+        event_blocks: list[str] = []
+        for event in events:
+            if not isinstance(event, dict):
                 continue
-            region_name = str(region.get("name") or region.get("id") or "未知区域")
-            entries = region.get("entries", [])
+            event_name = str(
+                event.get("command") or event.get("name") or event.get("id") or "未知事件"
+            )
+            entries = event.get("entries", [])
             if not isinstance(entries, list):
                 continue
 
@@ -1742,23 +1552,34 @@ class SaveWebViewer:
                 title = cls._single_line_text(
                     entry.get("title") or entry.get("id") or "条目"
                 )
-                min_level = int(entry.get("min_level", 1))
+                strategy = str(entry.get("strategy") or "keyword")
                 brief = str(entry.get("brief") or "").strip()
                 content = str(entry.get("content") or "").strip()
-                entry_lines.append(f"  [{title}] (Lv.{min_level})")
+                level_text = visible_levels_label(entry.get("visible_levels"))
+                entry_lines.append(f"  [{title}] ({level_text}, {strategy})")
                 if brief:
                     entry_lines.append(f"    简略: {brief}")
                 if content:
                     entry_lines.append(f"    详细: {content}")
 
             if entry_lines:
-                region_blocks.append(f"【{region_name}】\n" + "\n".join(entry_lines))
+                event_blocks.append(f"【{event_name}】\n" + "\n".join(entry_lines))
 
-        return "\n\n-----------------------------------------------\n\n".join(region_blocks) + ("\n" if region_blocks else "")
+        return "\n\n-----------------------------------------------\n\n".join(event_blocks) + ("\n" if event_blocks else "")
 
     @staticmethod
     def _single_line_text(value: object) -> str:
         return re.sub(r"\s+", " ", str(value or "")).strip()
+
+    @staticmethod
+    def _normalize_visible_levels(entry: dict) -> tuple[int, ...]:
+        if not isinstance(entry, dict):
+            return ALL_VISIBLE_LEVELS
+        return normalize_visible_levels(
+            entry.get("visible_levels"),
+            min_level=entry.get("min_level", 1),
+            max_level=entry.get("max_level", 7),
+        )
 
     @staticmethod
     def _default_book_display_name(file_id: str) -> str:
@@ -2899,6 +2720,9 @@ class SaveWebViewer:
     .summary-check input {{ width: 15px; height: 15px; }}
     .world-entry-body {{ padding: 10px; background: #fff; border-radius: 0 0 8px 8px; }}
     .world-entry-grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }}
+    .level-field {{ grid-column: 1 / -1; }}
+    .level-choice-row {{ display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 8px 10px; border: 1px solid #d9e1eb; border-radius: 8px; background: #f8fafc; }}
+    .level-choice {{ display: inline-flex; align-items: center; gap: 4px; margin: 0; white-space: nowrap; }}
     .compact-field {{ display: flex; align-items: center; gap: 6px; margin: 0; }}
     .compact-field span {{ flex: 0 0 auto; color: #3a4350; }}
     .world-entry input[type="text"], .world-entry input[type="number"], .world-entry select {{ width: 100%; min-width: 0; box-sizing: border-box; padding: 6px 8px; border: 1px solid #c8d0dc; border-radius: 7px; font: inherit; background: #fbfdff; }}
@@ -3037,7 +2861,7 @@ class SaveWebViewer:
             "world_book/default.json",
             "skill_book/default.json",
             "status_book/default.json",
-            "region_book/default.json",
+            "event_book/default.json",
         }
 
     def _editable_rows(self, items: list[dict[str, str]], category: str) -> list[str]:

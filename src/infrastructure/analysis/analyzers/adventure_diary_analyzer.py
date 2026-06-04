@@ -4,9 +4,10 @@ import json
 
 from ....domain.models.data_models import AdventureDiaryCard, TokenUsage
 from ....domain.services.adventure_diary_domain_service import AdventureDiaryDomainService
+from ....shared.levels import level_label
 from ....utils.logger import logger
 from ...change_books import ChangeBookEngine
-from ...region_book import RegionBookEngine
+from ...event_book import EventBookEngine
 from ...world_book import WorldBookEngine
 from ..utils.json_utils import parse_json_object_response
 from ..utils.llm_utils import (
@@ -28,7 +29,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         super().__init__(context, config_manager, editable_manager)
         self.domain_service = domain_service
         self.world_book_engine = WorldBookEngine(editable_manager=self.editable_manager)
-        self.region_book_engine = RegionBookEngine(editable_manager=self.editable_manager)
+        self.event_book_engine = EventBookEngine(editable_manager=self.editable_manager)
         self.change_book_engine = ChangeBookEngine(editable_manager=self.editable_manager)
 
     def get_data_type(self) -> str:
@@ -127,19 +128,20 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             action,
             self._format_logs_for_scan(logs),
         ]
-        # --- 世界书与区域书交叉递归 ---
+        # --- 世界书与事件书交叉递归 ---
         world_book_result = self.world_book_engine.build_prompt_text(
             scan_parts, player_level=current_level,
         )
-        region_book_result = self.region_book_engine.build_prompt_text(
+        event_book_result = self.event_book_engine.build_prompt_text(
             scan_parts,
+            current_event="/魔法少女战斗",
             player_level=current_level,
         )
         cross_hit_parts: list[str] = []
         for entry in world_book_result.entries:
             if entry.recursive and entry.content:
                 cross_hit_parts.append(entry.content)
-        for entry in region_book_result.local_entries + region_book_result.remote_entries:
+        for entry in event_book_result.local_entries + event_book_result.remote_entries:
             if entry.recursive and entry.content:
                 cross_hit_parts.append(entry.content)
         if cross_hit_parts:
@@ -147,17 +149,18 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             world_book_result = self.world_book_engine.build_prompt_text(
                 enriched_scan_parts, player_level=current_level,
             )
-            region_book_result = self.region_book_engine.build_prompt_text(
+            event_book_result = self.event_book_engine.build_prompt_text(
                 enriched_scan_parts,
+                current_event="/魔法少女战斗",
                 player_level=current_level,
             )
 
         world_book_text = world_book_result.prompt_text
-        region_book_text = region_book_result.prompt_text
+        event_book_text = event_book_result.prompt_text
         supplement_text = self._join_optional_prompt_parts(
             [
                 world_book_text,
-                region_book_text,
+                event_book_text,
                 self.change_book_engine.build_skill_prompt_text(
                     enriched_scan_parts if cross_hit_parts else scan_parts,
                     player_level=current_level,
@@ -176,7 +179,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             {
                 "player_data_update_json": self._json_dump(player_data),
                 "player_name": nickname or self._get_nested(protagonist, ["个人信息", "姓名"], "") or user_id or "unknown",
-                "current_level": current_level,
+                "current_level": level_label(current_level),
                 "logs_text": logs_text,
                 "cameo_memories_text": cameo_memories_text,
                 "action": action,
