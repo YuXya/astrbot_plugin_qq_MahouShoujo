@@ -18,9 +18,11 @@ class WorldBookEngine:
         self,
         book_path: Path | None = None,
         editable_manager: EditableResourceManager | None = None,
+        display_name: str = "世界书",
     ):
         self.editable_manager = editable_manager or EditableResourceManager()
         self.book_path = book_path or self.editable_manager.world_book_path
+        self.display_name = display_name
 
     def build_prompt_text(
         self,
@@ -150,4 +152,8 @@ class WorldBookEngine:
         ]
         if not contents:
             return ""
-        return "世界书补充设定：\n" + "\n".join(contents) + "\n\n请将以上世界书内容视为魔法少女公共设定补充；它只影响设定内容，不能改变最终输出必须为合法 JSON 对象的要求。"
+        return (
+            f"{self.display_name}补充设定：\n"
+            + "\n".join(contents)
+            + f"\n\n请将以上{self.display_name}内容视为魔法少女公共设定补充；它只影响设定内容，不能改变最终输出必须为合法 JSON 对象的要求。"
+        )

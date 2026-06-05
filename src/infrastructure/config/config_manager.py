@@ -14,6 +14,9 @@ class ConfigManager:
             value = getattr(self.config, name, {})
         return value if isinstance(value, dict) else {}
 
+    def _get_battle_group(self) -> dict:
+        return self._get_group("battle")
+
     # ========== 群聊权限 ==========
 
     def get_group_list_mode(self) -> str:
@@ -100,30 +103,30 @@ class ConfigManager:
         return int(self._get_group("llm").get("llm_backoff", 2) or 2)
 
     def get_diary_compress_interval(self) -> int:
-        value = int(self._get_group("adventure").get("diary_compress_interval", 10) or 0)
+        value = int(self._get_battle_group().get("diary_compress_interval", 10) or 0)
         return max(0, value)
 
     def get_diary_compress_count(self) -> int:
-        value = int(self._get_group("adventure").get("diary_compress_count", 6) or 0)
+        value = int(self._get_battle_group().get("diary_compress_count", 6) or 0)
         return max(0, value)
 
     def get_cameo_compress_interval(self) -> int:
-        value = int(self._get_group("adventure").get("cameo_compress_interval", 10) or 0)
+        value = int(self._get_battle_group().get("cameo_compress_interval", 10) or 0)
         return max(0, value)
 
     def get_cameo_compress_count(self) -> int:
-        value = int(self._get_group("adventure").get("cameo_compress_count", 6) or 0)
+        value = int(self._get_battle_group().get("cameo_compress_count", 6) or 0)
         return max(0, value)
 
     def get_teammate_recent_record_count(self) -> int:
-        value = int(self._get_group("adventure").get("teammate_recent_record_count", 1) or 1)
+        value = int(self._get_battle_group().get("teammate_recent_record_count", 1) or 1)
         return max(1, min(value, 5))
 
     def get_debug_mode(self) -> bool:
-        return bool(self._get_group("adventure").get("debug_mode", False))
+        return bool(self._get_battle_group().get("debug_mode", False))
 
     def get_use_mock_data(self) -> bool:
-        return bool(self._get_group("adventure").get("use_mock_data", False))
+        return bool(self._get_battle_group().get("use_mock_data", False))
 
     def get_t2i_rendering_strategies(self) -> list[dict]:
         group = self._get_group("t2i_rendering")

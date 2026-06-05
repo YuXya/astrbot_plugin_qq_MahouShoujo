@@ -2,21 +2,21 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import html as html_lib
 import os
+import re
 import time
 from typing import Any
 
 from astrbot.api.star import StarTools
 
-from ...domain.models.data_models import AdventureDiaryCard, ReincarnationCard
+from ...domain.models.data_models import BattleDiaryCard, ReincarnationCard
 from ...domain.repositories.card_repository import ICardGenerator
 from ...utils.logger import logger
 from ..editable_resources import EditableResourceManager
 from ..storage.state_progress import (
     build_progress_sections,
-    build_state_display_items,
     level_display,
-    level_exp_percent,
 )
 from .templates import HTMLTemplates
 
@@ -65,7 +65,7 @@ class ReportGenerator(ICardGenerator):
 
     async def generate_diary_image_card(
         self,
-        card: AdventureDiaryCard,
+        card: BattleDiaryCard,
         html_render_func: Any,
     ) -> tuple[str | None, str | None]:
         progress_sections = build_progress_sections(
@@ -75,7 +75,7 @@ class ReportGenerator(ICardGenerator):
                 "/主角/技能/",
             ),
             self.editable_manager.read_book_base_path(
-                "status_book/default.json",
+                "fetish_book/default.json",
                 "/主角/快感状态/性癖/",
             ),
             limit=8,
@@ -85,16 +85,16 @@ class ReportGenerator(ICardGenerator):
             "技能&熟练度",
         )
         status_progress_title = self.editable_manager.read_book_display_name(
-            "status_book/default.json",
+            "fetish_book/default.json",
             "特殊状态",
         )
         participants = [str(name).strip() for name in card.participants if str(name).strip()]
         if not participants:
             participants = [card.target_name]
-        battle_magical_girl_label = "魔法少女 " + "、".join(participants)
+        battle_magical_girl_label = "、".join(participants)
         battle_mode_label = "多人行动" if len(participants) > 1 else "单独行动"
         html_content = self.html_templates.render_template(
-            "adventure_diary.html",
+            "battle_diary.html",
             card=card,
             reason=card.reason,
             battle_magical_girl_label=battle_magical_girl_label,
@@ -104,9 +104,8 @@ class ReportGenerator(ICardGenerator):
             skill_progress_items=progress_sections.skill_items,
             status_progress_title=status_progress_title,
             status_progress_items=progress_sections.status_items,
-            state_items=build_state_display_items(card.state_snapshot, limit=9),
-            level_label=level_display(card.state_snapshot),
-            level_exp_percent=level_exp_percent(card.state_snapshot),
+            level_label=f"{level_display(card.state_snapshot)}级",
+            diary_html=self._highlight_diary_quotes(card.diary),
             avatar_url=card.avatar_url,
         )
         if not html_content:
@@ -127,7 +126,7 @@ class ReportGenerator(ICardGenerator):
                     image_path = self._persist_image(
                         image_data,
                         options.get("type", "png"),
-                        prefix="adventure_diary",
+                        prefix="battle_diary",
                     )
                     if image_path:
                         return image_path, html_content
@@ -135,6 +134,22 @@ class ReportGenerator(ICardGenerator):
                     logger.warning(f"战斗日记 HTML 转图片失败，尝试下一轮策略: {exc}")
 
         return None, html_content
+
+    @staticmethod
+    def _highlight_diary_quotes(text: object) -> str:
+        raw_text = str(text or "")
+        parts: list[str] = []
+        cursor = 0
+        for match in re.finditer(r"“[^”]*”|\"[^\"\n]*\"", raw_text):
+            parts.append(html_lib.escape(raw_text[cursor:match.start()]))
+            parts.append(
+                '<span class="diary-quote">'
+                + html_lib.escape(match.group(0))
+                + "</span>"
+            )
+            cursor = match.end()
+        parts.append(html_lib.escape(raw_text[cursor:]))
+        return "".join(parts)
 
     def _persist_image(
         self,

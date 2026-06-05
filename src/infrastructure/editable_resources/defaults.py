@@ -30,10 +30,14 @@ SKILL_BOOK_DEFAULT = _load_book("skill_book.json")
 
 STATUS_BOOK_DEFAULT = _load_book("status_book.json")
 
+FETISH_BOOK_DEFAULT = _load_book("fetish_book.json")
+
 EVENT_BOOK_DEFAULT = _load_book("event_book.json")
+
+MONSTER_BOOK_DEFAULT = _load_book("monster_book.json")
 
 REINCARNATION_PROMPT = _load_prompt("reincarnation_prompt.txt")
 
-ADVENTURE_DIARY_PROMPT = _load_prompt("adventure_diary_prompt.txt")
+BATTLE_DIARY_PROMPT = _load_prompt("battle_diary_prompt.txt")
 
 DEFAULT_SYSTEM_PROMPT = _load_prompt("default_system_prompt.txt")

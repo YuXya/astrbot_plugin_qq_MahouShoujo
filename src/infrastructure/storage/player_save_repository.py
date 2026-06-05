@@ -10,14 +10,14 @@ from typing import Any
 
 from astrbot.api.star import StarTools
 
-from ...domain.models.data_models import AdventureDiaryCard, ReincarnationCard
+from ...domain.models.data_models import BattleDiaryCard, ReincarnationCard
 from ...utils.logger import logger
 from .state_progress import PROGRESS_KEYS
 
 # ── 时间格式工具 ──────────────────────────────────
 
 def _format_date(value: object) -> str:
-    """将毫秒时间戳或字符串转为 '2025年1月1日' 格式；已是该格式则原样返回。"""
+    """将毫秒时间戳或字符串转为 '2020年4月1日' 格式；已是该格式则原样返回。"""
     if not value:
         return ""
     text = str(value).strip()
@@ -47,7 +47,7 @@ class PlayerSaveRepository:
         "cameo_memory.jsonl",
         "daily_memory.jsonl",
     }
-    WORLD_ERA_START = date(2025, 1, 1)
+    WORLD_ERA_START = date(2020, 4, 1)
 
     def __init__(
         self,
@@ -95,9 +95,9 @@ class PlayerSaveRepository:
             for user_dir in sorted(path for path in users_dir.iterdir() if path.is_dir()):
                 log_path = user_dir / "daily_memory.jsonl"
                 if not log_path.exists():
-                    log_path = user_dir / "adventure_log.jsonl"
+                    log_path = user_dir / "battle_log.jsonl"
                 for index, item in enumerate(self._read_recent_logs(log_path, limit=0)):
-                    if item.get("type") not in {"adventure_diary", "adventure_summary"}:
+                    if item.get("type") not in {"battle_diary", "battle_summary"}:
                         continue
                     records.append(
                         (
@@ -114,7 +114,7 @@ class PlayerSaveRepository:
             records,
             key=lambda value: (value[0], str(value[1]), value[2]),
         ):
-            if item.get("type") == "adventure_summary":
+            if item.get("type") == "battle_summary":
                 if "world_date_from" not in item and "world_date_to" not in item:
                     item["world_date_unknown"] = True
                     changed_paths.setdefault(log_path, log_path.read_text(encoding="utf-8").splitlines())
@@ -149,9 +149,9 @@ class PlayerSaveRepository:
         for user_dir in sorted(path for path in users_dir.iterdir() if path.is_dir()):
             log_path = user_dir / "daily_memory.jsonl"
             if not log_path.exists():
-                log_path = user_dir / "adventure_log.jsonl"
+                log_path = user_dir / "battle_log.jsonl"
             for item in self._read_recent_logs(log_path, limit=0):
-                if item.get("type") != "adventure_diary" or not item.get("world_date"):
+                if item.get("type") != "battle_diary" or not item.get("world_date"):
                     continue
                 source_dates[(user_dir.name, str(item.get("title") or ""))] = (
                     int(item.get("world_day_offset", 0) or 0),
@@ -320,11 +320,11 @@ class PlayerSaveRepository:
 
     # ── 战斗日记结果保存 ──────────────────────────────────
 
-    def save_adventure_result(
+    def save_battle_result(
         self,
         group_id: str,
         user_id: str,
-        card: AdventureDiaryCard,
+        card: BattleDiaryCard,
         new_level: int,
         new_level_exp: int = 0,
         world_day_offset: int | None = None,
@@ -383,7 +383,7 @@ class PlayerSaveRepository:
             group_id,
             user_id,
             {
-                "type": "adventure_diary",
+                "type": "battle_diary",
                 "created_at": now,
                 "title": card.title,
                 "date_label": card.date_label,
@@ -405,7 +405,7 @@ class PlayerSaveRepository:
 
     # ── 日志压缩 ──────────────────────────────────
 
-    def maybe_compress_adventure_logs(
+    def maybe_compress_battle_logs(
         self,
         group_id: str,
         user_id: str,
@@ -424,7 +424,7 @@ class PlayerSaveRepository:
         log_path = user_dir / "daily_memory.jsonl"
         if not log_path.exists():
             # 兼容旧文件名
-            log_path = user_dir / "adventure_log.jsonl"
+            log_path = user_dir / "battle_log.jsonl"
         if not log_path.exists():
             return False
 
@@ -436,7 +436,7 @@ class PlayerSaveRepository:
 
         parsed: list[dict[str, Any] | None] = []
         compressible: list[tuple[int, dict[str, Any]]] = []
-        adventure_ordinal = 0
+        battle_ordinal = 0
         for index, line in enumerate(raw_lines):
             try:
                 item = json.loads(line)
@@ -448,14 +448,14 @@ class PlayerSaveRepository:
                 continue
             parsed.append(item)
             log_type = item.get("type")
-            if log_type == "adventure_summary":
-                adventure_ordinal = max(
-                    adventure_ordinal,
-                    int(item.get("adventure_to", 0) or 0),
+            if log_type == "battle_summary":
+                battle_ordinal = max(
+                    battle_ordinal,
+                    int(item.get("battle_to", 0) or 0),
                 )
                 compressible.append((index, item))
-            elif log_type == "adventure_diary":
-                adventure_ordinal += 1
+            elif log_type == "battle_diary":
+                battle_ordinal += 1
                 compressible.append((index, item))
 
         if len(compressible) < interval:
@@ -463,15 +463,15 @@ class PlayerSaveRepository:
 
         selected = compressible[:compress_count]
         selected_indices = {index for index, _item in selected}
-        first_ordinal = self._adventure_ordinal_from_for_log(raw_lines, selected[0][0])
-        last_ordinal = self._adventure_ordinal_to_for_log(raw_lines, selected[-1][0])
+        first_ordinal = self._battle_ordinal_from_for_log(raw_lines, selected[0][0])
+        last_ordinal = self._battle_ordinal_to_for_log(raw_lines, selected[-1][0])
         summary_record = {
-            "type": "adventure_summary",
+            "type": "battle_summary",
             "created_at": self._now_ms(),
             "title": self._world_date_range_title(selected[0][1], selected[-1][1]),
             "date_label": self._world_date_range_title(selected[0][1], selected[-1][1]),
-            "adventure_from": first_ordinal,
-            "adventure_to": last_ordinal,
+            "battle_from": first_ordinal,
+            "battle_to": last_ordinal,
             "compressed_count": len(selected),
             "result": text,
         }
@@ -495,7 +495,7 @@ class PlayerSaveRepository:
         tmp_path.replace(log_path)
         return True
 
-    def get_adventure_logs_for_compression(
+    def get_battle_logs_for_compression(
         self,
         group_id: str,
         user_id: str,
@@ -508,13 +508,13 @@ class PlayerSaveRepository:
         user_dir = self.get_user_dir(group_id, user_id)
         log_path = user_dir / "daily_memory.jsonl"
         if not log_path.exists():
-            log_path = user_dir / "adventure_log.jsonl"
+            log_path = user_dir / "battle_log.jsonl"
         logs = self._read_recent_logs(log_path, limit=0)
         compressible = [
             item
             for item in logs
             if isinstance(item, dict)
-            and item.get("type") in ("adventure_diary", "adventure_summary")
+            and item.get("type") in ("battle_diary", "battle_summary")
         ]
         if len(compressible) < interval:
             return []
@@ -748,7 +748,7 @@ class PlayerSaveRepository:
 
         log_path = user_dir / "daily_memory.jsonl"
         if not log_path.exists():
-            log_path = user_dir / "adventure_log.jsonl"
+            log_path = user_dir / "battle_log.jsonl"
 
         return {
             "group_id": self._safe_id(group_id),
@@ -833,11 +833,11 @@ class PlayerSaveRepository:
 
     # ── 存档删除与清理 ──────────────────────────────────
 
-    def delete_adventure_log(self, group_id: str, user_id: str, log_index: int) -> bool:
+    def delete_battle_log(self, group_id: str, user_id: str, log_index: int) -> bool:
         user_dir = self.get_user_dir(group_id, user_id)
         log_path = user_dir / "daily_memory.jsonl"
         if not log_path.exists():
-            log_path = user_dir / "adventure_log.jsonl"
+            log_path = user_dir / "battle_log.jsonl"
         root = self.root_dir.resolve()
         target = log_path.resolve()
         if root != target and root not in target.parents:
@@ -858,11 +858,11 @@ class PlayerSaveRepository:
         tmp_path.replace(log_path)
         return True
 
-    def clear_adventure_logs(self, group_id: str, user_id: str) -> bool:
+    def clear_battle_logs(self, group_id: str, user_id: str) -> bool:
         user_dir = self.get_user_dir(group_id, user_id)
         log_path = user_dir / "daily_memory.jsonl"
         if not log_path.exists():
-            log_path = user_dir / "adventure_log.jsonl"
+            log_path = user_dir / "battle_log.jsonl"
         return self._clear_file(log_path)
 
     def clear_cameo_memories(self, group_id: str, user_id: str) -> bool:
@@ -1075,7 +1075,7 @@ class PlayerSaveRepository:
 
         log_path = user_dir / "daily_memory.jsonl"
         if not log_path.exists():
-            log_path = user_dir / "adventure_log.jsonl"
+            log_path = user_dir / "battle_log.jsonl"
 
         return {
             "_user_id": user_dir.name,
@@ -1091,7 +1091,7 @@ class PlayerSaveRepository:
             "身材细节": self._public_nested_value(protagonist.get("身材细节")),
             "性器官特征": self._public_nested_value(protagonist.get("性器官特征")),
             "等级": level,
-            "最近记录": self._read_recent_adventure_summaries(
+            "最近记录": self._read_recent_battle_summaries(
                 log_path,
                 limit=recent_record_count,
             ),
@@ -1108,7 +1108,7 @@ class PlayerSaveRepository:
             return [self._replace_protagonist_key(item, target_name) for item in value]
         return value
 
-    def _read_recent_adventure_summaries(
+    def _read_recent_battle_summaries(
         self,
         path: Path,
         *,
@@ -1117,7 +1117,7 @@ class PlayerSaveRepository:
         count = max(1, min(int(limit or 1), 5))
         records: list[dict[str, Any]] = []
         for item in reversed(self._read_recent_logs(path, limit=0)):
-            if item.get("type") != "adventure_diary":
+            if item.get("type") != "battle_diary":
                 continue
             records.append(
                 {
@@ -1423,7 +1423,7 @@ class PlayerSaveRepository:
     def _find_mentioned_teammate_names(
         self,
         group_id: str,
-        card: AdventureDiaryCard,
+        card: BattleDiaryCard,
     ) -> set[str]:
         text_parts = [
             str(card.encounter or ""),
@@ -1615,7 +1615,7 @@ class PlayerSaveRepository:
         editable_manager = getattr(self, "editable_manager", None)
         if editable_manager is not None:
             base_path = editable_manager.read_book_base_path(
-                "status_book/default.json",
+                "fetish_book/default.json",
                 fallback,
             )
         else:
@@ -1685,7 +1685,7 @@ class PlayerSaveRepository:
                 continue
         return logs
 
-    def _adventure_ordinal_for_log(self, raw_lines: list[str], target_index: int) -> int:
+    def _battle_ordinal_for_log(self, raw_lines: list[str], target_index: int) -> int:
         ordinal = 0
         for index, line in enumerate(raw_lines):
             if index > target_index:
@@ -1696,33 +1696,33 @@ class PlayerSaveRepository:
                 continue
             if not isinstance(item, dict):
                 continue
-            if item.get("type") == "adventure_summary":
-                ordinal = max(ordinal, int(item.get("adventure_to", 0) or 0))
-            elif item.get("type") == "adventure_diary":
+            if item.get("type") == "battle_summary":
+                ordinal = max(ordinal, int(item.get("battle_to", 0) or 0))
+            elif item.get("type") == "battle_diary":
                 ordinal += 1
         return max(1, ordinal)
 
-    def _adventure_ordinal_from_for_log(self, raw_lines: list[str], target_index: int) -> int:
+    def _battle_ordinal_from_for_log(self, raw_lines: list[str], target_index: int) -> int:
         try:
             item = json.loads(raw_lines[target_index])
-            if isinstance(item, dict) and item.get("type") == "adventure_summary":
-                from_val = int(item.get("adventure_from", 0) or 0)
+            if isinstance(item, dict) and item.get("type") == "battle_summary":
+                from_val = int(item.get("battle_from", 0) or 0)
                 if from_val > 0:
                     return from_val
         except (json.JSONDecodeError, IndexError):
             pass
-        return self._adventure_ordinal_for_log(raw_lines, target_index)
+        return self._battle_ordinal_for_log(raw_lines, target_index)
 
-    def _adventure_ordinal_to_for_log(self, raw_lines: list[str], target_index: int) -> int:
+    def _battle_ordinal_to_for_log(self, raw_lines: list[str], target_index: int) -> int:
         try:
             item = json.loads(raw_lines[target_index])
-            if isinstance(item, dict) and item.get("type") == "adventure_summary":
-                to_val = int(item.get("adventure_to", 0) or 0)
+            if isinstance(item, dict) and item.get("type") == "battle_summary":
+                to_val = int(item.get("battle_to", 0) or 0)
                 if to_val > 0:
                     return to_val
         except (json.JSONDecodeError, IndexError):
             pass
-        return self._adventure_ordinal_for_log(raw_lines, target_index)
+        return self._battle_ordinal_for_log(raw_lines, target_index)
 
     def _cameo_ordinal_for_log(self, raw_lines: list[str], target_index: int) -> int:
         ordinal = 0
@@ -1763,9 +1763,9 @@ class PlayerSaveRepository:
             pass
         return self._cameo_ordinal_for_log(raw_lines, target_index)
 
-    def _read_last_adventure_summary(self, path: Path) -> dict[str, Any]:
+    def _read_last_battle_summary(self, path: Path) -> dict[str, Any]:
         for item in reversed(self._read_recent_logs(path, limit=80)):
-            if item.get("type") != "adventure_diary":
+            if item.get("type") != "battle_diary":
                 continue
             return {
                 "encounter": item.get("encounter", ""),

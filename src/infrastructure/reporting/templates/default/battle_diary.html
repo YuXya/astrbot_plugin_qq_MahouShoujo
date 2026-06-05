@@ -7,11 +7,15 @@
     :root {
       color-scheme: light;
       --ink: #27303d;
-      --muted: #6f6a64;
-      --paper: #fffaf0;
-      --line: #d7c7a8;
-      --green: #52796f;
-      --red: #b75d4a;
+      --muted: #6d716d;
+      --paper: #fffdf7;
+      --line: #d8d0bd;
+      --green: #426b63;
+      --red: #a94e5a;
+      --rose: #b85c74;
+      --gold: #ad8026;
+      --panel: rgba(255, 255, 255, 0.82);
+      --shadow: rgba(55, 45, 34, 0.14);
     }
 
     * { box-sizing: border-box; }
@@ -27,34 +31,54 @@
     body {
       font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
       background:
-        linear-gradient(90deg, rgba(82, 121, 111, 0.08) 1px, transparent 1px),
-        linear-gradient(rgba(191, 143, 60, 0.10) 1px, transparent 1px),
-        linear-gradient(135deg, #f4ead7 0%, #fbf4e5 50%, #edf4ef 100%);
-      background-size: 34px 34px, 34px 34px, auto;
+        linear-gradient(rgba(255, 255, 255, 0.38) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.34) 1px, transparent 1px),
+        linear-gradient(135deg, #f7edf1 0%, #fff7e8 48%, #e9f3ef 100%);
+      background-size: 30px 30px, 30px 30px, auto;
       color: var(--ink);
-      padding: 36px;
+      padding: 30px;
     }
 
     .card {
       min-height: 1060px;
-      background: rgba(255, 250, 240, 0.96);
-      border: 2px solid var(--line);
-      box-shadow: 0 24px 64px rgba(74, 62, 42, 0.18);
-      padding: 38px;
       position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(135, 111, 70, 0.38);
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 251, 241, 0.78)),
+        var(--paper);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.84),
+        0 24px 58px var(--shadow);
+      padding: 36px;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 12px;
+      border: 1px solid rgba(66, 107, 99, 0.16);
+      border-radius: 5px;
+      pointer-events: none;
     }
 
     .header {
+      position: relative;
+      z-index: 1;
       display: grid;
       grid-template-columns: 1fr 148px;
       gap: 24px;
       align-items: center;
-      border-bottom: 3px double var(--line);
-      padding-bottom: 24px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 22px;
     }
 
     .eyebrow {
-      font-size: 18px;
+      display: inline-block;
+      border-left: 4px solid var(--green);
+      padding-left: 10px;
+      font-size: 16px;
       font-weight: 900;
       color: var(--green);
       margin-bottom: 10px;
@@ -62,9 +86,9 @@
 
     h1 {
       margin: 0;
-      font-size: 50px;
-      line-height: 1.14;
-      color: #3c4d46;
+      font-size: 48px;
+      line-height: 1.12;
+      color: #2f433e;
       letter-spacing: 0;
     }
 
@@ -78,13 +102,14 @@
     .avatar {
       width: 144px;
       height: 144px;
-      border-radius: 10px;
-      border: 7px solid #fff;
-      background: linear-gradient(135deg, #d8eadf, #f6d8bf);
-      box-shadow: 0 12px 30px rgba(70, 60, 40, 0.18);
+      border-radius: 8px;
+      border: 6px solid #fff;
+      background: linear-gradient(135deg, #d8eadf, #f4d9c7);
+      box-shadow: 0 12px 28px rgba(70, 60, 40, 0.16);
       display: grid;
       place-items: center;
       overflow: hidden;
+      color: var(--green);
       font-size: 34px;
       font-weight: 900;
     }
@@ -95,41 +120,62 @@
       object-fit: cover;
       display: block;
     }
-      color: var(--green);
-    }
 
     .meta {
+      position: relative;
+      z-index: 1;
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 12px;
       margin-top: 24px;
+      align-items: stretch;
     }
 
     .box {
+      min-width: 0;
+      min-height: 96px;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 9px;
+      align-items: center;
+      justify-items: center;
       border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.52);
-      padding: 14px 16px;
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 244, 235, 0.62));
+      padding: 15px 14px;
+      box-shadow: 0 10px 22px rgba(74, 62, 42, 0.06);
     }
 
     .label {
       color: var(--muted);
-      font-size: 16px;
-      margin-bottom: 5px;
+      font-size: 15px;
       font-weight: 700;
+      line-height: 1.25;
+      text-align: center;
+      white-space: nowrap;
     }
 
     .value {
-      font-size: 23px;
+      min-width: 0;
+      font-size: 22px;
       line-height: 1.28;
       font-weight: 900;
       color: var(--ink);
+      text-align: center;
       overflow-wrap: anywhere;
     }
 
     .section {
+      position: relative;
+      z-index: 1;
       margin-top: 20px;
       border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.45);
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.64)),
+        var(--panel);
+      box-shadow: 0 12px 28px rgba(74, 62, 42, 0.07);
       padding: 22px 24px;
     }
 
@@ -137,7 +183,9 @@
       color: var(--red);
       font-size: 21px;
       font-weight: 900;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(216, 208, 189, 0.72);
     }
 
     .diary {
@@ -145,11 +193,6 @@
       line-height: 1.6;
       color: #2f3532;
       white-space: pre-wrap;
-    }
-
-    .speech-quote {
-      color: #c46d16;
-      font-weight: 900;
     }
 
     .text {
@@ -166,6 +209,29 @@
       font-style: italic;
     }
 
+    .reason-list {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 9px;
+      margin-top: 16px;
+    }
+
+    .reason-item {
+      flex: 0 1 auto;
+      max-width: 100%;
+      border: 1px solid rgba(173, 128, 38, 0.42);
+      border-radius: 2px;
+      background: rgba(255, 248, 228, 0.92);
+      padding: 9px 12px;
+      color: #6d5420;
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1.42;
+      overflow-wrap: anywhere;
+      box-shadow: inset 3px 0 0 rgba(173, 128, 38, 0.34);
+    }
+
     .footer {
       margin-top: 24px;
       border-top: 1px solid var(--line);
@@ -175,47 +241,17 @@
       line-height: 1.42;
     }
 
-    .state-overview {
-      margin-top: 22px;
-      border: 1px solid var(--line);
-      background: rgba(237, 244, 239, 0.62);
-      padding: 18px 20px;
-    }
-
-    .state-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 9px;
-    }
-
-    .state-item {
-      border: 1px solid rgba(82, 121, 111, 0.28);
-      background: rgba(255, 255, 255, 0.56);
-      padding: 9px 11px;
-      min-height: 58px;
-    }
-
-    .state-key {
-      color: var(--muted);
-      font-size: 14px;
-      font-weight: 800;
-      overflow-wrap: anywhere;
-    }
-
-    .state-value {
-      color: #263f37;
-      font-size: 18px;
-      font-weight: 900;
-      margin-top: 3px;
-      overflow-wrap: anywhere;
-    }
-
     .progress-panel {
+      position: relative;
+      z-index: 1;
       margin-top: 22px;
       border: 1px solid var(--line);
-      background: rgba(237, 244, 239, 0.62);
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(237, 244, 239, 0.84), rgba(255, 255, 255, 0.66));
       color: var(--ink);
       padding: 18px 20px 20px;
+      box-shadow: 0 14px 32px rgba(74, 62, 42, 0.08);
     }
 
     .progress-panel .section-title {
@@ -228,19 +264,23 @@
     .progress-list {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 16px 24px;
+      gap: 12px;
     }
 
     .progress-row {
       min-width: 0;
+      border: 1px solid rgba(82, 121, 111, 0.22);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.62);
+      padding: 13px 14px 14px;
     }
 
     .progress-head {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: 10px;
       align-items: baseline;
-      margin-bottom: 8px;
+      margin-bottom: 9px;
     }
 
     .progress-name {
@@ -264,13 +304,6 @@
       border-radius: 50%;
     }
 
-    .progress-level {
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 800;
-      white-space: nowrap;
-    }
-
     .progress-xp {
       color: var(--green);
       font-size: 16px;
@@ -278,32 +311,13 @@
       white-space: nowrap;
     }
 
-    .progress-xp small {
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .progress-track {
-      width: 100%;
-      height: 7px;
-      overflow: hidden;
-      background: rgba(82, 121, 111, 0.16);
-      border-radius: 999px;
-    }
-
-    .progress-fill {
-      height: 100%;
-      border-radius: inherit;
-      background: var(--green);
-      box-shadow: 0 0 8px rgba(82, 121, 111, 0.24);
-    }
   </style>
 </head>
 <body>
   <main class="card">
     <section class="header">
       <div>
-        <div class="eyebrow">ISEKAI ADVENTURE DIARY</div>
+        <div class="eyebrow">ISEKAI BATTLE DIARY</div>
         <h1>{{ card.title }}</h1>
         <div class="subtitle">{{ card.subtitle }}</div>
       </div>
@@ -332,7 +346,6 @@
       <div class="box">
         <div class="label">玩家等级</div>
         <div class="value">{{ level_label }}</div>
-        <div class="label">{{ level_exp_percent }}%</div>
       </div>
     </section>
 
@@ -343,7 +356,7 @@
 
     <section class="section">
       <div class="section-title">日记</div>
-      <div class="diary">{{ card.diary | speech_quotes }}</div>
+      <div class="diary">{{ card.diary }}</div>
     </section>
 
     <section class="section">
@@ -355,7 +368,13 @@
       <div class="section-title">结算</div>
       <div class="text">{{ card.result | speech_quotes }}</div>
       {% if reason %}
-      <div class="reason">{{ reason | join('；') }}</div>
+      <div class="reason-list">
+        {% for item in reason %}
+        <div class="reason-item">
+          {{ item }}
+        </div>
+        {% endfor %}
+      </div>
       {% endif %}
     </section>
 
@@ -370,12 +389,8 @@
           <div class="progress-head">
             <div class="progress-name">
               <span>{{ item.label }}</span>
-              <span class="progress-level">{% if item.is_max %}Lv.Max{% else %}Lv.{{ item.level }}{% endif %}</span>
             </div>
-            <div class="progress-xp">{% if item.is_max %}MAX{% else %}{{ item.value }} <small>/ 100</small>{% endif %}</div>
-          </div>
-          <div class="progress-track">
-            <div class="progress-fill" style="width: {{ item.percent }}%;"></div>
+            <div class="progress-xp">{% if item.is_max %}Lv.Max{% else %}Lv.{{ item.level }}{% endif %}</div>
           </div>
         </div>
         {% endfor %}
@@ -392,12 +407,8 @@
           <div class="progress-head">
             <div class="progress-name">
               <span>{{ item.label }}</span>
-              <span class="progress-level">{% if item.is_max %}Lv.Max{% else %}Lv.{{ item.level }}{% endif %}</span>
             </div>
-            <div class="progress-xp">{% if item.is_max %}MAX{% else %}{{ item.value }} <small>/ 100</small>{% endif %}</div>
-          </div>
-          <div class="progress-track">
-            <div class="progress-fill" style="width: {{ item.percent }}%;"></div>
+            <div class="progress-xp">{% if item.is_max %}Lv.Max{% else %}Lv.{{ item.level }}{% endif %}</div>
           </div>
         </div>
         {% endfor %}
@@ -405,19 +416,6 @@
     </section>
     {% endif %}
 
-    {% if state_items %}
-    <section class="state-overview">
-      <div class="section-title">当前状态</div>
-      <div class="state-grid">
-        {% for key, value in state_items %}
-        <div class="state-item">
-          <div class="state-key">{{ key }}</div>
-          <div class="state-value">{{ value }}</div>
-        </div>
-        {% endfor %}
-      </div>
-    </section>
-    {% endif %}
   </main>
 </body>
 </html>

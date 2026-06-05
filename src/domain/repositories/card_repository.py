@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ..models.data_models import AdventureDiaryCard, ReincarnationCard
+from ..models.data_models import BattleDiaryCard, ReincarnationCard
 
 
 class ICardGenerator(ABC):
@@ -18,7 +18,7 @@ class ICardGenerator(ABC):
     @abstractmethod
     async def generate_diary_image_card(
         self,
-        card: AdventureDiaryCard,
+        card: BattleDiaryCard,
         html_render_func: Any,
     ) -> tuple[str | None, str | None]:
         pass

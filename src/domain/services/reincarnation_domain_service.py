@@ -3,7 +3,7 @@ from __future__ import annotations
 from ..models.data_models import ReincarnationCard
 
 
-class AdventureDomainService:
+class ReincarnationDomainService:
     def normalize_card(
         self,
         raw: dict,

@@ -64,12 +64,12 @@ class ChangeBookEngine:
             + entries_text
         )
 
-    def build_status_prompt_text(
+    def build_fetish_prompt_text(
         self,
         state: dict[str, Any],
         player_level: int = 1,
     ) -> str:
-        book = self._load_book(self.editable_manager.status_book_path, "状态书")
+        book = self._load_book(self.editable_manager.fetish_book_path, "性癖书")
         entries = self._entries_from_book(book)
         enabled_entries = [
             entry
@@ -120,19 +120,19 @@ class ChangeBookEngine:
         if not owned_entries and not pending_entries:
             return ""
 
-        parts = ["状态书补充设定：", f"默认 change 基础路径：{base_path}"]
+        parts = ["性癖书补充设定：", f"默认 change 基础路径：{base_path}"]
         if owned_entries:
-            parts.append("已拥有状态说明：")
+            parts.append("已拥有性癖说明：")
             parts.append(owned_entries)
         if pending_entries:
-            parts.append("待觉醒列表：")
+            parts.append("待开发列表：")
             parts.append(pending_entries)
         return "\n".join(parts)
 
     @staticmethod
     def _format_owned_status_entry(entry: WorldBookEntry, level: int) -> str:
         title = entry.title or entry.id
-        lines = [f"- 状态：{title}"]
+        lines = [f"- 性癖：{title}"]
         if entry.content:
             lines.append(f"  简介：{entry.content}")
         lines.append(f"  当前等级：{'Lv.Max' if level >= 5 else f'Lv.{level}'}")

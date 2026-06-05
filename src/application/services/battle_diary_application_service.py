@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from ...domain.models.data_models import AdventureDiaryExecutionResult
-from ...domain.services.adventure_diary_domain_service import AdventureDiaryDomainService
+from ...domain.models.data_models import BattleDiaryExecutionResult
+from ...domain.services.battle_diary_domain_service import BattleDiaryDomainService
 from ...utils.logger import logger
 
 
-class AdventureDiaryApplicationService:
+class BattleDiaryApplicationService:
     def __init__(
         self,
         config_manager: Any,
-        domain_service: AdventureDiaryDomainService,
+        domain_service: BattleDiaryDomainService,
         llm_analyzer: Any,
         card_generator: Any,
         save_repository: Any,
@@ -32,11 +32,11 @@ class AdventureDiaryApplicationService:
         umo: str | None,
         html_render_func,
         avatar_url: str | None = None,
-    ) -> AdventureDiaryExecutionResult:
+    ) -> BattleDiaryExecutionResult:
         try:
             save_data = self.save_repository.load_player_save(group_id, user_id)
             if not save_data:
-                return AdventureDiaryExecutionResult(
+                return BattleDiaryExecutionResult(
                     success=False,
                     text="还没有你的魔法少女转生存档，请先使用 /魔法少女转生 建档。",
                     error="player_save_not_found",
@@ -77,7 +77,7 @@ class AdventureDiaryApplicationService:
                 card.level_change,
                 fallback=current_level,
             )
-            self.save_repository.save_adventure_result(
+            self.save_repository.save_battle_result(
                 group_id,
                 user_id,
                 card,
@@ -85,7 +85,7 @@ class AdventureDiaryApplicationService:
                 card.level_exp_after,
                 world_day_offset=world_day_offset,
             )
-            await self._maybe_compress_adventure_logs(
+            await self._maybe_compress_battle_logs(
                 group_id=group_id,
                 user_id=user_id,
                 umo=umo,
@@ -105,7 +105,7 @@ class AdventureDiaryApplicationService:
                 html_render_func,
             )
             if not image_path:
-                return AdventureDiaryExecutionResult(
+                return BattleDiaryExecutionResult(
                     success=False,
                     card=card,
                     text=card.to_text(),
@@ -113,7 +113,7 @@ class AdventureDiaryApplicationService:
                     raw_response=analysis.raw_response,
                 )
 
-            return AdventureDiaryExecutionResult(
+            return BattleDiaryExecutionResult(
                 success=True,
                 card=card,
                 image_path=image_path,
@@ -122,7 +122,7 @@ class AdventureDiaryApplicationService:
             )
         except Exception as exc:
             logger.error(f"执行魔法少女战斗日记流程失败: {exc}", exc_info=True)
-            return AdventureDiaryExecutionResult(
+            return BattleDiaryExecutionResult(
                 success=False,
                 text=f"魔法少女战斗日记生成失败：{exc}",
                 error=str(exc),
@@ -176,7 +176,7 @@ class AdventureDiaryApplicationService:
             except Exception as exc:
                 logger.warning(f"写入客串记忆失败: {npc_user_id} {exc}")
 
-    async def _maybe_compress_adventure_logs(
+    async def _maybe_compress_battle_logs(
         self,
         *,
         group_id: str,
@@ -185,7 +185,7 @@ class AdventureDiaryApplicationService:
     ) -> None:
         interval = self.config_manager.get_diary_compress_interval()
         compress_count = self.config_manager.get_diary_compress_count()
-        logs = self.save_repository.get_adventure_logs_for_compression(
+        logs = self.save_repository.get_battle_logs_for_compression(
             group_id,
             user_id,
             interval=interval,
@@ -194,11 +194,11 @@ class AdventureDiaryApplicationService:
         if not logs:
             return
         try:
-            summary_text = await self.llm_analyzer.compress_adventure_logs(
+            summary_text = await self.llm_analyzer.compress_battle_logs(
                 logs=logs,
                 umo=umo,
             )
-            self.save_repository.maybe_compress_adventure_logs(
+            self.save_repository.maybe_compress_battle_logs(
                 group_id,
                 user_id,
                 interval=interval,

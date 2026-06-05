@@ -2,19 +2,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from ...domain.models.data_models import AdventureExecutionResult
-from ...domain.repositories.analysis_repository import IAdventureAnalysisProvider
+from ...domain.models.data_models import ReincarnationExecutionResult
+from ...domain.repositories.analysis_repository import IReincarnationAnalysisProvider
 from ...domain.repositories.card_repository import ICardGenerator
-from ...domain.services.adventure_domain_service import AdventureDomainService
+from ...domain.services.reincarnation_domain_service import ReincarnationDomainService
 from ...utils.logger import logger
 
 
-class AdventureApplicationService:
+class ReincarnationApplicationService:
     def __init__(
         self,
         config_manager: Any,
-        domain_service: AdventureDomainService,
-        llm_analyzer: IAdventureAnalysisProvider,
+        domain_service: ReincarnationDomainService,
+        llm_analyzer: IReincarnationAnalysisProvider,
         card_generator: ICardGenerator,
     ):
         self.config_manager = config_manager
@@ -22,7 +22,7 @@ class AdventureApplicationService:
         self.llm_analyzer = llm_analyzer
         self.card_generator = card_generator
 
-    async def execute_adventure(
+    async def execute_reincarnation(
         self,
         theme: str,
         html_render_func,
@@ -30,7 +30,7 @@ class AdventureApplicationService:
         nickname: str | None = None,
         umo: str | None = None,
         avatar_url: str | None = None,
-    ) -> AdventureExecutionResult:
+    ) -> ReincarnationExecutionResult:
         theme = (theme or "/魔法少女转生").strip()
 
         try:
@@ -38,7 +38,7 @@ class AdventureApplicationService:
                 card = self.domain_service.build_mock_card(theme, nickname)
                 raw_response = ""
             else:
-                analysis = await self.llm_analyzer.analyze_adventure(
+                analysis = await self.llm_analyzer.analyze_reincarnation(
                     theme,
                     user_id=user_id,
                     nickname=nickname,
@@ -55,7 +55,7 @@ class AdventureApplicationService:
                 html_render_func,
             )
             if not image_path:
-                return AdventureExecutionResult(
+                return ReincarnationExecutionResult(
                     success=False,
                     card=card,
                     text=card.to_text(),
@@ -63,7 +63,7 @@ class AdventureApplicationService:
                     raw_response=raw_response,
                 )
 
-            return AdventureExecutionResult(
+            return ReincarnationExecutionResult(
                 success=True,
                 card=card,
                 image_path=image_path,
@@ -72,7 +72,7 @@ class AdventureApplicationService:
             )
         except Exception as exc:
             logger.error(f"执行魔法少女转生卡片流程失败: {exc}", exc_info=True)
-            return AdventureExecutionResult(
+            return ReincarnationExecutionResult(
                 success=False,
                 text=f"魔法少女转生卡生成失败：{exc}",
                 error=str(exc),

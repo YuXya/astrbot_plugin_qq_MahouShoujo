@@ -90,14 +90,14 @@ class ReincarnationCard:
 
 
 @dataclass
-class AdventureAnalysisResult:
+class ReincarnationAnalysisResult:
     card: ReincarnationCard
     token_usage: TokenUsage = field(default_factory=TokenUsage)
     raw_response: str = ""
 
 
 @dataclass
-class AdventureDiaryCard:
+class BattleDiaryCard:
     title: str
     subtitle: str
     target_name: str
@@ -135,16 +135,16 @@ class AdventureDiaryCard:
 
 
 @dataclass
-class AdventureDiaryAnalysisResult:
-    card: AdventureDiaryCard
+class BattleDiaryAnalysisResult:
+    card: BattleDiaryCard
     token_usage: TokenUsage = field(default_factory=TokenUsage)
     raw_response: str = ""
 
 
 @dataclass
-class AdventureExecutionResult:
+class ReincarnationExecutionResult:
     success: bool
-    card: ReincarnationCard | AdventureDiaryCard | None = None
+    card: ReincarnationCard | None = None
     image_path: str | None = None
     text: str = ""
     error: str | None = None
@@ -152,9 +152,9 @@ class AdventureExecutionResult:
 
 
 @dataclass
-class AdventureDiaryExecutionResult:
+class BattleDiaryExecutionResult:
     success: bool
-    card: AdventureDiaryCard | None = None
+    card: BattleDiaryCard | None = None
     image_path: str | None = None
     text: str = ""
     error: str | None = None

@@ -1,33 +1,33 @@
 from __future__ import annotations
 
-from ...domain.models.data_models import AdventureAnalysisResult
-from ...domain.repositories.analysis_repository import IAdventureAnalysisProvider
-from ...domain.services.adventure_domain_service import AdventureDomainService
-from .analyzers.adventure_analyzer import AdventureAnalyzer
+from ...domain.models.data_models import ReincarnationAnalysisResult
+from ...domain.repositories.analysis_repository import IReincarnationAnalysisProvider
+from ...domain.services.reincarnation_domain_service import ReincarnationDomainService
+from .analyzers.reincarnation_analyzer import ReincarnationAnalyzer
 
 
-class LLMAdventureAnalyzer(IAdventureAnalysisProvider):
+class LLMReincarnationAnalyzer(IReincarnationAnalysisProvider):
     def __init__(
         self,
         context,
         config_manager,
-        domain_service: AdventureDomainService,
+        domain_service: ReincarnationDomainService,
         editable_manager=None,
     ):
-        self.analyzer = AdventureAnalyzer(
+        self.analyzer = ReincarnationAnalyzer(
             context,
             config_manager,
             domain_service,
             editable_manager,
         )
 
-    async def analyze_adventure(
+    async def analyze_reincarnation(
         self,
         theme: str,
         user_id: str | None = None,
         nickname: str | None = None,
         umo: str | None = None,
-    ) -> AdventureAnalysisResult:
+    ) -> ReincarnationAnalysisResult:
         card, usage, raw_response = await self.analyzer.analyze(
             theme,
             user_id=user_id,
@@ -36,7 +36,7 @@ class LLMAdventureAnalyzer(IAdventureAnalysisProvider):
         )
         if card is None:
             raise ValueError("LLM 响应无法解析为魔法少女转生人物卡 JSON")
-        return AdventureAnalysisResult(
+        return ReincarnationAnalysisResult(
             card=card,
             token_usage=usage,
             raw_response=raw_response,
