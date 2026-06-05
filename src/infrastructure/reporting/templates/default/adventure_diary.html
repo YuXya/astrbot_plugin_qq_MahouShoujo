@@ -12,6 +12,9 @@
       --line: #d7c7a8;
       --green: #52796f;
       --red: #b75d4a;
+      --rose: #b75d6a;
+      --gold: #c79b43;
+      --panel: rgba(255, 255, 255, 0.72);
     }
 
     * { box-sizing: border-box; }
@@ -27,24 +30,42 @@
     body {
       font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
       background:
-        linear-gradient(90deg, rgba(82, 121, 111, 0.08) 1px, transparent 1px),
-        linear-gradient(rgba(191, 143, 60, 0.10) 1px, transparent 1px),
-        linear-gradient(135deg, #f4ead7 0%, #fbf4e5 50%, #edf4ef 100%);
-      background-size: 34px 34px, 34px 34px, auto;
+        radial-gradient(circle at 14% 9%, rgba(255, 255, 255, 0.92) 0 2px, transparent 3px),
+        radial-gradient(ellipse at 16% 14%, rgba(255, 224, 236, 0.82), transparent 34%),
+        radial-gradient(ellipse at 84% 10%, rgba(205, 237, 230, 0.72), transparent 36%),
+        radial-gradient(ellipse at 50% 98%, rgba(255, 231, 164, 0.48), transparent 42%),
+        linear-gradient(145deg, #fff8fb 0%, #faeadf 36%, #eef6f1 100%);
       color: var(--ink);
-      padding: 36px;
+      padding: 34px;
     }
 
     .card {
       min-height: 1060px;
-      background: rgba(255, 250, 240, 0.96);
-      border: 2px solid var(--line);
-      box-shadow: 0 24px 64px rgba(74, 62, 42, 0.18);
-      padding: 38px;
       position: relative;
+      overflow: hidden;
+      border: 2px solid rgba(199, 155, 67, 0.42);
+      border-radius: 18px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.44)),
+        rgba(255, 250, 240, 0.96);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.84),
+        0 28px 70px rgba(74, 62, 42, 0.17);
+      padding: 38px;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 14px;
+      border: 1px solid rgba(199, 155, 67, 0.25);
+      border-radius: 13px;
+      pointer-events: none;
     }
 
     .header {
+      position: relative;
+      z-index: 1;
       display: grid;
       grid-template-columns: 1fr 148px;
       gap: 24px;
@@ -85,6 +106,7 @@
       display: grid;
       place-items: center;
       overflow: hidden;
+      color: var(--green);
       font-size: 34px;
       font-weight: 900;
     }
@@ -95,31 +117,45 @@
       object-fit: cover;
       display: block;
     }
-      color: var(--green);
-    }
 
     .meta {
+      position: relative;
+      z-index: 1;
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 12px;
       margin-top: 24px;
+      align-items: stretch;
     }
 
     .box {
+      min-width: 0;
+      min-height: 74px;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      column-gap: 9px;
+      row-gap: 4px;
+      align-items: baseline;
       border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.52);
-      padding: 14px 16px;
+      border-radius: 12px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.54)),
+        radial-gradient(circle at 12% 10%, rgba(255, 235, 183, 0.38), transparent 42%);
+      padding: 12px 13px;
+      box-shadow: 0 10px 22px rgba(74, 62, 42, 0.07);
     }
 
     .label {
       color: var(--muted);
-      font-size: 16px;
-      margin-bottom: 5px;
+      font-size: 15px;
       font-weight: 700;
+      line-height: 1.25;
+      white-space: nowrap;
     }
 
     .value {
-      font-size: 23px;
+      min-width: 0;
+      font-size: 19px;
       line-height: 1.28;
       font-weight: 900;
       color: var(--ink);
@@ -127,9 +163,15 @@
     }
 
     .section {
+      position: relative;
+      z-index: 1;
       margin-top: 20px;
       border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.45);
+      border-radius: 14px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.56)),
+        var(--panel);
+      box-shadow: 0 14px 32px rgba(74, 62, 42, 0.08);
       padding: 22px 24px;
     }
 
@@ -147,6 +189,10 @@
       white-space: pre-wrap;
     }
 
+    .diary-quote {
+      color: #d8732a;
+    }
+
     .text {
       font-size: 23px;
       line-height: 1.5;
@@ -161,6 +207,47 @@
       font-style: italic;
     }
 
+    .change-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .change-item {
+      min-width: 0;
+      border: 1px solid rgba(199, 155, 67, 0.34);
+      border-radius: 12px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 247, 226, 0.56));
+      padding: 12px 14px;
+    }
+
+    .change-op {
+      color: var(--rose);
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1.2;
+    }
+
+    .change-label {
+      margin-top: 6px;
+      color: var(--ink);
+      font-size: 17px;
+      font-weight: 900;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .change-value {
+      margin-top: 4px;
+      color: var(--green);
+      font-size: 16px;
+      font-weight: 900;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
     .footer {
       margin-top: 24px;
       border-top: 1px solid var(--line);
@@ -170,47 +257,17 @@
       line-height: 1.42;
     }
 
-    .state-overview {
-      margin-top: 22px;
-      border: 1px solid var(--line);
-      background: rgba(237, 244, 239, 0.62);
-      padding: 18px 20px;
-    }
-
-    .state-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 9px;
-    }
-
-    .state-item {
-      border: 1px solid rgba(82, 121, 111, 0.28);
-      background: rgba(255, 255, 255, 0.56);
-      padding: 9px 11px;
-      min-height: 58px;
-    }
-
-    .state-key {
-      color: var(--muted);
-      font-size: 14px;
-      font-weight: 800;
-      overflow-wrap: anywhere;
-    }
-
-    .state-value {
-      color: #263f37;
-      font-size: 18px;
-      font-weight: 900;
-      margin-top: 3px;
-      overflow-wrap: anywhere;
-    }
-
     .progress-panel {
+      position: relative;
+      z-index: 1;
       margin-top: 22px;
       border: 1px solid var(--line);
-      background: rgba(237, 244, 239, 0.62);
+      border-radius: 14px;
+      background:
+        linear-gradient(180deg, rgba(237, 244, 239, 0.78), rgba(255, 255, 255, 0.6));
       color: var(--ink);
       padding: 18px 20px 20px;
+      box-shadow: 0 14px 32px rgba(74, 62, 42, 0.08);
     }
 
     .progress-panel .section-title {
@@ -223,19 +280,23 @@
     .progress-list {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 16px 24px;
+      gap: 12px;
     }
 
     .progress-row {
       min-width: 0;
+      border: 1px solid rgba(82, 121, 111, 0.22);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.62);
+      padding: 13px 14px 14px;
     }
 
     .progress-head {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: 10px;
       align-items: baseline;
-      margin-bottom: 8px;
+      margin-bottom: 9px;
     }
 
     .progress-name {
@@ -273,24 +334,12 @@
       white-space: nowrap;
     }
 
-    .progress-xp small {
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .progress-track {
-      width: 100%;
-      height: 7px;
-      overflow: hidden;
-      background: rgba(82, 121, 111, 0.16);
-      border-radius: 999px;
-    }
-
-    .progress-fill {
-      height: 100%;
-      border-radius: inherit;
-      background: var(--green);
-      box-shadow: 0 0 8px rgba(82, 121, 111, 0.24);
+    .effect-text {
+      color: #343932;
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1.52;
+      overflow-wrap: anywhere;
     }
   </style>
 </head>
@@ -327,7 +376,6 @@
       <div class="box">
         <div class="label">玩家等级</div>
         <div class="value">{{ level_label }}</div>
-        <div class="label">{{ level_exp_percent }}%</div>
       </div>
     </section>
 
@@ -338,7 +386,7 @@
 
     <section class="section">
       <div class="section-title">日记</div>
-      <div class="diary">{{ card.diary }}</div>
+      <div class="diary">{{ diary_html | safe }}</div>
     </section>
 
     <section class="section">
@@ -351,6 +399,19 @@
       <div class="text">{{ card.result }}</div>
       {% if reason %}
       <div class="reason">{{ reason | join('；') }}</div>
+      {% endif %}
+      {% if change_items %}
+      <div class="change-list">
+        {% for item in change_items %}
+        <div class="change-item">
+          <div class="change-op">{{ item.op }}</div>
+          <div class="change-label">{{ item.label }}</div>
+          {% if item.value %}
+          <div class="change-value">{{ item.value }}</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
       {% endif %}
     </section>
 
@@ -367,11 +428,9 @@
               <span>{{ item.label }}</span>
               <span class="progress-level">{% if item.is_max %}Lv.Max{% else %}Lv.{{ item.level }}{% endif %}</span>
             </div>
-            <div class="progress-xp">{% if item.is_max %}MAX{% else %}{{ item.value }} <small>/ 100</small>{% endif %}</div>
+            <div class="progress-xp">效果</div>
           </div>
-          <div class="progress-track">
-            <div class="progress-fill" style="width: {{ item.percent }}%;"></div>
-          </div>
+          <div class="effect-text">{{ item.effect or "暂无效果说明" }}</div>
         </div>
         {% endfor %}
       </div>
@@ -389,30 +448,15 @@
               <span>{{ item.label }}</span>
               <span class="progress-level">{% if item.is_max %}Lv.Max{% else %}Lv.{{ item.level }}{% endif %}</span>
             </div>
-            <div class="progress-xp">{% if item.is_max %}MAX{% else %}{{ item.value }} <small>/ 100</small>{% endif %}</div>
+            <div class="progress-xp">效果</div>
           </div>
-          <div class="progress-track">
-            <div class="progress-fill" style="width: {{ item.percent }}%;"></div>
-          </div>
+          <div class="effect-text">{{ item.effect or "暂无效果说明" }}</div>
         </div>
         {% endfor %}
       </div>
     </section>
     {% endif %}
 
-    {% if state_items %}
-    <section class="state-overview">
-      <div class="section-title">当前状态</div>
-      <div class="state-grid">
-        {% for key, value in state_items %}
-        <div class="state-item">
-          <div class="state-key">{{ key }}</div>
-          <div class="state-value">{{ value }}</div>
-        </div>
-        {% endfor %}
-      </div>
-    </section>
-    {% endif %}
   </main>
 </body>
 </html>
