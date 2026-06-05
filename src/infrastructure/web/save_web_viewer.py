@@ -2663,6 +2663,7 @@ class SaveWebViewer:
         familiar = self._get_nested(protagonist, ["个人信息", "使魔伙伴种类"], "")
         familiar_bond = self._get_nested(protagonist, ["个人信息", "使魔伙伴与主角关系"], "")
         display_name = magical_name or title_name
+        page_name = f"魔法少女 {display_name}"
 
         identity_cards = [
             ("姓名", title_name),
@@ -2690,7 +2691,7 @@ class SaveWebViewer:
         )
 
         return self._html_response(
-            f"{display_name}的魔法少女档案",
+            page_name,
             f"""
             <section class="player-detail-shell" aria-label="魔法少女个人档案">
               <div class="player-stars" aria-hidden="true">
@@ -2700,7 +2701,7 @@ class SaveWebViewer:
                 <a class="player-back-link" href="{self._url('/')}">返回个人档案</a>
                 <div class="player-detail-emblem" aria-hidden="true">✦</div>
                 <p class="player-kicker">Mahou Shoujo Profile</p>
-                <h1>{self._e(display_name)}</h1>
+                <h1>{self._e(page_name)}</h1>
                 <p>{self._e(city_name)}记录中的魔法少女档案。这里汇总了你的身份、外观、装备、成长进度与最近的冒险痕迹。</p>
                 <div class="player-hero-tags">
                   <span>{self._e(level_display(player_data))}</span>
@@ -3662,8 +3663,8 @@ class SaveWebViewer:
     .player-stars span:nth-child(3) {{ left: 81%; top: 18%; transform: scale(1.8); animation-delay: .9s; }}
     .player-stars span:nth-child(4) {{ left: 71%; top: 72%; animation-delay: 1.3s; }}
     .player-stars span:nth-child(5) {{ left: 17%; top: 78%; transform: scale(1.2); animation-delay: 1.8s; }}
-    .player-hero {{ position: relative; max-width: 760px; margin: 0 auto 34px; text-align: center; }}
-    .player-hero::before {{ content: "✦"; display: grid; place-items: center; width: 78px; height: 78px; margin: 0 auto 18px; border-radius: 50%; border: 2px solid rgba(255,255,255,.8); background: conic-gradient(from 20deg, #ff73b7, #ffd66b, #8fe8ff, #b896ff, #ff73b7); color: #fff; font-size: 34px; box-shadow: 0 16px 36px rgba(188, 80, 166, .24), inset 0 0 0 8px rgba(255,255,255,.48); }}
+    .player-hero {{ position: relative; max-width: 760px; margin: 0 auto 34px; padding: 12px 108px 0; text-align: center; }}
+    .player-hero::before {{ content: "✦"; position: absolute; top: 0; right: 0; display: grid; place-items: center; width: 78px; height: 78px; border-radius: 50%; border: 2px solid rgba(255,255,255,.8); background: conic-gradient(from 20deg, #ff73b7, #ffd66b, #8fe8ff, #b896ff, #ff73b7); color: #fff; font-size: 34px; box-shadow: 0 16px 36px rgba(188, 80, 166, .24), inset 0 0 0 8px rgba(255,255,255,.48); }}
     .player-kicker, .player-section-head span, .city-card-label {{ display: block; margin: 0 0 8px; color: #c54793; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0; }}
     .player-hero h1 {{ margin: 0 0 12px; color: #64204f; font-size: clamp(34px, 5vw, 58px); line-height: 1.05; text-shadow: 0 2px 0 #fff, 0 18px 40px rgba(204, 70, 157, .18); }}
     .player-hero p {{ margin: 0 auto; max-width: 45em; color: #67425e; line-height: 1.75; }}
@@ -3691,10 +3692,10 @@ class SaveWebViewer:
     .player-detail-shell {{ position: relative; min-height: 100vh; padding: 70px clamp(18px, 5vw, 72px) 58px; box-sizing: border-box; overflow: hidden; background: radial-gradient(circle at 13% 16%, rgba(255, 241, 151, .82) 0 7%, transparent 21%), radial-gradient(circle at 82% 18%, rgba(139, 229, 255, .72) 0 8%, transparent 22%), radial-gradient(circle at 80% 82%, rgba(255, 139, 200, .52) 0 11%, transparent 25%), linear-gradient(135deg, #fff5fb 0%, #f7ddff 30%, #dff7ff 66%, #fff6c7 100%); color: #42233f; isolation: isolate; }}
     .player-detail-shell::before {{ content: ""; position: absolute; inset: -20%; z-index: -2; background-image: linear-gradient(rgba(255,255,255,.48) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.42) 1px, transparent 1px); background-size: 42px 42px; transform: rotate(-7deg); }}
     .player-detail-shell::after {{ content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 50% 18%, transparent 0 22%, rgba(255,255,255,.32) 23%, transparent 24%), radial-gradient(circle at 50% 18%, transparent 0 39%, rgba(255,255,255,.23) 40%, transparent 41%); }}
-    .player-detail-hero {{ position: relative; max-width: 980px; margin: 0 auto 24px; padding: 28px 24px 30px; border: 1px solid rgba(255,255,255,.72); border-radius: 8px; background: rgba(255,255,255,.48); box-shadow: 0 24px 70px rgba(141, 76, 146, .16), inset 0 0 0 1px rgba(255,255,255,.42); backdrop-filter: blur(14px); text-align: center; }}
+    .player-detail-hero {{ position: relative; max-width: 980px; margin: 0 auto 24px; padding: 32px 128px 30px; border: 1px solid rgba(255,255,255,.72); border-radius: 8px; background: rgba(255,255,255,.48); box-shadow: 0 24px 70px rgba(141, 76, 146, .16), inset 0 0 0 1px rgba(255,255,255,.42); backdrop-filter: blur(14px); text-align: center; }}
     .player-back-link {{ position: absolute; left: 18px; top: 18px; display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border: 1px solid rgba(212, 93, 166, .28); border-radius: 999px; background: rgba(255,255,255,.68); color: #8d3975; font-size: 13px; font-weight: 900; }}
     .player-back-link:hover {{ text-decoration: none; background: rgba(255,255,255,.9); }}
-    .player-detail-emblem {{ width: 86px; height: 86px; display: grid; place-items: center; margin: 8px auto 18px; border-radius: 50%; border: 2px solid rgba(255,255,255,.82); background: conic-gradient(from 20deg, #ff73b7, #ffd66b, #8fe8ff, #b896ff, #ff73b7); color: #fff; font-size: 38px; box-shadow: 0 16px 36px rgba(188, 80, 166, .24), inset 0 0 0 8px rgba(255,255,255,.48); }}
+    .player-detail-emblem {{ position: absolute; top: 18px; right: 24px; width: 86px; height: 86px; display: grid; place-items: center; border-radius: 50%; border: 2px solid rgba(255,255,255,.82); background: conic-gradient(from 20deg, #ff73b7, #ffd66b, #8fe8ff, #b896ff, #ff73b7); color: #fff; font-size: 38px; box-shadow: 0 16px 36px rgba(188, 80, 166, .24), inset 0 0 0 8px rgba(255,255,255,.48); }}
     .player-detail-hero h1 {{ margin: 0 0 12px; color: #64204f; font-size: clamp(34px, 5vw, 62px); line-height: 1.05; text-shadow: 0 2px 0 #fff, 0 18px 40px rgba(204, 70, 157, .18); overflow-wrap: anywhere; }}
     .player-detail-hero p {{ margin: 0 auto; max-width: 50em; color: #67425e; line-height: 1.75; }}
     .player-hero-tags {{ display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 18px; }}
@@ -3901,8 +3902,8 @@ class SaveWebViewer:
     @media (max-width: 900px) {{ .state-overview-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
     @media (max-width: 900px) {{ .detail-grid, .raw-grid {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 960px) {{ .player-detail-layout, .player-memory-grid {{ grid-template-columns: 1fr; }} .primary-profile-card {{ grid-row: auto; }} .player-state-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
-    @media (max-width: 720px) {{ .player-shell {{ padding: 76px 16px 34px; }} .player-hero {{ text-align: left; margin-bottom: 22px; }} .player-hero::before {{ margin-left: 0; }} .player-city-section {{ padding: 16px; }} .player-section-head {{ display: block; }} .player-city-card {{ grid-template-columns: 52px 1fr; padding: 15px; }} .city-card-orb {{ width: 46px; height: 46px; }} }}
-    @media (max-width: 720px) {{ .player-detail-shell {{ padding: 76px 16px 34px; }} .player-detail-hero {{ padding: 58px 18px 22px; text-align: left; }} .player-detail-emblem {{ margin-left: 0; }} .player-back-link {{ left: 14px; top: 14px; }} .player-hero-tags {{ justify-content: flex-start; }} .player-info-grid, .player-state-grid {{ grid-template-columns: 1fr; }} .player-profile-card, .player-site-section {{ padding: 16px; }} }}
+    @media (max-width: 720px) {{ .player-shell {{ padding: 76px 16px 34px; }} .player-hero {{ padding: 6px 74px 0 0; text-align: left; margin-bottom: 22px; }} .player-hero::before {{ width: 60px; height: 60px; font-size: 27px; }} .player-city-section {{ padding: 16px; }} .player-section-head {{ display: block; }} .player-city-card {{ grid-template-columns: 52px 1fr; padding: 15px; }} .city-card-orb {{ width: 46px; height: 46px; }} }}
+    @media (max-width: 720px) {{ .player-detail-shell {{ padding: 76px 16px 34px; }} .player-detail-hero {{ padding: 58px 82px 22px 18px; text-align: left; }} .player-detail-emblem {{ top: 16px; right: 16px; width: 58px; height: 58px; font-size: 27px; }} .player-back-link {{ left: 14px; top: 14px; }} .player-hero-tags {{ justify-content: flex-start; }} .player-info-grid, .player-state-grid {{ grid-template-columns: 1fr; }} .player-profile-card, .player-site-section {{ padding: 16px; }} }}
     @media (max-width: 560px) {{ .state-overview-grid {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .progress-list {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .profile-edit-grid {{ grid-template-columns: 1fr; }} }}
