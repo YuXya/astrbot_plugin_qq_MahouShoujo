@@ -2546,7 +2546,6 @@ class SaveWebViewer:
             else ""
         )
         progress_overview = self._progress_overview_html(player_data)
-        state_overview = self._state_overview_html(player_data)
         log_note = (
             "删除单条记录只会移除 daily_memory.jsonl 中对应一行，不会回滚当前状态。"
             if is_admin
@@ -2585,7 +2584,7 @@ class SaveWebViewer:
                 user_id,
                 "/player/state/reset",
                 "刷新状态",
-                "确定重置状态？等级和状态进度都会恢复为初始值。",
+                "确定刷新状态？player_data_update.json 会恢复为 player_data.json 的初始状态。",
             )
             if is_admin
             else ""
@@ -2596,7 +2595,6 @@ class SaveWebViewer:
               <input type="hidden" name="group_id" value="{self._e(group_id)}">
               <input type="hidden" name="user_id" value="{self._e(user_id)}">
               <strong>危险操作</strong>
-              {state_reset_button}
               <span>删除该玩家的 player_data 和 daily_memory。</span>
               <button class="danger" type="submit">删除玩家存档</button>
             </form>
@@ -2644,7 +2642,7 @@ class SaveWebViewer:
                 <pre>{self._e_json(player_data_base)}</pre>
               </details>
             </section>
-            {state_overview}
+            {self._state_overview_html(player_data, state_reset_button)}
             {source_file_panel}
             {danger_zone}
             """,
@@ -3334,9 +3332,9 @@ class SaveWebViewer:
             </section>
         """
 
-    def _state_overview_html(self, state: dict[str, Any]) -> str:
+    def _state_overview_html(self, state: dict[str, Any], action_html: str = "") -> str:
         items = build_state_display_items(state, limit=40)
-        if not items:
+        if not items and not action_html:
             return ""
         item_html = "".join(
             f"""
@@ -3346,11 +3344,16 @@ class SaveWebViewer:
             </div>
             """
             for label, value in items
-        )
+        ) or '<p class="muted empty-state">暂无可展示的状态项。</p>'
         return f"""
             <section class="detail-panel state-overview-panel">
-              <h2>完整状态</h2>
-              <p class="muted">包含当前 state 中除经验进度外的状态项；原始 JSON 可在上方展开查看。</p>
+              <div class="section-head">
+                <div>
+                  <h2>完整状态</h2>
+                  <p class="muted">包含当前 state 中除经验进度外的状态项；原始 JSON 可在上方展开查看。</p>
+                </div>
+                {action_html}
+              </div>
               <div class="state-overview-grid">{item_html}</div>
             </section>
         """

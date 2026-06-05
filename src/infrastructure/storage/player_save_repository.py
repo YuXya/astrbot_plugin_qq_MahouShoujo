@@ -928,20 +928,12 @@ class PlayerSaveRepository:
 
     def reset_player_state(self, group_id: str, user_id: str) -> None:
         user_dir = self.get_user_dir(group_id, user_id)
-        player_data = self._load_current_player_data(user_dir)
+        player_data_path = user_dir / "player_data.json"
+        player_data = self._read_json(player_data_path)
         if not player_data:
             raise ValueError("玩家存档不存在或无法读取")
 
-        # 保留元信息和人物描述，只重置状态节点
-        protagonist = player_data.setdefault("主角", {})
-        # 移除所有状态类节点，保留人物描述
-        for key in list(protagonist.keys()):
-            if key in {"技能", "快感状态"}:
-                protagonist[key] = {}
-        protagonist["等级"] = {"等级": 1, "经验": 0}
-
-        player_data["updated_at"] = _now_date_str()
-        self._save_current_player_data(user_dir, player_data)
+        self._atomic_write_json(user_dir / "player_data_update.json", player_data)
 
     def delete_player_save(self, group_id: str, user_id: str) -> bool:
         user_dir = self.get_user_dir(group_id, user_id)
