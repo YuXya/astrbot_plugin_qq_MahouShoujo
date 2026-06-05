@@ -3752,6 +3752,7 @@ class SaveWebViewer:
     .sparkles span:nth-child(5) {{ left: 17%; top: 78%; transform: scale(1.1); animation-delay: 1.7s; }}
     .sparkles span:nth-child(6) {{ left: 92%; top: 58%; transform: scale(1.3); animation-delay: 2.1s; }}
     .login-panel {{ position: relative; z-index: 2; max-width: 480px; margin: 0; padding: 34px; border: 2px solid rgba(255, 255, 255, .76); border-radius: 8px; background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,246,252,.84)); box-shadow: 0 28px 70px rgba(167, 76, 146, .24), inset 0 0 0 1px rgba(255, 156, 208, .25); backdrop-filter: blur(18px); }}
+    @media (min-width: 861px) {{ .login-panel {{ grid-column: 2; justify-self: start; }} .login-vision {{ grid-column: 1; grid-row: 1; justify-self: end; }} }}
     .login-panel::before {{ content: ""; position: absolute; inset: 10px; border: 1px dashed rgba(231, 104, 178, .45); border-radius: 8px; pointer-events: none; }}
     .login-badge {{ width: 82px; height: 82px; display: grid; place-items: center; margin-bottom: 18px; border: 2px solid rgba(255,255,255,.82); border-radius: 50%; background: conic-gradient(from 18deg, #ff73b7, #ffd66b, #8fe8ff, #b896ff, #ff73b7); box-shadow: 0 14px 30px rgba(255, 104, 181, .34), inset 0 0 0 8px rgba(255,255,255,.5); color: #fff; font-size: 38px; text-shadow: 0 2px 10px rgba(128, 35, 119, .42); }}
     .badge-star {{ display: inline-block; transform: translateY(-1px); }}
