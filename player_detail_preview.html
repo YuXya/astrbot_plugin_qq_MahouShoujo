@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>魔法少女 ????</title>
+  <title>魔法少女 星羽琥珀</title>
   <style>
     :root { color-scheme: light; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     body { margin: 0; background: linear-gradient(180deg, #f3f6fb 0%, #eef3f8 42%, #f8fafc 100%); color: #20242a; -webkit-font-smoothing: antialiased; }
@@ -90,6 +90,18 @@
     .player-top-item span { display: block; color: #c54793; font-size: 12px; font-weight: 900; }
     .player-top-item strong { display: block; margin-top: 8px; color: #4b2447; font-size: clamp(20px, 2.5vw, 28px); line-height: 1.18; overflow-wrap: anywhere; }
     .player-split-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .player-profile-triad { display: grid; grid-template-columns: minmax(230px, .92fr) minmax(360px, 1.28fr) minmax(230px, .92fr); gap: 14px; align-items: stretch; }
+    .player-side-stack { display: grid; grid-template-rows: 1fr 1fr; gap: 14px; min-height: 100%; }
+    .player-profile-main, .player-profile-side { display: grid; min-height: 100%; }
+    .player-profile-triad .player-profile-card { height: 100%; padding: 16px; }
+    .player-profile-triad .profile-card-head { margin-bottom: 10px; }
+    .player-profile-triad .profile-card-head h2 { font-size: 21px; }
+    .player-profile-triad .player-info-grid { gap: 8px; }
+    .player-side-stack .player-info-grid, .player-profile-side .player-info-grid { grid-template-columns: 1fr; }
+    .player-profile-main .player-info-grid { grid-template-columns: 1fr; }
+    .player-profile-triad .player-info-item { min-height: 50px; padding: 8px 10px; }
+    .player-profile-triad .player-info-item span { font-size: 11px; }
+    .player-profile-triad .player-info-item strong { margin-top: 3px; font-size: 14px; line-height: 1.35; }
     .player-profile-card, .player-site-section { position: relative; padding: 20px; border: 1px solid rgba(221, 91, 169, .28); border-radius: 8px; background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,247,252,.78)); box-shadow: 0 14px 36px rgba(175, 74, 151, .13); overflow: hidden; }
     .primary-profile-card { grid-row: span 2; }
     .profile-card-head { margin-bottom: 14px; }
@@ -108,6 +120,10 @@
     .player-state-item { min-height: 64px; padding: 11px 12px; border: 1px solid rgba(211, 91, 165, .22); border-radius: 8px; background: rgba(255,255,255,.62); }
     .player-memory-grid { max-width: 1180px; margin: 14px auto 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     .player-memory-grid .player-site-section { margin: 0; }
+    .player-detail-flow > .player-site-section { width: 100%; max-width: none; margin: 0; }
+    .player-memory-row { max-width: none; margin: 0; }
+    .player-memory-row .log-card-summary { padding: 12px 14px; }
+    .player-memory-row .log-card-body { padding: 0 14px 14px; }
     .player-detail-shell .log-card { border-color: rgba(221, 91, 169, .22); background: rgba(255,255,255,.72); box-shadow: 0 8px 22px rgba(175, 74, 151, .08); }
     .player-detail-shell .log-card-summary, .player-detail-shell .log-card[open] .log-card-summary { background: rgba(255,255,255,.62); }
     .player-site-empty { margin: 0; padding: 18px; border: 1px dashed rgba(207, 84, 161, .42); border-radius: 8px; background: rgba(255,255,255,.64); color: #76506c; }
@@ -291,7 +307,7 @@
     @media (max-width: 900px) { .world-entry-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .level-field { grid-column: 1 / -1; } }
     @media (max-width: 900px) { .state-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 900px) { .detail-grid, .raw-grid { grid-template-columns: 1fr; } }
-    @media (max-width: 960px) { .player-detail-layout, .player-split-grid, .player-memory-grid { grid-template-columns: 1fr; } .primary-profile-card { grid-row: auto; } .player-state-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 960px) { .player-detail-layout, .player-profile-triad, .player-split-grid, .player-memory-grid { grid-template-columns: 1fr; } .player-profile-main { order: -1; } .player-side-stack { grid-template-rows: auto; } .player-profile-main .player-info-grid { grid-template-columns: 1fr; } .primary-profile-card { grid-row: auto; } .player-state-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 720px) { .player-shell { padding: 76px 16px 34px; } .player-hero { padding: 6px 74px 0 0; text-align: left; margin-bottom: 22px; } .player-hero::before { width: 60px; height: 60px; font-size: 27px; } .player-city-section { padding: 16px; } .player-section-head { display: block; } .player-city-card { grid-template-columns: 52px 1fr; padding: 15px; } .city-card-orb { width: 46px; height: 46px; } }
     @media (max-width: 720px) { .player-detail-shell { padding: 76px 16px 34px; } .player-detail-hero { padding: 58px 82px 22px 18px; text-align: left; } .player-detail-emblem { top: 16px; right: 16px; width: 58px; height: 58px; font-size: 27px; } .player-back-link { left: 14px; top: 14px; } .player-hero-tags { justify-content: flex-start; } .player-detail-hero .player-top-grid { grid-template-columns: 1fr; } .player-info-grid, .player-state-grid { grid-template-columns: 1fr; } .player-profile-card, .player-site-section { padding: 16px; } }
     @media (max-width: 560px) { .state-overview-grid { grid-template-columns: 1fr; } }
@@ -314,111 +330,37 @@
                 <a class="player-back-link" href="/">返回个人档案</a>
                 <div class="player-detail-emblem" aria-hidden="true">✦</div>
                 <p class="player-kicker">Mahou Shoujo Profile</p>
-                <h1>魔法少女 ????</h1>
-                <p>???记录中的魔法少女档案。这里汇总了你的身份、外观、装备、成长进度与最近的冒险痕迹。</p>
+                <h1>魔法少女 星羽琥珀</h1>
+                <p>星环第七城记录中的魔法少女档案。这里汇总了你的身份、外观、装备、成长进度与最近的冒险痕迹。</p>
                 <div class="player-hero-tags">
+                  <span>E级</span>
                   <span>F级</span>
-                  <span>未知职阶</span>
-                  <span>星光色</span>
+                  <span>樱光金</span>
                 </div>
                 <section class="player-top-grid">
                   
             <article class="player-top-item">
               <span>姓名</span>
-              <strong>????</strong>
+              <strong>琥珀</strong>
             </article>
             
             <article class="player-top-item">
               <span>年龄</span>
-              <strong>未记录</strong>
+              <strong>16岁</strong>
             </article>
             
             <article class="player-top-item">
               <span>身高</span>
-              <strong>未记录</strong>
+              <strong>158cm</strong>
             </article>
             
                 </section>
               </header>
 
               <section class="player-detail-flow">
-                
-            <article class="player-profile-card">
-              <div class="profile-card-head">
-                <span>Personal</span>
-                <h2>个人信息</h2>
-              </div>
-              <div class="player-info-grid">
-                <div class="player-info-item">
-                  <span>魔法少女名</span>
-                  <strong>未记录</strong>
-                </div>
-                
-                <div class="player-info-item">
-                  <span>所在城市</span>
-                  <strong>???</strong>
-                </div>
-                
-                <div class="player-info-item">
-                  <span>城市 ID</span>
-                  <strong>10001</strong>
-                </div>
-                
-                <div class="player-info-item">
-                  <span>职阶</span>
-                  <strong>未知职阶</strong>
-                </div>
-                
-                <div class="player-info-item">
-                  <span>等级</span>
-                  <strong>F级</strong>
-                </div>
-                
-                <div class="player-info-item">
-                  <span>等级经验</span>
-                  <strong>0%</strong>
-                </div>
-                
-                <div class="player-info-item">
-                  <span>代表色</span>
-                  <strong>星光色</strong>
-                </div>
-                
-                <div class="player-info-item">
-                  <span>核心能力</span>
-                  <strong>未记录</strong>
-                </div>
-                
-                <div class="player-info-item">
-                  <span>使魔伙伴</span>
-                  <strong>未记录</strong>
-                </div>
-                
-                <div class="player-info-item">
-                  <span>使魔关系</span>
-                  <strong>未记录</strong>
-                </div>
-                
-                <div class="player-info-item">
-                  <span>武装</span>
-                  <strong>未记录</strong>
-                </div>
-                
-                <div class="player-info-item">
-                  <span>变身服</span>
-                  <strong>未记录</strong>
-                </div>
-                
-                <div class="player-info-item">
-                  <span>性格特质</span>
-                  <strong>未记录</strong>
-                </div>
-                </div>
-            </article>
-        
-
-                <section class="player-split-grid">
-                  
+                <section class="player-profile-triad">
+                  <div class="player-side-stack">
+                    
             <article class="player-profile-card">
               <div class="profile-card-head">
                 <span>Appearance</span>
@@ -427,32 +369,32 @@
               <div class="player-info-grid">
                 <div class="player-info-item">
                   <span>脸型</span>
-                  <strong>未记录</strong>
+                  <strong>柔和的鹅蛋脸</strong>
                 </div>
                 
                 <div class="player-info-item">
                   <span>五官</span>
-                  <strong>未记录</strong>
+                  <strong>轮廓精致，笑起来有小酒窝</strong>
                 </div>
                 
                 <div class="player-info-item">
                   <span>眼睛颜色</span>
-                  <strong>未记录</strong>
+                  <strong>蜂蜜金</strong>
                 </div>
                 
                 <div class="player-info-item">
                   <span>发型与发色</span>
-                  <strong>未记录</strong>
+                  <strong>浅栗长发，战斗时会浮现星纹</strong>
                 </div>
                 
                 <div class="player-info-item">
                   <span>特殊记号</span>
-                  <strong>未记录</strong>
+                  <strong>右手腕的月牙印</strong>
                 </div>
                 </div>
             </article>
         
-                  
+                    
             <article class="player-profile-card">
               <div class="profile-card-head">
                 <span>Body</span>
@@ -461,34 +403,110 @@
               <div class="player-info-grid">
                 <div class="player-info-item">
                   <span>三围</span>
-                  <strong>未记录</strong>
+                  <strong>83 / 56 / 84</strong>
                 </div>
                 
                 <div class="player-info-item">
                   <span>体态</span>
-                  <strong>未记录</strong>
+                  <strong>轻快敏捷，姿态很有舞台感</strong>
                 </div>
                 
                 <div class="player-info-item">
                   <span>肌肉线条</span>
-                  <strong>未记录</strong>
+                  <strong>细而紧实</strong>
                 </div>
                 
                 <div class="player-info-item">
                   <span>体脂率</span>
-                  <strong>未记录</strong>
+                  <strong>偏低</strong>
                 </div>
                 
                 <div class="player-info-item">
                   <span>皮肤状态</span>
-                  <strong>未记录</strong>
+                  <strong>干净透亮，有微弱星光感</strong>
                 </div>
                 </div>
             </article>
         
-                </section>
-
+                  </div>
+                  <div class="player-profile-main">
+                    
+            <article class="player-profile-card">
+              <div class="profile-card-head">
+                <span>Personal</span>
+                <h2>个人信息</h2>
+              </div>
+              <div class="player-info-grid">
+                <div class="player-info-item">
+                  <span>魔法少女名</span>
+                  <strong>星羽琥珀</strong>
+                </div>
                 
+                <div class="player-info-item">
+                  <span>所在城市</span>
+                  <strong>星环第七城</strong>
+                </div>
+                
+                <div class="player-info-item">
+                  <span>城市 ID</span>
+                  <strong>1008611</strong>
+                </div>
+                
+                <div class="player-info-item">
+                  <span>职阶</span>
+                  <strong>F级</strong>
+                </div>
+                
+                <div class="player-info-item">
+                  <span>等级</span>
+                  <strong>E级</strong>
+                </div>
+                
+                <div class="player-info-item">
+                  <span>等级经验</span>
+                  <strong>42%</strong>
+                </div>
+                
+                <div class="player-info-item">
+                  <span>代表色</span>
+                  <strong>樱光金</strong>
+                </div>
+                
+                <div class="player-info-item">
+                  <span>核心能力</span>
+                  <strong>将约定的星屑化作防护与短距离闪现</strong>
+                </div>
+                
+                <div class="player-info-item">
+                  <span>使魔伙伴</span>
+                  <strong>星盘精灵</strong>
+                </div>
+                
+                <div class="player-info-item">
+                  <span>使魔关系</span>
+                  <strong>契约守护者</strong>
+                </div>
+                
+                <div class="player-info-item">
+                  <span>武装</span>
+                  <strong>月环权杖</strong>
+                </div>
+                
+                <div class="player-info-item">
+                  <span>变身服</span>
+                  <strong>短斗篷与星轨裙摆</strong>
+                </div>
+                
+                <div class="player-info-item">
+                  <span>性格特质</span>
+                  <strong>警觉、温和，遇到求助会忍不住接近</strong>
+                </div>
+                </div>
+            </article>
+        
+                  </div>
+                  <div class="player-profile-side">
+                    
             <article class="player-profile-card">
               <div class="profile-card-head">
                 <span>Body Detail</span>
@@ -497,12 +515,12 @@
               <div class="player-info-grid">
                 <div class="player-info-item">
                   <span>乳房形状</span>
-                  <strong>未记录</strong>
+                  <strong>小巧圆润</strong>
                 </div>
                 
                 <div class="player-info-item">
                   <span>乳晕与乳头颜色</span>
-                  <strong>未记录</strong>
+                  <strong>淡粉色</strong>
                 </div>
                 
                 <div class="player-info-item">
@@ -512,20 +530,20 @@
                 
                 <div class="player-info-item">
                   <span>体毛状况</span>
-                  <strong>未记录</strong>
+                  <strong>清洁稀少</strong>
                 </div>
                 
                 <div class="player-info-item">
                   <span>天生敏感度</span>
-                  <strong>未记录</strong>
+                  <strong>较高</strong>
                 </div>
                 </div>
             </article>
         
-              </section>
+                  </div>
+                </section>
 
-              <section class="player-memory-grid">
-                <article class="player-site-section">
+                <article class="player-site-section player-memory-row">
                   <div class="profile-card-head">
                     <span>Diary</span>
                     <h2>最近冒险记录</h2>
@@ -536,7 +554,7 @@
                     <div class="log-card-head">
                       <div>
                         <span class="log-index">#1</span>
-                        <h3>????????</h3>
+                        <h3>战斗记录</h3>
                       </div>
                       
                     </div>
@@ -554,16 +572,16 @@
                       <span>log</span>
                       
                     </div>
-                    <p class="log-action">????????</p>
                     
                     
-                    <p class="log-result">?????????????????</p>
+                    
+                    <p class="log-result"></p>
                     
                   </div>
                 </details>
                 </div>
                 </article>
-                <article class="player-site-section">
+                <article class="player-site-section player-memory-row">
                   <div class="profile-card-head">
                     <span>Connections</span>
                     <h2>城市中的交互</h2>
@@ -574,36 +592,35 @@
                     <div class="log-card-head">
                       <div>
                         <span class="log-index">#1</span>
-                        <h3>?????</h3>
+                        <h3>其他人与主角的交互</h3>
                       </div>
                       
                     </div>
                     <div class="log-meta summary-meta">
                       <span></span>
                       
-                      <span>来源：???</span>
+                      <span>来源：未知角色</span>
                     </div>
                   </summary>
                   <div class="log-card-body">
                     <div class="log-meta">
                       <span></span>
                       
-                      <span>来源：???</span>
+                      <span>来源：未知角色</span>
                     </div>
                     
-                    <p class="log-result">???????????????</p>
+                    <p class="log-result"></p>
                   </div>
                 </details>
                 </div>
                 </article>
-              </section>
 
-              <section class="player-site-section">
-                <div class="profile-card-head">
-                  <span>Growth</span>
-                  <h2>成长进度</h2>
-                </div>
-                
+                <section class="player-site-section">
+                  <div class="profile-card-head">
+                    <span>Growth</span>
+                    <h2>成长进度</h2>
+                  </div>
+                  
             <section class="detail-panel progress-overview-panel">
               <h2>技能&amp;熟练度</h2>
               <p class="muted empty-state">暂无可展示的经验进度。</p>
@@ -614,6 +631,7 @@
               <p class="muted empty-state">暂无可展示的经验进度。</p>
             </section>
             
+                </section>
               </section>
             </section>
             </main></body>

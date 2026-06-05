@@ -2741,39 +2741,41 @@ class SaveWebViewer:
               </header>
 
               <section class="player-detail-flow">
-                {self._player_site_profile_card("Personal", "个人信息", personal_items)}
-
-                <section class="player-split-grid">
-                  {self._player_site_profile_card("Appearance", "相貌特征", appearance_items)}
-                  {self._player_site_profile_card("Body", "身材细节", body_items)}
+                <section class="player-profile-triad">
+                  <div class="player-side-stack">
+                    {self._player_site_profile_card("Appearance", "相貌特征", appearance_items)}
+                    {self._player_site_profile_card("Body", "身材细节", body_items)}
+                  </div>
+                  <div class="player-profile-main">
+                    {self._player_site_profile_card("Personal", "个人信息", personal_items)}
+                  </div>
+                  <div class="player-profile-side">
+                    {self._player_site_profile_card("Body Detail", "性器官特征", sex_items)}
+                  </div>
                 </section>
 
-                {self._player_site_profile_card("Body Detail", "性器官特征", sex_items)}
-              </section>
-
-              <section class="player-memory-grid">
-                <article class="player-site-section">
+                <article class="player-site-section player-memory-row">
                   <div class="profile-card-head">
                     <span>Diary</span>
                     <h2>最近冒险记录</h2>
                   </div>
                   <div class="log-list">{logs_html}</div>
                 </article>
-                <article class="player-site-section">
+                <article class="player-site-section player-memory-row">
                   <div class="profile-card-head">
                     <span>Connections</span>
                     <h2>城市中的交互</h2>
                   </div>
                   <div class="log-list">{cameo_html}</div>
                 </article>
-              </section>
 
-              <section class="player-site-section">
-                <div class="profile-card-head">
-                  <span>Growth</span>
-                  <h2>成长进度</h2>
-                </div>
-                {progress_html or '<p class="player-site-empty">暂无成长进度记录。</p>'}
+                <section class="player-site-section">
+                  <div class="profile-card-head">
+                    <span>Growth</span>
+                    <h2>成长进度</h2>
+                  </div>
+                  {progress_html or '<p class="player-site-empty">暂无成长进度记录。</p>'}
+                </section>
               </section>
             </section>
             """,
@@ -3773,6 +3775,18 @@ class SaveWebViewer:
     .player-top-item span {{ display: block; color: #c54793; font-size: 12px; font-weight: 900; }}
     .player-top-item strong {{ display: block; margin-top: 8px; color: #4b2447; font-size: clamp(20px, 2.5vw, 28px); line-height: 1.18; overflow-wrap: anywhere; }}
     .player-split-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }}
+    .player-profile-triad {{ display: grid; grid-template-columns: minmax(230px, .92fr) minmax(360px, 1.28fr) minmax(230px, .92fr); gap: 14px; align-items: stretch; }}
+    .player-side-stack {{ display: grid; grid-template-rows: 1fr 1fr; gap: 14px; min-height: 100%; }}
+    .player-profile-main, .player-profile-side {{ display: grid; min-height: 100%; }}
+    .player-profile-triad .player-profile-card {{ height: 100%; padding: 16px; }}
+    .player-profile-triad .profile-card-head {{ margin-bottom: 10px; }}
+    .player-profile-triad .profile-card-head h2 {{ font-size: 21px; }}
+    .player-profile-triad .player-info-grid {{ gap: 8px; }}
+    .player-side-stack .player-info-grid, .player-profile-side .player-info-grid {{ grid-template-columns: 1fr; }}
+    .player-profile-main .player-info-grid {{ grid-template-columns: 1fr; }}
+    .player-profile-triad .player-info-item {{ min-height: 50px; padding: 8px 10px; }}
+    .player-profile-triad .player-info-item span {{ font-size: 11px; }}
+    .player-profile-triad .player-info-item strong {{ margin-top: 3px; font-size: 14px; line-height: 1.35; }}
     .player-profile-card, .player-site-section {{ position: relative; padding: 20px; border: 1px solid rgba(221, 91, 169, .28); border-radius: 8px; background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,247,252,.78)); box-shadow: 0 14px 36px rgba(175, 74, 151, .13); overflow: hidden; }}
     .primary-profile-card {{ grid-row: span 2; }}
     .profile-card-head {{ margin-bottom: 14px; }}
@@ -3791,6 +3805,10 @@ class SaveWebViewer:
     .player-state-item {{ min-height: 64px; padding: 11px 12px; border: 1px solid rgba(211, 91, 165, .22); border-radius: 8px; background: rgba(255,255,255,.62); }}
     .player-memory-grid {{ max-width: 1180px; margin: 14px auto 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }}
     .player-memory-grid .player-site-section {{ margin: 0; }}
+    .player-detail-flow > .player-site-section {{ width: 100%; max-width: none; margin: 0; }}
+    .player-memory-row {{ max-width: none; margin: 0; }}
+    .player-memory-row .log-card-summary {{ padding: 12px 14px; }}
+    .player-memory-row .log-card-body {{ padding: 0 14px 14px; }}
     .player-detail-shell .log-card {{ border-color: rgba(221, 91, 169, .22); background: rgba(255,255,255,.72); box-shadow: 0 8px 22px rgba(175, 74, 151, .08); }}
     .player-detail-shell .log-card-summary, .player-detail-shell .log-card[open] .log-card-summary {{ background: rgba(255,255,255,.62); }}
     .player-site-empty {{ margin: 0; padding: 18px; border: 1px dashed rgba(207, 84, 161, .42); border-radius: 8px; background: rgba(255,255,255,.64); color: #76506c; }}
@@ -3974,7 +3992,7 @@ class SaveWebViewer:
     @media (max-width: 900px) {{ .world-entry-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} .level-field {{ grid-column: 1 / -1; }} }}
     @media (max-width: 900px) {{ .state-overview-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
     @media (max-width: 900px) {{ .detail-grid, .raw-grid {{ grid-template-columns: 1fr; }} }}
-    @media (max-width: 960px) {{ .player-detail-layout, .player-split-grid, .player-memory-grid {{ grid-template-columns: 1fr; }} .primary-profile-card {{ grid-row: auto; }} .player-state-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
+    @media (max-width: 960px) {{ .player-detail-layout, .player-profile-triad, .player-split-grid, .player-memory-grid {{ grid-template-columns: 1fr; }} .player-profile-main {{ order: -1; }} .player-side-stack {{ grid-template-rows: auto; }} .player-profile-main .player-info-grid {{ grid-template-columns: 1fr; }} .primary-profile-card {{ grid-row: auto; }} .player-state-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
     @media (max-width: 720px) {{ .player-shell {{ padding: 76px 16px 34px; }} .player-hero {{ padding: 6px 74px 0 0; text-align: left; margin-bottom: 22px; }} .player-hero::before {{ width: 60px; height: 60px; font-size: 27px; }} .player-city-section {{ padding: 16px; }} .player-section-head {{ display: block; }} .player-city-card {{ grid-template-columns: 52px 1fr; padding: 15px; }} .city-card-orb {{ width: 46px; height: 46px; }} }}
     @media (max-width: 720px) {{ .player-detail-shell {{ padding: 76px 16px 34px; }} .player-detail-hero {{ padding: 58px 82px 22px 18px; text-align: left; }} .player-detail-emblem {{ top: 16px; right: 16px; width: 58px; height: 58px; font-size: 27px; }} .player-back-link {{ left: 14px; top: 14px; }} .player-hero-tags {{ justify-content: flex-start; }} .player-detail-hero .player-top-grid {{ grid-template-columns: 1fr; }} .player-info-grid, .player-state-grid {{ grid-template-columns: 1fr; }} .player-profile-card, .player-site-section {{ padding: 16px; }} }}
     @media (max-width: 560px) {{ .state-overview-grid {{ grid-template-columns: 1fr; }} }}
