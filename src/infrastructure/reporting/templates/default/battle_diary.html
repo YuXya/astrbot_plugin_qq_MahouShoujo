@@ -195,6 +195,12 @@
       white-space: pre-wrap;
     }
 
+    .speech-quote,
+    .diary-quote {
+      color: #c46d16;
+      font-weight: 900;
+    }
+
     .text {
       font-size: 23px;
       line-height: 1.5;
@@ -356,7 +362,7 @@
 
     <section class="section">
       <div class="section-title">日记</div>
-      <div class="diary">{{ card.diary }}</div>
+      <div class="diary">{{ diary_html | safe }}</div>
     </section>
 
     <section class="section">

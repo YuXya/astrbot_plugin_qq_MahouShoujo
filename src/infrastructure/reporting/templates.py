@@ -8,7 +8,10 @@ from markupsafe import Markup, escape
 
 from ...utils.logger import logger
 
-SPEECH_QUOTE_RE = re.compile(r'(“[^”]*”|"[^"]*"|「[^」]*」)', re.S)
+SPEECH_QUOTE_RE = re.compile(
+    r'(\u201c[^\u201d]*\u201d|"[^"]*"|\u300c[^\u300d]*\u300d)',
+    re.S,
+)
 
 
 class HTMLTemplates:

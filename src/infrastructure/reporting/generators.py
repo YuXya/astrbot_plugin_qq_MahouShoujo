@@ -140,7 +140,10 @@ class ReportGenerator(ICardGenerator):
         raw_text = str(text or "")
         parts: list[str] = []
         cursor = 0
-        for match in re.finditer(r"“[^”]*”|\"[^\"\n]*\"", raw_text):
+        for match in re.finditer(
+            r"\u201c[^\u201d]*\u201d|\"[^\"\n]*\"|\u300c[^\u300d]*\u300d",
+            raw_text,
+        ):
             parts.append(html_lib.escape(raw_text[cursor:match.start()]))
             parts.append(
                 '<span class="diary-quote">'
