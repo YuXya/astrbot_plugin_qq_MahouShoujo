@@ -399,33 +399,61 @@ class SaveWebViewer:
 
     def _user_index(self, user_id: str) -> web.Response:
         saves = self.repository.list_saves_by_user(user_id)
-        rows = []
+        city_cards = []
         for item in saves:
             row = self._save_table_row(item)
-            rows.append(
-                "<tr>"
-                f"<td>{row['city_name']}</td>"
-                f"<td><a href=\"{row['href']}\">{row['nickname']}</a></td>"
-                f"<td>{row['class_name']}</td>"
-                f"<td>{row['level']}</td>"
-                f"<td>{row['updated_at']}</td>"
-                "</tr>"
+            meta_items = [row["nickname"], row["level"], row["updated_at"]]
+            meta_html = "".join(
+                f"<span>{value}</span>" for value in meta_items if str(value or "").strip()
+            )
+            city_cards.append(
+                f"""
+                <article class="player-city-card">
+                  <div class="city-card-orb" aria-hidden="true">✦</div>
+                  <div class="city-card-main">
+                    <span class="city-card-label">城市档案</span>
+                    <h2>{row['city_name']}</h2>
+                    <p>城市 ID：{row['group_id']}</p>
+                    <div class="city-card-meta">
+                      {meta_html}
+                    </div>
+                  </div>
+                  <a class="player-enter-link" href="{row['href']}">进入城市</a>
+                </article>
+                """
             )
 
-        body = "\n".join(rows) or "<tr><td colspan=\"5\">还没有找到你的魔法少女存档。</td></tr>"
+        city_list = "\n".join(city_cards) or (
+            """
+            <section class="player-empty-state">
+              <div aria-hidden="true">✧</div>
+              <h2>还没有可进入城市</h2>
+              <p>完成一次转生后，你的魔法少女个人档案会在这里生成，并按所在城市归档。</p>
+            </section>
+            """
+        )
         return self._html_response(
-            "我的魔法少女存档",
+            "魔法少女个人档案",
             f"""
-            <h1>我的魔法少女存档</h1>
-            <p class="muted">当前登录 QQ：{self._e(user_id)}</p>
-            <table>
-              <thead>
-                <tr>
-                  <th>城市</th><th>角色</th><th>职阶</th><th>等级</th><th>更新时间</th>
-                </tr>
-              </thead>
-              <tbody>{body}</tbody>
-            </table>
+            <section class="player-shell" aria-label="魔法少女个人档案">
+              <div class="player-stars" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <header class="player-hero">
+                <p class="player-kicker">Mahou Shoujo City Gate</p>
+                <h1>魔法少女个人档案</h1>
+                <p>契约者 {self._e(user_id)}，这里记录着你的魔法少女身份、所在城市与成长痕迹。</p>
+              </header>
+              <section class="player-city-section">
+                <div class="player-section-head">
+                  <div>
+                    <span>Available Cities</span>
+                    <h2>可进入城市</h2>
+                  </div>
+                </div>
+                <div class="player-city-grid">{city_list}</div>
+              </section>
+            </section>
             """,
         )
 
@@ -2480,11 +2508,21 @@ class SaveWebViewer:
         player_data = detail.get("player_data", {})
         logs = detail.get("logs", [])
         cameo_memories = detail.get("cameo_memories", [])
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+        title_name = self._get_nested(protagonist, ["个人信息", "姓名"], player_data.get("nickname", "")) or user_id
+        if not is_admin:
+            return self._player_site_detail_response(
+                group_id,
+                user_id,
+                player_data,
+                logs,
+                cameo_memories,
+                title_name,
+            )
+
         # 读取初始状态用于对比展示
         user_dir = self.repository.get_user_dir(group_id, user_id)
         player_data_base = self.repository._read_json(user_dir / "player_data.json")
-        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
-        title_name = self._get_nested(protagonist, ["个人信息", "姓名"], player_data.get("nickname", "")) or user_id
         summary = self._player_summary_html(
             group_id,
             user_id,
@@ -2603,6 +2641,205 @@ class SaveWebViewer:
             {source_file_panel}
             {danger_zone}
             """,
+        )
+
+    def _player_site_detail_response(
+        self,
+        group_id: str,
+        user_id: str,
+        player_data: dict[str, Any],
+        logs: list[dict[str, Any]],
+        cameo_memories: list[dict[str, Any]],
+        title_name: str,
+    ) -> web.Response:
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+        city_name = self.repository.get_city_name(group_id)
+        magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], "")
+        class_name = self._get_nested(protagonist, ["个人信息", "身份&职业"], "未知职阶")
+        color = self._get_nested(protagonist, ["个人信息", "代表色"], "星光色")
+        ability = self._get_nested(protagonist, ["个人信息", "核心能力"], "未记录")
+        weapon = self._get_nested(protagonist, ["个人信息", "武装"], "未记录")
+        outfit = self._get_nested(protagonist, ["个人信息", "变身服"], "未记录")
+        familiar = self._get_nested(protagonist, ["个人信息", "使魔伙伴种类"], "")
+        familiar_bond = self._get_nested(protagonist, ["个人信息", "使魔伙伴与主角关系"], "")
+        display_name = magical_name or title_name
+
+        identity_cards = [
+            ("姓名", title_name),
+            ("魔法少女名", magical_name or "未记录"),
+            ("所在城市", city_name),
+            ("城市 ID", group_id),
+            ("职阶", class_name),
+            ("等级", level_display(player_data)),
+            ("等级经验", f"{level_exp_percent(player_data)}%"),
+            ("代表色", color),
+            ("核心能力", ability),
+            ("武装", weapon),
+            ("变身服", outfit),
+        ]
+        if familiar:
+            identity_cards.append(("使魔伙伴", familiar))
+        if familiar_bond:
+            identity_cards.append(("使魔关系", familiar_bond))
+
+        progress_html = self._progress_overview_html(player_data)
+        state_html = self._player_site_state_html(player_data)
+        logs_html = self._player_log_cards(group_id, user_id, logs[:8], allow_delete=False)
+        cameo_html = self._player_cameo_memory_cards(
+            group_id, user_id, cameo_memories[:8], allow_delete=False
+        )
+
+        return self._html_response(
+            f"{display_name}的魔法少女档案",
+            f"""
+            <section class="player-detail-shell" aria-label="魔法少女个人档案">
+              <div class="player-stars" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <header class="player-detail-hero">
+                <a class="player-back-link" href="{self._url('/')}">返回个人档案</a>
+                <div class="player-detail-emblem" aria-hidden="true">✦</div>
+                <p class="player-kicker">Mahou Shoujo Profile</p>
+                <h1>{self._e(display_name)}</h1>
+                <p>{self._e(city_name)}记录中的魔法少女档案。这里汇总了你的身份、外观、装备、成长进度与最近的冒险痕迹。</p>
+                <div class="player-hero-tags">
+                  <span>{self._e(level_display(player_data))}</span>
+                  <span>{self._e(class_name)}</span>
+                  <span>{self._e(color)}</span>
+                </div>
+              </header>
+
+              <section class="player-detail-layout">
+                <article class="player-profile-card primary-profile-card">
+                  <div class="profile-card-head">
+                    <span>Identity</span>
+                    <h2>身份档案</h2>
+                  </div>
+                  {self._player_site_info_grid(identity_cards)}
+                </article>
+                {self._player_site_profile_sections(protagonist)}
+              </section>
+
+              <section class="player-site-section">
+                <div class="profile-card-head">
+                  <span>Growth</span>
+                  <h2>成长进度</h2>
+                </div>
+                {progress_html or '<p class="player-site-empty">暂无成长进度记录。</p>'}
+              </section>
+
+              <section class="player-site-section">
+                <div class="profile-card-head">
+                  <span>Status</span>
+                  <h2>当前状态</h2>
+                </div>
+                {state_html or '<p class="player-site-empty">暂无额外状态记录。</p>'}
+              </section>
+
+              <section class="player-memory-grid">
+                <article class="player-site-section">
+                  <div class="profile-card-head">
+                    <span>Diary</span>
+                    <h2>最近冒险记录</h2>
+                  </div>
+                  <div class="log-list">{logs_html}</div>
+                </article>
+                <article class="player-site-section">
+                  <div class="profile-card-head">
+                    <span>Connections</span>
+                    <h2>城市中的交互</h2>
+                  </div>
+                  <div class="log-list">{cameo_html}</div>
+                </article>
+              </section>
+            </section>
+            """,
+        )
+
+    def _player_site_info_grid(self, items: list[tuple[str, object]]) -> str:
+        rows = []
+        for label, value in items:
+            text = str(value or "").strip()
+            if not text:
+                continue
+            rows.append(
+                f"""
+                <div class="player-info-item">
+                  <span>{self._e(label)}</span>
+                  <strong>{self._e(text)}</strong>
+                </div>
+                """
+            )
+        return f'<div class="player-info-grid">{"".join(rows)}</div>'
+
+    def _player_site_profile_sections(self, protagonist: dict[str, Any]) -> str:
+        groups = [
+            ("Personal", "个人信息", [
+                ("性格特质", ["个人信息", "性格特质"]),
+                ("年龄", ["个人信息", "年龄"]),
+                ("核心能力", ["个人信息", "核心能力"]),
+                ("使魔伙伴种类", ["个人信息", "使魔伙伴种类"]),
+                ("使魔伙伴与主角关系", ["个人信息", "使魔伙伴与主角关系"]),
+            ]),
+            ("Appearance", "相貌特征", [
+                ("脸型", ["相貌特征", "脸型"]),
+                ("五官", ["相貌特征", "五官"]),
+                ("眼睛颜色", ["相貌特征", "眼睛颜色"]),
+                ("发型与发色", ["相貌特征", "发型与发色"]),
+                ("特殊记号", ["相貌特征", "特殊记号"]),
+            ]),
+            ("Body", "身体记录", [
+                ("身高", ["身材细节", "身高"]),
+                ("三围", ["身材细节", "三围"]),
+                ("体态", ["身材细节", "体态"]),
+                ("肌肉线条", ["身材细节", "肌肉线条"]),
+                ("体脂率", ["身材细节", "体脂率"]),
+                ("皮肤状态", ["身材细节", "皮肤状态"]),
+            ]),
+            ("Equipment", "魔法装备", [
+                ("武装", ["个人信息", "武装"]),
+                ("变身服", ["个人信息", "变身服"]),
+                ("代表色", ["个人信息", "代表色"]),
+            ]),
+        ]
+        cards = []
+        for kicker, title, fields in groups:
+            items = []
+            for label, path in fields:
+                value = self._get_nested(protagonist, path, "")
+                if value:
+                    items.append((label, value))
+            if not items:
+                continue
+            cards.append(
+                f"""
+                <article class="player-profile-card">
+                  <div class="profile-card-head">
+                    <span>{self._e(kicker)}</span>
+                    <h2>{self._e(title)}</h2>
+                  </div>
+                  {self._player_site_info_grid(items)}
+                </article>
+                """
+            )
+        return "\n".join(cards)
+
+    def _player_site_state_html(self, state: dict[str, Any]) -> str:
+        items = build_state_display_items(state, limit=36)
+        if not items:
+            return ""
+        return (
+            '<div class="player-state-grid">'
+            + "".join(
+                f"""
+                <div class="player-state-item">
+                  <span>{self._e(label)}</span>
+                  <strong>{self._e(value)}</strong>
+                </div>
+                """
+                for label, value in items
+            )
+            + "</div>"
         )
 
     async def _player_profile_save(self, request: web.Request) -> web.Response:
@@ -3412,6 +3649,78 @@ class SaveWebViewer:
     .compact-button {{ margin: 0; padding: 6px 10px; font-size: 13px; }}
     .city-editor-panel {{ margin: 16px 0; }}
     .city-name-form input[type="text"] {{ width: min(360px, 100%); }}
+    main:has(.player-shell) {{ width: 100%; max-width: none; min-height: 100vh; box-sizing: border-box; padding: 0; overflow: hidden; }}
+    main:has(.player-shell) .topbar {{ position: absolute; top: 18px; right: 22px; z-index: 5; margin: 0; min-height: 0; }}
+    main:has(.player-shell) .topbar button {{ border: 1px solid rgba(255,255,255,.68); background: rgba(112, 72, 156, .72); box-shadow: 0 12px 28px rgba(108, 53, 133, .18); backdrop-filter: blur(10px); }}
+    .player-shell {{ position: relative; min-height: 100vh; padding: 72px clamp(18px, 5vw, 72px) 58px; box-sizing: border-box; overflow: hidden; background: radial-gradient(circle at 14% 14%, rgba(255, 241, 151, .82) 0 7%, transparent 21%), radial-gradient(circle at 78% 20%, rgba(139, 229, 255, .72) 0 8%, transparent 22%), radial-gradient(circle at 82% 78%, rgba(255, 139, 200, .52) 0 11%, transparent 25%), linear-gradient(135deg, #fff5fb 0%, #f7ddff 30%, #dff7ff 66%, #fff6c7 100%); color: #42233f; isolation: isolate; }}
+    .player-shell::before {{ content: ""; position: absolute; inset: -20%; z-index: -2; background-image: linear-gradient(rgba(255,255,255,.48) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.42) 1px, transparent 1px); background-size: 42px 42px; transform: rotate(-7deg); }}
+    .player-shell::after {{ content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 62% 28%, transparent 0 23%, rgba(255,255,255,.32) 24%, transparent 25%), radial-gradient(circle at 62% 28%, transparent 0 38%, rgba(255,255,255,.24) 39%, transparent 40%); }}
+    .player-stars {{ position: absolute; inset: 0; pointer-events: none; }}
+    .player-stars span {{ position: absolute; width: 9px; height: 9px; background: #fff; clip-path: polygon(50% 0, 63% 36%, 100% 50%, 63% 64%, 50% 100%, 37% 64%, 0 50%, 37% 36%); filter: drop-shadow(0 0 8px rgba(255, 94, 178, .72)); opacity: .9; animation: twinkle 3s ease-in-out infinite; }}
+    .player-stars span:nth-child(1) {{ left: 9%; top: 22%; transform: scale(1.5); }}
+    .player-stars span:nth-child(2) {{ left: 38%; top: 15%; animation-delay: .5s; }}
+    .player-stars span:nth-child(3) {{ left: 81%; top: 18%; transform: scale(1.8); animation-delay: .9s; }}
+    .player-stars span:nth-child(4) {{ left: 71%; top: 72%; animation-delay: 1.3s; }}
+    .player-stars span:nth-child(5) {{ left: 17%; top: 78%; transform: scale(1.2); animation-delay: 1.8s; }}
+    .player-hero {{ position: relative; max-width: 760px; margin: 0 auto 34px; text-align: center; }}
+    .player-hero::before {{ content: "✦"; display: grid; place-items: center; width: 78px; height: 78px; margin: 0 auto 18px; border-radius: 50%; border: 2px solid rgba(255,255,255,.8); background: conic-gradient(from 20deg, #ff73b7, #ffd66b, #8fe8ff, #b896ff, #ff73b7); color: #fff; font-size: 34px; box-shadow: 0 16px 36px rgba(188, 80, 166, .24), inset 0 0 0 8px rgba(255,255,255,.48); }}
+    .player-kicker, .player-section-head span, .city-card-label {{ display: block; margin: 0 0 8px; color: #c54793; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0; }}
+    .player-hero h1 {{ margin: 0 0 12px; color: #64204f; font-size: clamp(34px, 5vw, 58px); line-height: 1.05; text-shadow: 0 2px 0 #fff, 0 18px 40px rgba(204, 70, 157, .18); }}
+    .player-hero p {{ margin: 0 auto; max-width: 45em; color: #67425e; line-height: 1.75; }}
+    .player-city-section {{ position: relative; max-width: 1080px; margin: 0 auto; padding: 22px; border: 1px solid rgba(255,255,255,.72); border-radius: 8px; background: rgba(255,255,255,.5); box-shadow: 0 24px 70px rgba(141, 76, 146, .18), inset 0 0 0 1px rgba(255,255,255,.4); backdrop-filter: blur(14px); }}
+    .player-section-head {{ display: flex; justify-content: space-between; align-items: end; gap: 18px; margin-bottom: 16px; }}
+    .player-section-head h2 {{ margin: 0; color: #652052; font-size: 24px; }}
+    .player-city-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }}
+    .player-city-card {{ position: relative; min-height: 188px; display: grid; grid-template-columns: 62px 1fr; grid-template-rows: 1fr auto; gap: 12px; padding: 18px; border: 1px solid rgba(221, 91, 169, .28); border-radius: 8px; background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,247,252,.78)); box-shadow: 0 14px 36px rgba(175, 74, 151, .13); overflow: hidden; }}
+    .player-city-card::after {{ content: ""; position: absolute; right: -36px; top: -44px; width: 130px; height: 130px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 221, 113, .7), rgba(122, 222, 248, .35) 54%, transparent 56%); }}
+    .city-card-orb {{ position: relative; z-index: 1; width: 54px; height: 54px; display: grid; place-items: center; border-radius: 50%; background: linear-gradient(135deg, #ff6bb3, #8ee8ff); color: #fff; font-size: 25px; box-shadow: 0 12px 24px rgba(192, 80, 169, .22); }}
+    .city-card-main {{ position: relative; z-index: 1; min-width: 0; }}
+    .city-card-main h2 {{ margin: 0 0 6px; color: #5a214e; font-size: 22px; overflow-wrap: anywhere; }}
+    .city-card-main p {{ margin: 0; color: #76506c; font-size: 13px; font-weight: 800; overflow-wrap: anywhere; }}
+    .city-card-meta {{ display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }}
+    .city-card-meta span {{ min-height: 24px; display: inline-flex; align-items: center; padding: 3px 8px; border: 1px solid rgba(211, 91, 165, .24); border-radius: 999px; background: rgba(255,255,255,.72); color: #744160; font-size: 12px; font-weight: 800; }}
+    .player-enter-link {{ position: relative; z-index: 1; grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 0 14px; border-radius: 8px; background: linear-gradient(135deg, #ff5fae, #b56bff 52%, #45c9ee); color: #fff; font-weight: 900; box-shadow: 0 14px 28px rgba(180, 70, 176, .22); }}
+    .player-enter-link:hover {{ text-decoration: none; filter: brightness(1.04); }}
+    .player-empty-state {{ padding: 34px 18px; text-align: center; border: 1px dashed rgba(207, 84, 161, .42); border-radius: 8px; background: rgba(255,255,255,.64); }}
+    .player-empty-state div {{ color: #ff62ad; font-size: 44px; }}
+    .player-empty-state h2 {{ margin: 4px 0 8px; color: #652052; }}
+    .player-empty-state p {{ max-width: 34em; margin: 0 auto; color: #76506c; line-height: 1.7; }}
+    main:has(.player-detail-shell) {{ width: 100%; max-width: none; min-height: 100vh; box-sizing: border-box; padding: 0; overflow: hidden; }}
+    main:has(.player-detail-shell) .topbar {{ position: absolute; top: 18px; right: 22px; z-index: 5; margin: 0; min-height: 0; }}
+    main:has(.player-detail-shell) .topbar button {{ border: 1px solid rgba(255,255,255,.68); background: rgba(112, 72, 156, .72); box-shadow: 0 12px 28px rgba(108, 53, 133, .18); backdrop-filter: blur(10px); }}
+    .player-detail-shell {{ position: relative; min-height: 100vh; padding: 70px clamp(18px, 5vw, 72px) 58px; box-sizing: border-box; overflow: hidden; background: radial-gradient(circle at 13% 16%, rgba(255, 241, 151, .82) 0 7%, transparent 21%), radial-gradient(circle at 82% 18%, rgba(139, 229, 255, .72) 0 8%, transparent 22%), radial-gradient(circle at 80% 82%, rgba(255, 139, 200, .52) 0 11%, transparent 25%), linear-gradient(135deg, #fff5fb 0%, #f7ddff 30%, #dff7ff 66%, #fff6c7 100%); color: #42233f; isolation: isolate; }}
+    .player-detail-shell::before {{ content: ""; position: absolute; inset: -20%; z-index: -2; background-image: linear-gradient(rgba(255,255,255,.48) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.42) 1px, transparent 1px); background-size: 42px 42px; transform: rotate(-7deg); }}
+    .player-detail-shell::after {{ content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 50% 18%, transparent 0 22%, rgba(255,255,255,.32) 23%, transparent 24%), radial-gradient(circle at 50% 18%, transparent 0 39%, rgba(255,255,255,.23) 40%, transparent 41%); }}
+    .player-detail-hero {{ position: relative; max-width: 980px; margin: 0 auto 24px; padding: 28px 24px 30px; border: 1px solid rgba(255,255,255,.72); border-radius: 8px; background: rgba(255,255,255,.48); box-shadow: 0 24px 70px rgba(141, 76, 146, .16), inset 0 0 0 1px rgba(255,255,255,.42); backdrop-filter: blur(14px); text-align: center; }}
+    .player-back-link {{ position: absolute; left: 18px; top: 18px; display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border: 1px solid rgba(212, 93, 166, .28); border-radius: 999px; background: rgba(255,255,255,.68); color: #8d3975; font-size: 13px; font-weight: 900; }}
+    .player-back-link:hover {{ text-decoration: none; background: rgba(255,255,255,.9); }}
+    .player-detail-emblem {{ width: 86px; height: 86px; display: grid; place-items: center; margin: 8px auto 18px; border-radius: 50%; border: 2px solid rgba(255,255,255,.82); background: conic-gradient(from 20deg, #ff73b7, #ffd66b, #8fe8ff, #b896ff, #ff73b7); color: #fff; font-size: 38px; box-shadow: 0 16px 36px rgba(188, 80, 166, .24), inset 0 0 0 8px rgba(255,255,255,.48); }}
+    .player-detail-hero h1 {{ margin: 0 0 12px; color: #64204f; font-size: clamp(34px, 5vw, 62px); line-height: 1.05; text-shadow: 0 2px 0 #fff, 0 18px 40px rgba(204, 70, 157, .18); overflow-wrap: anywhere; }}
+    .player-detail-hero p {{ margin: 0 auto; max-width: 50em; color: #67425e; line-height: 1.75; }}
+    .player-hero-tags {{ display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 18px; }}
+    .player-hero-tags span {{ min-height: 28px; display: inline-flex; align-items: center; padding: 3px 10px; border: 1px solid rgba(211, 91, 165, .26); border-radius: 999px; background: rgba(255,255,255,.72); color: #744160; font-size: 13px; font-weight: 900; }}
+    .player-detail-layout {{ max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }}
+    .player-profile-card, .player-site-section {{ position: relative; padding: 20px; border: 1px solid rgba(221, 91, 169, .28); border-radius: 8px; background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,247,252,.78)); box-shadow: 0 14px 36px rgba(175, 74, 151, .13); overflow: hidden; }}
+    .primary-profile-card {{ grid-row: span 2; }}
+    .profile-card-head {{ margin-bottom: 14px; }}
+    .profile-card-head span {{ display: block; margin: 0 0 6px; color: #c54793; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0; }}
+    .profile-card-head h2 {{ margin: 0; color: #652052; font-size: 24px; }}
+    .player-info-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }}
+    .player-info-item {{ min-height: 64px; padding: 11px 12px; border: 1px solid rgba(211, 91, 165, .22); border-radius: 8px; background: rgba(255,255,255,.62); }}
+    .player-info-item span, .player-state-item span {{ display: block; color: #9b477d; font-size: 12px; font-weight: 900; }}
+    .player-info-item strong, .player-state-item strong {{ display: block; margin-top: 5px; color: #4b2447; font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; }}
+    .player-site-section {{ max-width: 1180px; margin: 14px auto 0; }}
+    .player-site-section .detail-panel {{ border-color: rgba(221, 91, 169, .22); background: rgba(255,255,255,.58); box-shadow: none; }}
+    .player-site-section .progress-name {{ color: #5a214e; }}
+    .player-site-section .progress-name::before {{ border-color: #ffd8eb; border-top-color: #ff5fae; }}
+    .player-site-section .progress-fill {{ background: linear-gradient(90deg, #ff5fae, #45c9ee); box-shadow: 0 0 10px rgba(255, 95, 174, .22); }}
+    .player-state-grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }}
+    .player-state-item {{ min-height: 64px; padding: 11px 12px; border: 1px solid rgba(211, 91, 165, .22); border-radius: 8px; background: rgba(255,255,255,.62); }}
+    .player-memory-grid {{ max-width: 1180px; margin: 14px auto 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }}
+    .player-memory-grid .player-site-section {{ margin: 0; }}
+    .player-detail-shell .log-card {{ border-color: rgba(221, 91, 169, .22); background: rgba(255,255,255,.72); box-shadow: 0 8px 22px rgba(175, 74, 151, .08); }}
+    .player-detail-shell .log-card-summary, .player-detail-shell .log-card[open] .log-card-summary {{ background: rgba(255,255,255,.62); }}
+    .player-site-empty {{ margin: 0; padding: 18px; border: 1px dashed rgba(207, 84, 161, .42); border-radius: 8px; background: rgba(255,255,255,.64); color: #76506c; }}
     label {{ display: block; margin: 18px 0 8px; font-weight: 700; color: #303846; }}
     input[type="text"] {{ width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #c8d0dc; border-radius: 7px; font: inherit; background: #fbfdff; }}
     input[type="number"] {{ width: 76px; box-sizing: border-box; padding: 7px 9px; border: 1px solid #c8d0dc; border-radius: 7px; font: inherit; background: #fbfdff; }}
@@ -3591,6 +3900,9 @@ class SaveWebViewer:
     @media (max-width: 900px) {{ .world-entry-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} .level-field {{ grid-column: 1 / -1; }} }}
     @media (max-width: 900px) {{ .state-overview-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
     @media (max-width: 900px) {{ .detail-grid, .raw-grid {{ grid-template-columns: 1fr; }} }}
+    @media (max-width: 960px) {{ .player-detail-layout, .player-memory-grid {{ grid-template-columns: 1fr; }} .primary-profile-card {{ grid-row: auto; }} .player-state-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
+    @media (max-width: 720px) {{ .player-shell {{ padding: 76px 16px 34px; }} .player-hero {{ text-align: left; margin-bottom: 22px; }} .player-hero::before {{ margin-left: 0; }} .player-city-section {{ padding: 16px; }} .player-section-head {{ display: block; }} .player-city-card {{ grid-template-columns: 52px 1fr; padding: 15px; }} .city-card-orb {{ width: 46px; height: 46px; }} }}
+    @media (max-width: 720px) {{ .player-detail-shell {{ padding: 76px 16px 34px; }} .player-detail-hero {{ padding: 58px 18px 22px; text-align: left; }} .player-detail-emblem {{ margin-left: 0; }} .player-back-link {{ left: 14px; top: 14px; }} .player-hero-tags {{ justify-content: flex-start; }} .player-info-grid, .player-state-grid {{ grid-template-columns: 1fr; }} .player-profile-card, .player-site-section {{ padding: 16px; }} }}
     @media (max-width: 560px) {{ .state-overview-grid {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .progress-list {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .profile-edit-grid {{ grid-template-columns: 1fr; }} }}
