@@ -3,17 +3,17 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from ..models.data_models import AdventureDiaryCard
+from ..models.data_models import BattleDiaryCard
 from ...shared.levels import clamp_level, level_change_label, parse_level_label
 
 
-class AdventureDiaryDomainService:
+class BattleDiaryDomainService:
     def normalize_card(
         self,
         raw: dict,
         player_data: dict,
         action_text: str,
-    ) -> AdventureDiaryCard:
+    ) -> BattleDiaryCard:
         """规范化战斗日记卡。
 
         player_data 是完整的当前玩家数据（来自 player_data_update.json 或 player_data.json，含主角树）。
@@ -41,7 +41,7 @@ class AdventureDiaryDomainService:
             target_name,
         )
         participants = self.normalize_participants(raw.get("participants"), default_participant)
-        return AdventureDiaryCard(
+        return BattleDiaryCard(
             title=self._clean_text(raw.get("title"), "魔法少女战斗日记")[:32],
             subtitle=self._clean_text(raw.get("subtitle"), "新的旅途被写进日记")[:64],
             target_name=target_name[:32],

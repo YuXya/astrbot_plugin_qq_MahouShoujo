@@ -8,19 +8,19 @@ from astrbot.api import AstrBotConfig
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star
 
-from .src.application.services.adventure_application_service import (
-    AdventureApplicationService,
+from .src.application.services.reincarnation_application_service import (
+    ReincarnationApplicationService,
 )
-from .src.application.services.adventure_diary_application_service import (
-    AdventureDiaryApplicationService,
+from .src.application.services.battle_diary_application_service import (
+    BattleDiaryApplicationService,
 )
-from .src.domain.services.adventure_diary_domain_service import (
-    AdventureDiaryDomainService,
+from .src.domain.services.battle_diary_domain_service import (
+    BattleDiaryDomainService,
 )
-from .src.domain.services.adventure_domain_service import AdventureDomainService
-from .src.infrastructure.analysis.llm_adventure_analyzer import LLMAdventureAnalyzer
-from .src.infrastructure.analysis.llm_adventure_diary_analyzer import (
-    LLMAdventureDiaryAnalyzer,
+from .src.domain.services.reincarnation_domain_service import ReincarnationDomainService
+from .src.infrastructure.analysis.llm_reincarnation_analyzer import LLMReincarnationAnalyzer
+from .src.infrastructure.analysis.llm_battle_diary_analyzer import (
+    LLMBattleDiaryAnalyzer,
 )
 from .src.infrastructure.config.config_manager import ConfigManager
 from .src.infrastructure.editable_resources import EditableResourceManager
@@ -53,14 +53,14 @@ REINCARNATION_TEMPLATE = (
 class QQMahouShoujo(Star):
     config: AstrBotConfig
     config_manager: ConfigManager
-    domain_service: AdventureDomainService
-    diary_domain_service: AdventureDiaryDomainService
+    domain_service: ReincarnationDomainService
+    diary_domain_service: BattleDiaryDomainService
     editable_manager: EditableResourceManager
-    llm_analyzer: LLMAdventureAnalyzer
-    diary_llm_analyzer: LLMAdventureDiaryAnalyzer
+    llm_analyzer: LLMReincarnationAnalyzer
+    diary_llm_analyzer: LLMBattleDiaryAnalyzer
     report_generator: ReportGenerator
-    adventure_service: AdventureApplicationService
-    diary_service: AdventureDiaryApplicationService
+    reincarnation_service: ReincarnationApplicationService
+    diary_service: BattleDiaryApplicationService
     avatar_service: QQAvatarService
     message_sender: MessageSender
     save_repository: PlayerSaveRepository
@@ -72,22 +72,22 @@ class QQMahouShoujo(Star):
         self.config = config
         self.config_manager = ConfigManager(config)
         self.editable_manager = EditableResourceManager()
-        self.domain_service = AdventureDomainService()
-        self.diary_domain_service = AdventureDiaryDomainService()
-        self.llm_analyzer = LLMAdventureAnalyzer(
+        self.domain_service = ReincarnationDomainService()
+        self.diary_domain_service = BattleDiaryDomainService()
+        self.llm_analyzer = LLMReincarnationAnalyzer(
             context,
             self.config_manager,
             self.domain_service,
             self.editable_manager,
         )
-        self.diary_llm_analyzer = LLMAdventureDiaryAnalyzer(
+        self.diary_llm_analyzer = LLMBattleDiaryAnalyzer(
             context,
             self.config_manager,
             self.diary_domain_service,
             self.editable_manager,
         )
         self.report_generator = ReportGenerator(self.config_manager, self.editable_manager)
-        self.adventure_service = AdventureApplicationService(
+        self.reincarnation_service = ReincarnationApplicationService(
             self.config_manager,
             self.domain_service,
             self.llm_analyzer,
@@ -98,7 +98,7 @@ class QQMahouShoujo(Star):
         self.save_repository = PlayerSaveRepository(
             editable_manager=self.editable_manager,
         )
-        self.diary_service = AdventureDiaryApplicationService(
+        self.diary_service = BattleDiaryApplicationService(
             self.config_manager,
             self.diary_domain_service,
             self.diary_llm_analyzer,
@@ -298,7 +298,7 @@ class QQMahouShoujo(Star):
         if preference_text:
             theme = f"{theme} {preference_text}"
 
-        result = await self.adventure_service.execute_adventure(
+        result = await self.reincarnation_service.execute_reincarnation(
             theme=theme,
             html_render_func=self.html_render,
             user_id=user_id,
@@ -326,8 +326,8 @@ class QQMahouShoujo(Star):
             fallback_text=result.text,
         )
 
-    @filter.command("魔法少女战斗", alias={"adventure"})
-    async def adventure_diary(
+    @filter.command("魔法少女战斗")
+    async def battle_diary(
         self,
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
@@ -352,10 +352,10 @@ class QQMahouShoujo(Star):
 
         async with self.player_queue.lock_for(group_id, user_id):
             async with self.player_queue.group_lock_for(group_id):
-                async for result in self._run_adventure_diary(event, group_id, user_id):
+                async for result in self._run_battle_diary(event, group_id, user_id):
                     yield result
 
-    async def _run_adventure_diary(
+    async def _run_battle_diary(
         self,
         event: AstrMessageEvent,
         group_id: str,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from astrbot.api.message_components import Image
 
-from ...domain.models.data_models import AdventureDiaryCard, ReincarnationCard
+from ...domain.models.data_models import BattleDiaryCard, ReincarnationCard
 from ...utils.logger import logger
 
 
@@ -11,7 +11,7 @@ class MessageSender:
         self,
         event,
         image_path: str | None,
-        fallback_card: ReincarnationCard | AdventureDiaryCard | None,
+        fallback_card: ReincarnationCard | BattleDiaryCard | None,
         fallback_text: str = "",
     ):
         if image_path:

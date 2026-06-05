@@ -10,7 +10,7 @@ from typing import Any
 
 from astrbot.api.star import StarTools
 
-from ...domain.models.data_models import AdventureDiaryCard, ReincarnationCard
+from ...domain.models.data_models import BattleDiaryCard, ReincarnationCard
 from ...domain.repositories.card_repository import ICardGenerator
 from ...utils.logger import logger
 from ..editable_resources import EditableResourceManager
@@ -65,7 +65,7 @@ class ReportGenerator(ICardGenerator):
 
     async def generate_diary_image_card(
         self,
-        card: AdventureDiaryCard,
+        card: BattleDiaryCard,
         html_render_func: Any,
     ) -> tuple[str | None, str | None]:
         progress_sections = build_progress_sections(
@@ -94,7 +94,7 @@ class ReportGenerator(ICardGenerator):
         battle_magical_girl_label = "、".join(participants)
         battle_mode_label = "多人行动" if len(participants) > 1 else "单独行动"
         html_content = self.html_templates.render_template(
-            "adventure_diary.html",
+            "battle_diary.html",
             card=card,
             reason=card.reason,
             battle_magical_girl_label=battle_magical_girl_label,
@@ -126,7 +126,7 @@ class ReportGenerator(ICardGenerator):
                     image_path = self._persist_image(
                         image_data,
                         options.get("type", "png"),
-                        prefix="adventure_diary",
+                        prefix="battle_diary",
                     )
                     if image_path:
                         return image_path, html_content
@@ -140,7 +140,7 @@ class ReportGenerator(ICardGenerator):
         raw_text = str(text or "")
         parts: list[str] = []
         cursor = 0
-        for match in re.finditer(r"“[^”]*”", raw_text):
+        for match in re.finditer(r"“[^”]*”|\"[^\"\n]*\"", raw_text):
             parts.append(html_lib.escape(raw_text[cursor:match.start()]))
             parts.append(
                 '<span class="diary-quote">'

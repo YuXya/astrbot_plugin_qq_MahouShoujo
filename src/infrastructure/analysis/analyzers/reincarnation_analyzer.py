@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 from ....domain.models.data_models import ReincarnationCard
-from ....domain.services.adventure_domain_service import AdventureDomainService
+from ....domain.services.reincarnation_domain_service import ReincarnationDomainService
 from ...event_book import EventBookEngine
 from ...world_book import WorldBookEngine
 from .base_analyzer import BaseAnalyzer
 
 
-class AdventureAnalyzer(BaseAnalyzer[ReincarnationCard]):
+class ReincarnationAnalyzer(BaseAnalyzer[ReincarnationCard]):
     def __init__(
         self,
         context,
         config_manager,
-        domain_service: AdventureDomainService,
+        domain_service: ReincarnationDomainService,
         editable_manager=None,
     ):
         super().__init__(context, config_manager, editable_manager)

@@ -7,14 +7,15 @@
     :root {
       color-scheme: light;
       --ink: #27303d;
-      --muted: #6f6a64;
-      --paper: #fffaf0;
-      --line: #d7c7a8;
-      --green: #52796f;
-      --red: #b75d4a;
-      --rose: #b75d6a;
-      --gold: #c79b43;
-      --panel: rgba(255, 255, 255, 0.72);
+      --muted: #6d716d;
+      --paper: #fffdf7;
+      --line: #d8d0bd;
+      --green: #426b63;
+      --red: #a94e5a;
+      --rose: #b85c74;
+      --gold: #ad8026;
+      --panel: rgba(255, 255, 255, 0.82);
+      --shadow: rgba(55, 45, 34, 0.14);
     }
 
     * { box-sizing: border-box; }
@@ -30,36 +31,35 @@
     body {
       font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
       background:
-        radial-gradient(circle at 14% 9%, rgba(255, 255, 255, 0.92) 0 2px, transparent 3px),
-        radial-gradient(ellipse at 16% 14%, rgba(255, 224, 236, 0.82), transparent 34%),
-        radial-gradient(ellipse at 84% 10%, rgba(205, 237, 230, 0.72), transparent 36%),
-        radial-gradient(ellipse at 50% 98%, rgba(255, 231, 164, 0.48), transparent 42%),
-        linear-gradient(145deg, #fff8fb 0%, #faeadf 36%, #eef6f1 100%);
+        linear-gradient(rgba(255, 255, 255, 0.38) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.34) 1px, transparent 1px),
+        linear-gradient(135deg, #f7edf1 0%, #fff7e8 48%, #e9f3ef 100%);
+      background-size: 30px 30px, 30px 30px, auto;
       color: var(--ink);
-      padding: 34px;
+      padding: 30px;
     }
 
     .card {
       min-height: 1060px;
       position: relative;
       overflow: hidden;
-      border: 2px solid rgba(199, 155, 67, 0.42);
-      border-radius: 18px;
+      border: 1px solid rgba(135, 111, 70, 0.38);
+      border-radius: 8px;
       background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.44)),
-        rgba(255, 250, 240, 0.96);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 251, 241, 0.78)),
+        var(--paper);
       box-shadow:
         inset 0 0 0 1px rgba(255, 255, 255, 0.84),
-        0 28px 70px rgba(74, 62, 42, 0.17);
-      padding: 38px;
+        0 24px 58px var(--shadow);
+      padding: 36px;
     }
 
     .card::before {
       content: "";
       position: absolute;
-      inset: 14px;
-      border: 1px solid rgba(199, 155, 67, 0.25);
-      border-radius: 13px;
+      inset: 12px;
+      border: 1px solid rgba(66, 107, 99, 0.16);
+      border-radius: 5px;
       pointer-events: none;
     }
 
@@ -70,12 +70,15 @@
       grid-template-columns: 1fr 148px;
       gap: 24px;
       align-items: center;
-      border-bottom: 3px double var(--line);
-      padding-bottom: 24px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 22px;
     }
 
     .eyebrow {
-      font-size: 18px;
+      display: inline-block;
+      border-left: 4px solid var(--green);
+      padding-left: 10px;
+      font-size: 16px;
       font-weight: 900;
       color: var(--green);
       margin-bottom: 10px;
@@ -83,9 +86,9 @@
 
     h1 {
       margin: 0;
-      font-size: 50px;
-      line-height: 1.14;
-      color: #3c4d46;
+      font-size: 48px;
+      line-height: 1.12;
+      color: #2f433e;
       letter-spacing: 0;
     }
 
@@ -99,10 +102,10 @@
     .avatar {
       width: 144px;
       height: 144px;
-      border-radius: 10px;
-      border: 7px solid #fff;
-      background: linear-gradient(135deg, #d8eadf, #f6d8bf);
-      box-shadow: 0 12px 30px rgba(70, 60, 40, 0.18);
+      border-radius: 8px;
+      border: 6px solid #fff;
+      background: linear-gradient(135deg, #d8eadf, #f4d9c7);
+      box-shadow: 0 12px 28px rgba(70, 60, 40, 0.16);
       display: grid;
       place-items: center;
       overflow: hidden;
@@ -137,12 +140,11 @@
       align-items: center;
       justify-items: center;
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 8px;
       background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.54)),
-        radial-gradient(circle at 12% 10%, rgba(255, 235, 183, 0.38), transparent 42%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 244, 235, 0.62));
       padding: 15px 14px;
-      box-shadow: 0 10px 22px rgba(74, 62, 42, 0.07);
+      box-shadow: 0 10px 22px rgba(74, 62, 42, 0.06);
     }
 
     .label {
@@ -169,11 +171,11 @@
       z-index: 1;
       margin-top: 20px;
       border: 1px solid var(--line);
-      border-radius: 14px;
+      border-radius: 8px;
       background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.56)),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.64)),
         var(--panel);
-      box-shadow: 0 14px 32px rgba(74, 62, 42, 0.08);
+      box-shadow: 0 12px 28px rgba(74, 62, 42, 0.07);
       padding: 22px 24px;
     }
 
@@ -181,7 +183,9 @@
       color: var(--red);
       font-size: 21px;
       font-weight: 900;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(216, 208, 189, 0.72);
     }
 
     .diary {
@@ -192,7 +196,8 @@
     }
 
     .diary-quote {
-      color: #d8732a;
+      color: #c7662e;
+      font-weight: 800;
     }
 
     .text {
@@ -210,24 +215,26 @@
     }
 
     .reason-list {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 9px;
       margin-top: 16px;
     }
 
     .reason-item {
-      min-width: 0;
-      border: 1px solid rgba(199, 155, 67, 0.34);
-      border-radius: 12px;
-      background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 247, 226, 0.56));
-      padding: 12px 14px;
-      color: #765d28;
+      flex: 0 1 auto;
+      max-width: 100%;
+      border: 1px solid rgba(173, 128, 38, 0.42);
+      border-radius: 2px;
+      background: rgba(255, 248, 228, 0.92);
+      padding: 9px 12px;
+      color: #6d5420;
       font-size: 17px;
       font-weight: 700;
-      line-height: 1.45;
+      line-height: 1.42;
       overflow-wrap: anywhere;
+      box-shadow: inset 3px 0 0 rgba(173, 128, 38, 0.34);
     }
 
     .footer {
@@ -244,9 +251,9 @@
       z-index: 1;
       margin-top: 22px;
       border: 1px solid var(--line);
-      border-radius: 14px;
+      border-radius: 8px;
       background:
-        linear-gradient(180deg, rgba(237, 244, 239, 0.78), rgba(255, 255, 255, 0.6));
+        linear-gradient(180deg, rgba(237, 244, 239, 0.84), rgba(255, 255, 255, 0.66));
       color: var(--ink);
       padding: 18px 20px 20px;
       box-shadow: 0 14px 32px rgba(74, 62, 42, 0.08);
@@ -268,7 +275,7 @@
     .progress-row {
       min-width: 0;
       border: 1px solid rgba(82, 121, 111, 0.22);
-      border-radius: 12px;
+      border-radius: 6px;
       background: rgba(255, 255, 255, 0.62);
       padding: 13px 14px 14px;
     }
@@ -315,7 +322,7 @@
   <main class="card">
     <section class="header">
       <div>
-        <div class="eyebrow">ISEKAI ADVENTURE DIARY</div>
+        <div class="eyebrow">ISEKAI BATTLE DIARY</div>
         <h1>{{ card.title }}</h1>
         <div class="subtitle">{{ card.subtitle }}</div>
       </div>

@@ -2345,7 +2345,7 @@ class SaveWebViewer:
                 else ""
             )
             delete_button = ""
-            if allow_delete and log_index >= 0 and raw_log_type == "adventure_diary":
+            if allow_delete and log_index >= 0 and raw_log_type == "battle_diary":
                 delete_button = f"""
                   <form class="inline-form" method="post" action="{self._url('/player/log/delete')}" onsubmit="return confirm('确定删除这条战斗记录？当前 state 不会自动回滚。');">
                     <input type="hidden" name="group_id" value="{self._e(group_id)}">
@@ -2569,14 +2569,14 @@ class SaveWebViewer:
         if not group_id or not user_id or log_index < 0:
             raise web.HTTPBadRequest(text="missing group_id, user_id or log_index")
 
-        self.repository.delete_adventure_log(group_id, user_id, log_index)
+        self.repository.delete_battle_log(group_id, user_id, log_index)
         raise web.HTTPFound(
             self._url(f"/player?group_id={self._e(group_id)}&user_id={self._e(user_id)}")
         )
 
     async def _player_log_clear(self, request: web.Request) -> web.Response:
         group_id, user_id = await self._admin_player_action_ids(request)
-        self.repository.clear_adventure_logs(group_id, user_id)
+        self.repository.clear_battle_logs(group_id, user_id)
         raise self._player_detail_redirect(group_id, user_id)
 
     async def _player_cameo_delete(self, request: web.Request) -> web.Response:

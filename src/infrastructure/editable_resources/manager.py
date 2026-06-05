@@ -14,7 +14,7 @@ from . import defaults
 class EditableResourceManager:
     PROMPT_FILES = {
         "reincarnation_prompt": "prompts/reincarnation_prompt.txt",
-        "adventure_diary_prompt": "prompts/adventure_diary_prompt.txt",
+        "battle_diary_prompt": "prompts/battle_diary_prompt.txt",
         "default_system_prompt": "prompts/default_system_prompt.txt",
     }
 
@@ -201,7 +201,7 @@ class EditableResourceManager:
                 "category": "text_completion",
             },
             {
-                "id": self.PROMPT_FILES["adventure_diary_prompt"],
+                "id": self.PROMPT_FILES["battle_diary_prompt"],
                 "label": "战斗日记 Prompt",
                 "type": "text",
                 "category": "text_completion",
@@ -221,7 +221,7 @@ class EditableResourceManager:
             "status_book/default.json": defaults.STATUS_BOOK_DEFAULT,
             "event_book/default.json": defaults.EVENT_BOOK_DEFAULT,
             self.PROMPT_FILES["reincarnation_prompt"]: defaults.REINCARNATION_PROMPT,
-            self.PROMPT_FILES["adventure_diary_prompt"]: defaults.ADVENTURE_DIARY_PROMPT,
+            self.PROMPT_FILES["battle_diary_prompt"]: defaults.BATTLE_DIARY_PROMPT,
             self.PROMPT_FILES["default_system_prompt"]: defaults.DEFAULT_SYSTEM_PROMPT,
         }
 
@@ -252,7 +252,7 @@ class EditableResourceManager:
                 "可用变量：{{theme}}（触发命令+玩家偏好）、{{player_text}}（目标群友昵称或ID）、"
                 "{{supplement_text}}（世界书+事件书命中的补充设定，未命中时为空）。"
             ),
-            self.PROMPT_FILES["adventure_diary_prompt"]: (
+            self.PROMPT_FILES["battle_diary_prompt"]: (
                 "用于 /魔法少女战斗 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
                 "可用变量：{{player_data_update_json}}"
                 "（来自玩家当前人物卡，包含全部属性和状态，用于第一人称人格设定和状态参考）；"

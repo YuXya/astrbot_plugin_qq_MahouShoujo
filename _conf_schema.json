@@ -59,7 +59,7 @@
       }
     }
   },
-  "adventure": {
+  "battle": {
     "description": "魔法少女转生卡设置",
     "type": "object",
     "items": {

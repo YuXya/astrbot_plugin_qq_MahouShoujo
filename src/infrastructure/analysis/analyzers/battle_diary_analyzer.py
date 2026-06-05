@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from ....domain.models.data_models import AdventureDiaryCard, TokenUsage
-from ....domain.services.adventure_diary_domain_service import AdventureDiaryDomainService
+from ....domain.models.data_models import BattleDiaryCard, TokenUsage
+from ....domain.services.battle_diary_domain_service import BattleDiaryDomainService
 from ....shared.levels import level_label
 from ....utils.logger import logger
 from ...change_books import ChangeBookEngine
@@ -18,12 +18,12 @@ from ..utils.llm_utils import (
 from .base_analyzer import BaseAnalyzer
 
 
-class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
+class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
     def __init__(
         self,
         context,
         config_manager,
-        domain_service: AdventureDiaryDomainService,
+        domain_service: BattleDiaryDomainService,
         editable_manager=None,
     ):
         super().__init__(context, config_manager, editable_manager)
@@ -46,7 +46,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
     def create_data_object(
         self,
         data: dict,
-    ) -> AdventureDiaryCard:
+    ) -> BattleDiaryCard:
         return self.domain_service.normalize_card(data, {}, "")
 
     async def analyze_diary(
@@ -61,7 +61,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         nickname: str | None = None,
         umo: str | None = None,
         current_world_date: str = "",
-    ) -> tuple[AdventureDiaryCard | None, TokenUsage, str]:
+    ) -> tuple[BattleDiaryCard | None, TokenUsage, str]:
         prompt = self.build_diary_prompt(
             action_text=action_text,
             player_data=player_data,
@@ -175,7 +175,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         teammate_info = self._format_teammate_info(nearby_players)
 
         return self.editable_manager.render_prompt(
-            "adventure_diary_prompt",
+            "battle_diary_prompt",
             {
                 "player_data_update_json": self._json_dump(player_data),
                 "player_name": self._get_nested(protagonist, ["个人信息", "姓名"], "") or "主角",
@@ -191,7 +191,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             },
         )
 
-    async def compress_adventure_logs(
+    async def compress_battle_logs(
         self,
         *,
         logs: list[dict],
@@ -273,9 +273,9 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
         return str(current) if current is not None else default
 
     @staticmethod
-    def _is_first_adventure(logs: list[dict]) -> bool:
+    def _is_first_battle(logs: list[dict]) -> bool:
         return not any(
-            isinstance(item, dict) and item.get("type") == "adventure_diary"
+            isinstance(item, dict) and item.get("type") == "battle_diary"
             for item in logs
         )
 
@@ -296,7 +296,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
             return "（暂无战斗日志。）"
         lines = []
         for index, item in enumerate(logs, start=1):
-            title = AdventureDiaryAnalyzer._world_diary_title(item)
+            title = BattleDiaryAnalyzer._world_diary_title(item)
             action = item.get("action", "")
             result = item.get("result", "")
             level = item.get("level_change", "")
@@ -321,8 +321,8 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
     def _format_logs_for_compression(logs: list[dict]) -> str:
         parts = []
         for index, item in enumerate(logs, start=1):
-            title = AdventureDiaryAnalyzer._world_diary_title(item)
-            if item.get("type") == "adventure_summary":
+            title = BattleDiaryAnalyzer._world_diary_title(item)
+            if item.get("type") == "battle_summary":
                 parts.append(
                     "\n".join(
                         [
@@ -357,7 +357,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
                 if item.get("type") == "cameo_summary"
                 else item.get("source_target_name", "")
             )
-            title = AdventureDiaryAnalyzer._world_diary_title(item)
+            title = BattleDiaryAnalyzer._world_diary_title(item)
             encounter = item.get("encounter", "")
             result = item.get("result", "")
             line = f"{index}. {source_name or '未知'}在{title}"
@@ -372,7 +372,7 @@ class AdventureDiaryAnalyzer(BaseAnalyzer[AdventureDiaryCard]):
     def _format_cameo_memories_for_compression(memories: list[dict]) -> str:
         parts = []
         for index, item in enumerate(memories, start=1):
-            title = AdventureDiaryAnalyzer._world_diary_title(item)
+            title = BattleDiaryAnalyzer._world_diary_title(item)
             if item.get("type") == "cameo_summary":
                 parts.append(
                     "\n".join(

@@ -99,7 +99,7 @@ class BaseAnalyzer(ABC, Generic[TDataObject]):
         try:
             debug_dir = StarTools.get_data_dir() / "debug_data"
             debug_dir.mkdir(parents=True, exist_ok=True)
-            path = debug_dir / f"adventure_{suffix}.txt"
+            path = debug_dir / f"battle_{suffix}.txt"
             path.write_text(content, encoding="utf-8")
         except Exception as exc:
             logger.warning(f"保存调试文件失败: {exc}")
