@@ -130,18 +130,18 @@
 
     .box {
       min-width: 0;
-      min-height: 74px;
+      min-height: 96px;
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      column-gap: 9px;
-      row-gap: 4px;
-      align-items: baseline;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 9px;
+      align-items: center;
+      justify-items: center;
       border: 1px solid var(--line);
       border-radius: 12px;
       background:
         linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.54)),
         radial-gradient(circle at 12% 10%, rgba(255, 235, 183, 0.38), transparent 42%);
-      padding: 12px 13px;
+      padding: 15px 14px;
       box-shadow: 0 10px 22px rgba(74, 62, 42, 0.07);
     }
 
@@ -150,15 +150,17 @@
       font-size: 15px;
       font-weight: 700;
       line-height: 1.25;
+      text-align: center;
       white-space: nowrap;
     }
 
     .value {
       min-width: 0;
-      font-size: 19px;
+      font-size: 22px;
       line-height: 1.28;
       font-weight: 900;
       color: var(--ink);
+      text-align: center;
       overflow-wrap: anywhere;
     }
 
@@ -207,44 +209,24 @@
       font-style: italic;
     }
 
-    .change-list {
+    .reason-list {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
       margin-top: 16px;
     }
 
-    .change-item {
+    .reason-item {
       min-width: 0;
       border: 1px solid rgba(199, 155, 67, 0.34);
       border-radius: 12px;
       background:
         linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 247, 226, 0.56));
       padding: 12px 14px;
-    }
-
-    .change-op {
-      color: var(--rose);
-      font-size: 14px;
-      font-weight: 900;
-      line-height: 1.2;
-    }
-
-    .change-label {
-      margin-top: 6px;
-      color: var(--ink);
+      color: #765d28;
       font-size: 17px;
-      font-weight: 900;
-      line-height: 1.35;
-      overflow-wrap: anywhere;
-    }
-
-    .change-value {
-      margin-top: 4px;
-      color: var(--green);
-      font-size: 16px;
-      font-weight: 900;
-      line-height: 1.25;
+      font-weight: 700;
+      line-height: 1.45;
       overflow-wrap: anywhere;
     }
 
@@ -320,13 +302,6 @@
       border-radius: 50%;
     }
 
-    .progress-level {
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 800;
-      white-space: nowrap;
-    }
-
     .progress-xp {
       color: var(--green);
       font-size: 16px;
@@ -334,13 +309,6 @@
       white-space: nowrap;
     }
 
-    .effect-text {
-      color: #343932;
-      font-size: 17px;
-      font-weight: 700;
-      line-height: 1.52;
-      overflow-wrap: anywhere;
-    }
   </style>
 </head>
 <body>
@@ -398,17 +366,10 @@
       <div class="section-title">结算</div>
       <div class="text">{{ card.result }}</div>
       {% if reason %}
-      <div class="reason">{{ reason | join('；') }}</div>
-      {% endif %}
-      {% if change_items %}
-      <div class="change-list">
-        {% for item in change_items %}
-        <div class="change-item">
-          <div class="change-op">{{ item.op }}</div>
-          <div class="change-label">{{ item.label }}</div>
-          {% if item.value %}
-          <div class="change-value">{{ item.value }}</div>
-          {% endif %}
+      <div class="reason-list">
+        {% for item in reason %}
+        <div class="reason-item">
+          {{ item }}
         </div>
         {% endfor %}
       </div>
@@ -426,11 +387,9 @@
           <div class="progress-head">
             <div class="progress-name">
               <span>{{ item.label }}</span>
-              <span class="progress-level">{% if item.is_max %}Lv.Max{% else %}Lv.{{ item.level }}{% endif %}</span>
             </div>
-            <div class="progress-xp">效果</div>
+            <div class="progress-xp">{% if item.is_max %}Lv.Max{% else %}Lv.{{ item.level }}{% endif %}</div>
           </div>
-          <div class="effect-text">{{ item.effect or "暂无效果说明" }}</div>
         </div>
         {% endfor %}
       </div>
@@ -446,11 +405,9 @@
           <div class="progress-head">
             <div class="progress-name">
               <span>{{ item.label }}</span>
-              <span class="progress-level">{% if item.is_max %}Lv.Max{% else %}Lv.{{ item.level }}{% endif %}</span>
             </div>
-            <div class="progress-xp">效果</div>
+            <div class="progress-xp">{% if item.is_max %}Lv.Max{% else %}Lv.{{ item.level }}{% endif %}</div>
           </div>
-          <div class="effect-text">{{ item.effect or "暂无效果说明" }}</div>
         </div>
         {% endfor %}
       </div>

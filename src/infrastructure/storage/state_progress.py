@@ -21,7 +21,6 @@ class ProgressItem:
     value: int
     percent: int
     is_max: bool = False
-    effect: str = ""
 
 
 @dataclass(frozen=True)
@@ -228,7 +227,6 @@ def _with_label(item: ProgressItem, label: str, *, is_max: bool = False) -> Prog
         value=item.value,
         percent=item.percent,
         is_max=is_max,
-        effect=item.effect,
     )
 
 
