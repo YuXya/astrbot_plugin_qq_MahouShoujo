@@ -147,6 +147,11 @@
       white-space: pre-wrap;
     }
 
+    .speech-quote {
+      color: #c46d16;
+      font-weight: 900;
+    }
+
     .text {
       font-size: 23px;
       line-height: 1.5;
@@ -333,22 +338,22 @@
 
     <section class="section">
       <div class="section-title">{{ card.date_label }} / 行动</div>
-      <div class="text">{{ card.action }}</div>
+      <div class="text">{{ card.action | speech_quotes }}</div>
     </section>
 
     <section class="section">
       <div class="section-title">日记</div>
-      <div class="diary">{{ card.diary }}</div>
+      <div class="diary">{{ card.diary | speech_quotes }}</div>
     </section>
 
     <section class="section">
       <div class="section-title">遭遇</div>
-      <div class="text">{{ card.encounter }}</div>
+      <div class="text">{{ card.encounter | speech_quotes }}</div>
     </section>
 
     <section class="section">
       <div class="section-title">结算</div>
-      <div class="text">{{ card.result }}</div>
+      <div class="text">{{ card.result | speech_quotes }}</div>
       {% if reason %}
       <div class="reason">{{ reason | join('；') }}</div>
       {% endif %}

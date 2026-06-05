@@ -150,17 +150,45 @@ class SaveWebViewer:
         return self._html_response(
             "魔法少女登录",
             f"""
-            <section class="login-panel">
-              <h1>魔法少女网页登录</h1>
-              <p class="muted">请输入 QQ 号登录。</p>
-              {error_html}
-              <form method="post" action="{self._url('/login')}">
-                <label for="qq-id">QQ号</label>
-                <input id="qq-id" name="qq_id" type="text" autocomplete="username" autofocus>
-                <div class="actions">
-                  <button type="submit">登录</button>
+            <section class="login-shell" aria-label="魔法少女网页登录">
+              <div class="sparkles" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <div class="login-panel">
+                <div class="login-badge" aria-hidden="true">
+                  <span class="badge-star">✦</span>
                 </div>
-              </form>
+                <p class="login-kicker">Mahou Shoujo Portal</p>
+                <h1>魔法少女网页登录</h1>
+                <p class="login-copy">输入 QQ 号，唤醒你的契约档案，让星光为你展开下一页冒险。</p>
+                {error_html}
+                <form method="post" action="{self._url('/login')}">
+                  <label for="qq-id">契约者 QQ 号</label>
+                  <div class="magic-input">
+                    <span aria-hidden="true">☾</span>
+                    <input id="qq-id" name="qq_id" type="text" autocomplete="username" autofocus placeholder="在星光中输入 QQ 号">
+                  </div>
+                  <div class="actions login-actions">
+                    <button class="login-button" type="submit">开启魔法档案</button>
+                  </div>
+                </form>
+                <div class="login-runes" aria-hidden="true">
+                  <span>星愿</span><span>守护</span><span>契约</span>
+                </div>
+              </div>
+              <div class="login-vision" aria-hidden="true">
+                <div class="moon"></div>
+                <div class="magic-circle">
+                  <div class="circle-core">✧</div>
+                  <span class="orbit orbit-one"></span>
+                  <span class="orbit orbit-two"></span>
+                  <span class="orbit orbit-three"></span>
+                </div>
+                <div class="wand">
+                  <span class="wand-star">✦</span>
+                  <span class="wand-stick"></span>
+                </div>
+              </div>
             </section>
             """,
             status=status,
@@ -2845,7 +2873,53 @@ class SaveWebViewer:
     .actions {{ display: flex; gap: 10px; align-items: center; }}
     .inline-label {{ display: inline; margin: 0; }}
     .error {{ color: #b42318; font-weight: 700; }}
-    .login-panel {{ max-width: 420px; margin: 12vh auto 0; padding: 24px; border: 1px solid #dde2ea; border-radius: 8px; background: #fff; box-shadow: 0 10px 24px rgba(31, 41, 55, 0.06); }}
+    main:has(.login-shell) {{ width: 100%; max-width: none; min-height: 100vh; box-sizing: border-box; padding: 0; overflow: hidden; }}
+    main:has(.login-shell) .topbar {{ display: none; }}
+    .login-shell {{ position: relative; min-height: 100vh; display: grid; grid-template-columns: minmax(320px, 480px) minmax(320px, 1fr); align-items: center; gap: 42px; padding: 46px clamp(22px, 6vw, 86px); box-sizing: border-box; overflow: hidden; background: radial-gradient(circle at 18% 16%, rgba(255, 247, 177, .96) 0 6%, transparent 19%), radial-gradient(circle at 82% 22%, rgba(169, 236, 255, .76) 0 7%, transparent 20%), radial-gradient(circle at 74% 76%, rgba(255, 156, 208, .5) 0 10%, transparent 24%), linear-gradient(135deg, #fff5fb 0%, #fee3f2 28%, #dff6ff 62%, #fff8c9 100%); color: #42233f; isolation: isolate; }}
+    .login-shell::before {{ content: ""; position: absolute; inset: -18%; z-index: -2; background-image: linear-gradient(rgba(255,255,255,.58) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.46) 1px, transparent 1px); background-size: 44px 44px; transform: rotate(-9deg); mask-image: radial-gradient(circle at 50% 50%, #000 0 58%, transparent 76%); }}
+    .login-shell::after {{ content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 50% 42%, transparent 0 30%, rgba(255,255,255,.34) 31%, transparent 32%), radial-gradient(circle at 50% 42%, transparent 0 43%, rgba(255,255,255,.3) 44%, transparent 45%), radial-gradient(circle at 50% 42%, transparent 0 55%, rgba(255,255,255,.22) 56%, transparent 57%); opacity: .9; }}
+    .sparkles {{ position: absolute; inset: 0; pointer-events: none; }}
+    .sparkles span {{ position: absolute; width: 8px; height: 8px; background: #fff; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); filter: drop-shadow(0 0 8px rgba(255, 106, 180, .72)); opacity: .9; animation: twinkle 2.8s ease-in-out infinite; }}
+    .sparkles span:nth-child(1) {{ left: 10%; top: 18%; transform: scale(1.6); }}
+    .sparkles span:nth-child(2) {{ left: 42%; top: 12%; animation-delay: .4s; }}
+    .sparkles span:nth-child(3) {{ left: 83%; top: 15%; transform: scale(2); animation-delay: .9s; }}
+    .sparkles span:nth-child(4) {{ left: 64%; top: 72%; transform: scale(1.4); animation-delay: 1.2s; }}
+    .sparkles span:nth-child(5) {{ left: 17%; top: 78%; transform: scale(1.1); animation-delay: 1.7s; }}
+    .sparkles span:nth-child(6) {{ left: 92%; top: 58%; transform: scale(1.3); animation-delay: 2.1s; }}
+    .login-panel {{ position: relative; z-index: 2; max-width: 480px; margin: 0; padding: 34px; border: 2px solid rgba(255, 255, 255, .76); border-radius: 8px; background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,246,252,.84)); box-shadow: 0 28px 70px rgba(167, 76, 146, .24), inset 0 0 0 1px rgba(255, 156, 208, .25); backdrop-filter: blur(18px); }}
+    .login-panel::before {{ content: ""; position: absolute; inset: 10px; border: 1px dashed rgba(231, 104, 178, .45); border-radius: 8px; pointer-events: none; }}
+    .login-badge {{ width: 82px; height: 82px; display: grid; place-items: center; margin-bottom: 18px; border: 2px solid rgba(255,255,255,.82); border-radius: 50%; background: conic-gradient(from 18deg, #ff73b7, #ffd66b, #8fe8ff, #b896ff, #ff73b7); box-shadow: 0 14px 30px rgba(255, 104, 181, .34), inset 0 0 0 8px rgba(255,255,255,.5); color: #fff; font-size: 38px; text-shadow: 0 2px 10px rgba(128, 35, 119, .42); }}
+    .badge-star {{ display: inline-block; transform: translateY(-1px); }}
+    .login-kicker {{ margin: 0 0 7px; color: #cc4e98; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .14em; }}
+    .login-panel h1 {{ margin: 0 0 10px; color: #652052; font-size: clamp(31px, 4.6vw, 48px); line-height: 1.05; text-shadow: 0 2px 0 #fff, 0 12px 28px rgba(209, 70, 150, .18); }}
+    .login-copy {{ max-width: 35em; margin: 0 0 20px; color: #694260; line-height: 1.75; }}
+    .login-panel label {{ margin: 18px 0 9px; color: #743063; font-size: 14px; }}
+    .magic-input {{ display: grid; grid-template-columns: 42px 1fr; align-items: center; border: 1px solid rgba(219, 83, 165, .42); border-radius: 8px; background: rgba(255,255,255,.84); box-shadow: inset 0 0 0 1px rgba(255,255,255,.7), 0 12px 28px rgba(196, 77, 156, .12); overflow: hidden; }}
+    .magic-input span {{ display: grid; place-items: center; min-height: 48px; color: #d854a2; font-size: 22px; background: linear-gradient(180deg, rgba(255, 238, 248, .9), rgba(255, 255, 255, .45)); }}
+    .magic-input input[type="text"] {{ min-height: 48px; padding: 12px 14px 12px 0; border: 0; border-radius: 0; background: transparent; color: #4b2847; }}
+    .magic-input:focus-within {{ border-color: #ff66b3; box-shadow: 0 0 0 4px rgba(255, 102, 179, .18), 0 18px 36px rgba(196, 77, 156, .18); }}
+    .magic-input:focus-within input {{ box-shadow: none !important; }}
+    .login-actions {{ margin-top: 18px; }}
+    button.login-button {{ width: 100%; min-height: 50px; margin-top: 0; border: 1px solid rgba(255,255,255,.72); border-radius: 8px; background: linear-gradient(135deg, #ff5fae, #b56bff 52%, #45c9ee); box-shadow: 0 16px 32px rgba(180, 70, 176, .28), inset 0 1px 0 rgba(255,255,255,.42); color: #fff; font-size: 16px; text-shadow: 0 1px 8px rgba(89, 31, 116, .35); }}
+    button.login-button:hover {{ filter: brightness(1.04); transform: translateY(-1px); }}
+    .login-runes {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }}
+    .login-runes span {{ padding: 6px 10px; border: 1px solid rgba(209, 84, 162, .28); border-radius: 999px; background: rgba(255,255,255,.54); color: #9b3d82; font-size: 12px; font-weight: 800; }}
+    .login-panel .error {{ margin: 14px 0 0; padding: 10px 12px; border: 1px solid rgba(225, 71, 111, .3); border-radius: 8px; background: rgba(255, 239, 245, .86); color: #b42360; }}
+    .login-vision {{ position: relative; z-index: 1; min-height: 560px; display: grid; place-items: center; }}
+    .moon {{ position: absolute; right: 11%; top: 11%; width: 120px; height: 120px; border-radius: 50%; background: #fff9c9; box-shadow: 0 0 42px rgba(255, 247, 166, .9), inset -22px -8px 0 rgba(255, 210, 237, .75); }}
+    .magic-circle {{ position: relative; width: min(52vw, 520px); aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.74) 0 16%, transparent 17%), conic-gradient(from 0deg, rgba(255,102,179,.2), rgba(96,211,242,.24), rgba(255,216,103,.24), rgba(181,107,255,.22), rgba(255,102,179,.2)); box-shadow: 0 0 0 2px rgba(255,255,255,.72), 0 0 52px rgba(255, 93, 174, .33); }}
+    .magic-circle::before, .magic-circle::after {{ content: ""; position: absolute; inset: 12%; border-radius: 50%; border: 2px solid rgba(255,255,255,.75); box-shadow: inset 0 0 30px rgba(255, 255, 255, .35); }}
+    .magic-circle::after {{ inset: 25%; border-style: dashed; transform: rotate(24deg); }}
+    .circle-core {{ position: relative; z-index: 2; width: 132px; height: 132px; display: grid; place-items: center; border-radius: 50%; background: linear-gradient(135deg, #fff, #ffe4f2); color: #ff5fae; font-size: 68px; box-shadow: 0 20px 42px rgba(167, 76, 146, .24); }}
+    .orbit {{ position: absolute; border: 2px solid rgba(255,255,255,.62); border-radius: 50%; transform: rotate(var(--tilt)); }}
+    .orbit::before {{ content: "✦"; position: absolute; top: -14px; left: 50%; color: #fff; font-size: 22px; filter: drop-shadow(0 0 8px #ff69b4); }}
+    .orbit-one {{ --tilt: 18deg; width: 82%; height: 36%; }}
+    .orbit-two {{ --tilt: -31deg; width: 90%; height: 42%; }}
+    .orbit-three {{ --tilt: 68deg; width: 78%; height: 32%; }}
+    .wand {{ position: absolute; right: 7%; bottom: 16%; width: 250px; height: 250px; transform: rotate(-26deg); }}
+    .wand-star {{ position: absolute; right: 38px; top: 4px; color: #fff; font-size: 86px; line-height: 1; text-shadow: 0 0 18px #ff55af, 0 0 38px rgba(255, 214, 107, .9); }}
+    .wand-stick {{ position: absolute; right: 86px; top: 78px; width: 18px; height: 190px; border-radius: 999px; background: linear-gradient(180deg, #fff, #ffb8dc 48%, #8ee7ff); box-shadow: 0 12px 28px rgba(113, 66, 158, .22); }}
+    @keyframes twinkle {{ 0%, 100% {{ opacity: .4; transform: scale(.72) rotate(0deg); }} 50% {{ opacity: 1; transform: scale(1.35) rotate(28deg); }} }}
     .danger-zone {{ display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 16px 0 22px; padding: 14px 16px; border: 1px solid #f0b8b0; border-radius: 8px; background: #fff5f3; color: #6f1d15; }}
     .danger-zone span {{ color: #7a3b34; }}
     .world-book-toolbar {{ display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin: 16px 0 8px; padding: 10px 12px; border: 1px solid #d9e1eb; border-radius: 8px; background: rgba(255,255,255,0.86); box-shadow: 0 6px 14px rgba(31, 41, 55, 0.05); }}
@@ -2961,6 +3035,8 @@ class SaveWebViewer:
     @media (max-width: 560px) {{ .state-overview-grid {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .progress-list {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .profile-edit-grid {{ grid-template-columns: 1fr; }} }}
+    @media (max-width: 860px) {{ .login-shell {{ grid-template-columns: 1fr; align-items: start; gap: 18px; padding: 28px 18px 36px; }} .login-panel {{ max-width: 560px; margin: 0 auto; padding: 28px 22px; }} .login-vision {{ min-height: 310px; order: -1; }} .magic-circle {{ width: min(78vw, 340px); }} .moon {{ width: 78px; height: 78px; right: 7%; top: 5%; }} .wand {{ right: 0; bottom: 3%; transform: rotate(-32deg) scale(.72); transform-origin: bottom right; }} }}
+    @media (max-width: 480px) {{ .login-panel h1 {{ font-size: 32px; }} .login-copy {{ font-size: 14px; }} .login-vision {{ min-height: 250px; }} .login-badge {{ width: 68px; height: 68px; font-size: 31px; }} .magic-input {{ grid-template-columns: 38px 1fr; }} }}
     @media (max-width: 720px) {{ .world-entry-grid, .book-config-grid {{ grid-template-columns: 1fr; }} .world-book-toolbar {{ flex-direction: column; }} .world-entry-head {{ flex-wrap: wrap; }} .hero-card {{ align-items: flex-start; }} .log-card-head {{ flex-direction: column; }} }}
     pre {{ overflow: auto; padding: 14px; background: #111827; color: #d1e7dd; border-radius: 6px; line-height: 1.45; }}
   </style>
