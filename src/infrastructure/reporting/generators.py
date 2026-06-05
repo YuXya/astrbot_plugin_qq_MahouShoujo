@@ -80,6 +80,10 @@ class ReportGenerator(ICardGenerator):
             ),
             limit=8,
         )
+        skill_progress_items = [
+            item for item in progress_sections.skill_items
+            if item.label != "等级"
+        ]
         skill_progress_title = self.editable_manager.read_book_display_name(
             "skill_book/default.json",
             "技能&熟练度",
@@ -101,7 +105,7 @@ class ReportGenerator(ICardGenerator):
             battle_mode_label=battle_mode_label,
             monster_name=card.monster_name or "未知魔物",
             skill_progress_title=skill_progress_title,
-            skill_progress_items=progress_sections.skill_items,
+            skill_progress_items=skill_progress_items,
             status_progress_title=status_progress_title,
             status_progress_items=progress_sections.status_items,
             level_label=f"{level_display(card.state_snapshot)}级",

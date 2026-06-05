@@ -268,51 +268,46 @@
     }
 
     .progress-list {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 9px;
     }
 
     .progress-row {
-      min-width: 0;
+      flex: 0 1 auto;
+      max-width: 100%;
       border: 1px solid rgba(82, 121, 111, 0.22);
-      border-radius: 6px;
+      border-radius: 2px;
       background: rgba(255, 255, 255, 0.62);
-      padding: 13px 14px 14px;
+      padding: 9px 12px;
+      box-shadow: inset 3px 0 0 rgba(82, 121, 111, 0.28);
     }
 
     .progress-head {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
       align-items: baseline;
-      margin-bottom: 9px;
     }
 
     .progress-name {
       display: flex;
       align-items: baseline;
-      gap: 7px;
       min-width: 0;
       color: #263f37;
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 900;
       overflow-wrap: anywhere;
     }
 
     .progress-name::before {
-      content: "";
-      width: 15px;
-      height: 15px;
-      flex: 0 0 auto;
-      border: 3px solid rgba(82, 121, 111, 0.26);
-      border-top-color: var(--green);
-      border-radius: 50%;
+      content: none;
     }
 
     .progress-xp {
       color: var(--green);
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 900;
       white-space: nowrap;
     }
