@@ -36,6 +36,10 @@ class EditableResourceManager:
         return self.root_dir / "status_book" / "default.json"
 
     @property
+    def fetish_book_path(self) -> Path:
+        return self.root_dir / "fetish_book" / "default.json"
+
+    @property
     def event_book_path(self) -> Path:
         return self.root_dir / "event_book" / "default.json"
 
@@ -135,6 +139,7 @@ class EditableResourceManager:
             "world_book/default.json",
             "skill_book/default.json",
             "status_book/default.json",
+            "fetish_book/default.json",
             "event_book/default.json",
             "monster_book/default.json",
         }:
@@ -162,6 +167,7 @@ class EditableResourceManager:
         return files
 
     def _ensure_defaults(self) -> None:
+        self._migrate_status_book_to_fetish_book()
         for relative, content in self._default_content_map().items():
             path = self._resolve(relative)
             if not path.exists():
@@ -173,11 +179,42 @@ class EditableResourceManager:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding="utf-8")
 
+    def _migrate_status_book_to_fetish_book(self) -> None:
+        status_path = self._resolve("status_book/default.json")
+        fetish_path = self._resolve("fetish_book/default.json")
+        if fetish_path.exists() or not status_path.exists():
+            return
+
+        try:
+            fetish_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(status_path, fetish_path)
+            self._backup(status_path)
+            status_path.write_text(defaults.STATUS_BOOK_DEFAULT, encoding="utf-8")
+
+            status_note_path = self._resolve(self._note_path("status_book/default.json"))
+            fetish_note_path = self._resolve(self._note_path("fetish_book/default.json"))
+            if status_note_path.exists() and not fetish_note_path.exists():
+                fetish_note_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(status_note_path, fetish_note_path)
+                self._backup(status_note_path)
+                status_note_path.write_text(
+                    self._default_note_map()["status_book/default.json"],
+                    encoding="utf-8",
+                )
+        except Exception as exc:
+            logger.warning(f"迁移状态书到性癖书失败: {exc}")
+
     def _editable_file_defs(self) -> list[dict[str, str]]:
         return [
             {
                 "id": "world_book/default.json",
                 "label": "世界书 default.json",
+                "type": "json",
+                "category": "world_background",
+            },
+            {
+                "id": "status_book/default.json",
+                "label": "状态书 default.json",
                 "type": "json",
                 "category": "world_background",
             },
@@ -188,8 +225,8 @@ class EditableResourceManager:
                 "category": "world_background",
             },
             {
-                "id": "status_book/default.json",
-                "label": "状态书 default.json",
+                "id": "fetish_book/default.json",
+                "label": "性癖书 default.json",
                 "type": "json",
                 "category": "world_background",
             },
@@ -230,6 +267,7 @@ class EditableResourceManager:
             "world_book/default.json": defaults.WORLD_BOOK_DEFAULT,
             "skill_book/default.json": defaults.SKILL_BOOK_DEFAULT,
             "status_book/default.json": defaults.STATUS_BOOK_DEFAULT,
+            "fetish_book/default.json": defaults.FETISH_BOOK_DEFAULT,
             "event_book/default.json": defaults.EVENT_BOOK_DEFAULT,
             "monster_book/default.json": defaults.MONSTER_BOOK_DEFAULT,
             self.PROMPT_FILES["reincarnation_prompt"]: defaults.REINCARNATION_PROMPT,
@@ -249,10 +287,14 @@ class EditableResourceManager:
                 "命中条目后把技能说明注入 Prompt。base_path 是给 AI 输出 update.changes 的路径提示。"
             ),
             "status_book/default.json": (
-                "状态书文件。条目标题代表全部可觉醒状态，content 是简单介绍，level_descriptions 是 Lv.1 到 Lv.Max"
-                " 的分级效果。已拥有状态只会注入简介和当前等级效果；\u201c总是注入\u201d的已拥有状态每次都会注入，"
-                "未拥有时会在待觉醒列表附带简单介绍。"
-                "状态最高 Lv.5；base_path 是给 AI 输出 update.changes 的路径提示。"
+                "状态书文件。结构、触发方式和注入逻辑与世界书一致；条目命中后作为状态相关补充设定注入。"
+                "visible_levels 为可见主角等级，数字 1-7 对应 F、E、D、C、B、A、S；未填写时默认全部可见。"
+            ),
+            "fetish_book/default.json": (
+                "性癖书文件。条目标题代表全部可开发性癖，content 是简单介绍，level_descriptions 是 Lv.1 到 Lv.Max"
+                " 的分级效果。已拥有性癖只会注入简介和当前等级效果；\u201c总是注入\u201d的已拥有性癖每次都会注入，"
+                "未拥有时会在待开发列表附带简单介绍。"
+                "性癖最高 Lv.5；base_path 是给 AI 输出 update.changes 的路径提示。"
             ),
             "event_book/default.json": (
                 "事件书文件。按 /魔法少女转生、/魔法少女战斗、/魔法少女日常 分组。"
@@ -267,7 +309,7 @@ class EditableResourceManager:
             self.PROMPT_FILES["reincarnation_prompt"]: (
                 "用于 /魔法少女转生 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
                 "可用变量：{{theme}}（触发命令+玩家偏好）、{{player_text}}（目标群友昵称或ID）、"
-                "{{supplement_text}}（世界书+事件书命中的补充设定，未命中时为空）。"
+                "{{supplement_text}}（世界书+状态书+事件书命中的补充设定，未命中时为空）。"
             ),
             self.PROMPT_FILES["battle_diary_prompt"]: (
                 "用于 /魔法少女战斗 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
@@ -275,7 +317,7 @@ class EditableResourceManager:
                 "（来自玩家当前人物卡，包含全部属性和状态，用于第一人称人格设定和状态参考）；"
                 "{{player_name}}、{{current_level}}（字母等级 F/E/D/C/B/A/S）、"
                 "{{logs_text}}、{{cameo_memories_text}}、{{current_world_date}}、{{action}}、"
-                "{{supplement_text}}（世界书+事件书+技能书+状态书命中的补充设定，未命中时为空）、"
+                "{{supplement_text}}（世界书+状态书+事件书+技能书+性癖书命中的补充设定，未命中时为空）、"
                 "{{teammates_json}}（命中其他存档角色名时的队友公开字段 JSON；未命中时为空数组）。"
             ),
             self.PROMPT_FILES["default_system_prompt"]: (

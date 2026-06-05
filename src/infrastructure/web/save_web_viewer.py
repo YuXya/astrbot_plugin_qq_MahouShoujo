@@ -379,7 +379,7 @@ class SaveWebViewer:
             f"""
             <h1>{self._e(title)}</h1>
             <p><a href="{self._url('/')}">返回存档列表</a></p>
-            <p class="muted">保存时会自动备份旧文件。世界书、技能书和状态书 default.json 会先做 JSON 校验。</p>
+            <p class="muted">保存时会自动备份旧文件。世界书、状态书、技能书、性癖书、事件书和魔物书 default.json 会先做 JSON 校验。</p>
             {self._editable_table(description, rows)}
             """,
         )
@@ -491,7 +491,7 @@ class SaveWebViewer:
             )
 
         book_json = self._json_script_data(book)
-        is_change_book = file_id in {"skill_book/default.json", "status_book/default.json"}
+        is_change_book = file_id in {"skill_book/default.json", "fetish_book/default.json"}
         base_path_block = (
             f"""
               <div class="book-config-grid">
@@ -512,6 +512,8 @@ class SaveWebViewer:
         book_title = (
             "技能书条目"
             if file_id == "skill_book/default.json"
+            else "性癖书条目"
+            if file_id == "fetish_book/default.json"
             else "状态书条目"
             if file_id == "status_book/default.json"
             else "世界书条目"
@@ -519,7 +521,9 @@ class SaveWebViewer:
         book_hint = (
             "每个条目会在命中后作为技能说明注入 Prompt。可见等级用 F、E、D、C、B、A、S 多选控制，默认全部可见。"
             if file_id == "skill_book/default.json"
-            else '条目标题代表可觉醒状态；content 是简单介绍，Lv.1 到 Lv.Max 分别填写当前等级效果。已拥有状态只注入简介和当前等级效果；"总是注入"的已拥有状态每次都会注入，未拥有时会在待觉醒列表附带简单介绍。状态最高 Lv.5；可见等级用 F、E、D、C、B、A、S 多选控制。'
+            else '条目标题代表可开发性癖；content 是简单介绍，Lv.1 到 Lv.Max 分别填写当前等级效果。已拥有性癖只注入简介和当前等级效果；"总是注入"的已拥有性癖每次都会注入，未拥有时会在待开发列表附带简单介绍。性癖最高 Lv.5；可见等级用 F、E、D、C、B、A、S 多选控制。'
+            if file_id == "fetish_book/default.json"
+            else "每个条目会在命中后作为状态补充设定注入 Prompt。可见等级用 F、E、D、C、B、A、S 多选控制，默认全部可见。"
             if file_id == "status_book/default.json"
             else "每个条目会在命中后作为世界背景补充注入 Prompt。可见等级用 F、E、D、C、B、A、S 多选控制，默认全部可见。"
         )
@@ -581,7 +585,7 @@ class SaveWebViewer:
               const contentInput = document.getElementById("world-book-content");
               const displayNameInput = document.getElementById("book-display-name");
               const basePathInput = document.getElementById("book-base-path");
-              const isStatusBook = {str(file_id == "status_book/default.json").lower()};
+              const isStatusBook = {str(file_id == "fetish_book/default.json").lower()};
               const levelOptions = [
                 {{ value: 1, label: "F" }},
                 {{ value: 2, label: "E" }},
@@ -1932,7 +1936,7 @@ class SaveWebViewer:
             )
             if not content and not level_descriptions:
                 continue
-            if file_id == "status_book/default.json":
+            if file_id == "fetish_book/default.json":
                 lines = [title]
                 if content:
                     lines.append(f"简介：{content}")
@@ -2066,8 +2070,8 @@ class SaveWebViewer:
     def _default_book_display_name(file_id: str) -> str:
         if file_id == "skill_book/default.json":
             return "技能&熟练度"
-        if file_id == "status_book/default.json":
-            return "特殊状态"
+        if file_id == "fetish_book/default.json":
+            return "性癖开发"
         return ""
 
     @staticmethod
@@ -2210,9 +2214,11 @@ class SaveWebViewer:
                 json.loads(content)
                 self.editable_manager.write_world_book(content)
             elif file_id in {
-                "skill_book/default.json",
                 "status_book/default.json",
+                "skill_book/default.json",
+                "fetish_book/default.json",
                 "event_book/default.json",
+                "monster_book/default.json",
             }:
                 self.editable_manager.write_json_book(file_id, content)
             else:
@@ -2949,7 +2955,7 @@ class SaveWebViewer:
                 "/主角/技能/",
             ),
             self.editable_manager.read_book_base_path(
-                "status_book/default.json",
+                "fetish_book/default.json",
                 "/主角/快感状态/性癖/",
             ),
             limit=16,
@@ -2959,8 +2965,8 @@ class SaveWebViewer:
             "技能&熟练度",
         )
         status_title = self.editable_manager.read_book_display_name(
-            "status_book/default.json",
-            "特殊状态",
+            "fetish_book/default.json",
+            "性癖开发",
         )
         return (
             self._progress_panel_html(skill_title, sections.skill_items)
@@ -3499,8 +3505,9 @@ class SaveWebViewer:
     def _is_structured_book_file(file_id: str) -> bool:
         return file_id in {
             "world_book/default.json",
-            "skill_book/default.json",
             "status_book/default.json",
+            "skill_book/default.json",
+            "fetish_book/default.json",
             "event_book/default.json",
             "monster_book/default.json",
         }

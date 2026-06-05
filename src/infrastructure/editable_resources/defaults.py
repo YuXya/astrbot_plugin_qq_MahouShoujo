@@ -30,6 +30,8 @@ SKILL_BOOK_DEFAULT = _load_book("skill_book.json")
 
 STATUS_BOOK_DEFAULT = _load_book("status_book.json")
 
+FETISH_BOOK_DEFAULT = _load_book("fetish_book.json")
+
 EVENT_BOOK_DEFAULT = _load_book("event_book.json")
 
 MONSTER_BOOK_DEFAULT = _load_book("monster_book.json")

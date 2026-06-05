@@ -75,7 +75,7 @@ class ReportGenerator(ICardGenerator):
                 "/主角/技能/",
             ),
             self.editable_manager.read_book_base_path(
-                "status_book/default.json",
+                "fetish_book/default.json",
                 "/主角/快感状态/性癖/",
             ),
             limit=8,
@@ -85,7 +85,7 @@ class ReportGenerator(ICardGenerator):
             "技能&熟练度",
         )
         status_progress_title = self.editable_manager.read_book_display_name(
-            "status_book/default.json",
+            "fetish_book/default.json",
             "特殊状态",
         )
         participants = [str(name).strip() for name in card.participants if str(name).strip()]

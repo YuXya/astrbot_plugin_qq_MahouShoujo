@@ -1615,7 +1615,7 @@ class PlayerSaveRepository:
         editable_manager = getattr(self, "editable_manager", None)
         if editable_manager is not None:
             base_path = editable_manager.read_book_base_path(
-                "status_book/default.json",
+                "fetish_book/default.json",
                 fallback,
             )
         else:

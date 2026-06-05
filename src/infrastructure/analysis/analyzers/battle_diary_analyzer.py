@@ -29,6 +29,11 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         super().__init__(context, config_manager, editable_manager)
         self.domain_service = domain_service
         self.world_book_engine = WorldBookEngine(editable_manager=self.editable_manager)
+        self.status_book_engine = WorldBookEngine(
+            book_path=self.editable_manager.status_book_path,
+            editable_manager=self.editable_manager,
+            display_name="状态书",
+        )
         self.event_book_engine = EventBookEngine(editable_manager=self.editable_manager)
         self.change_book_engine = ChangeBookEngine(editable_manager=self.editable_manager)
 
@@ -128,8 +133,11 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             action,
             self._format_logs_for_scan(logs),
         ]
-        # --- 世界书与事件书交叉递归 ---
+        # --- 世界书、状态书与事件书交叉递归 ---
         world_book_result = self.world_book_engine.build_prompt_text(
+            scan_parts, player_level=current_level,
+        )
+        status_book_result = self.status_book_engine.build_prompt_text(
             scan_parts, player_level=current_level,
         )
         event_book_result = self.event_book_engine.build_prompt_text(
@@ -138,7 +146,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             player_level=current_level,
         )
         cross_hit_parts: list[str] = []
-        for entry in world_book_result.entries:
+        for entry in world_book_result.entries + status_book_result.entries:
             if entry.recursive and entry.content:
                 cross_hit_parts.append(entry.content)
         for entry in event_book_result.local_entries + event_book_result.remote_entries:
@@ -149,6 +157,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             world_book_result = self.world_book_engine.build_prompt_text(
                 enriched_scan_parts, player_level=current_level,
             )
+            status_book_result = self.status_book_engine.build_prompt_text(
+                enriched_scan_parts, player_level=current_level,
+            )
             event_book_result = self.event_book_engine.build_prompt_text(
                 enriched_scan_parts,
                 current_event="/魔法少女战斗",
@@ -156,16 +167,18 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             )
 
         world_book_text = world_book_result.prompt_text
+        status_book_text = status_book_result.prompt_text
         event_book_text = event_book_result.prompt_text
         supplement_text = self._join_optional_prompt_parts(
             [
                 world_book_text,
+                status_book_text,
                 event_book_text,
                 self.change_book_engine.build_skill_prompt_text(
                     enriched_scan_parts if cross_hit_parts else scan_parts,
                     player_level=current_level,
                 ),
-                self.change_book_engine.build_status_prompt_text(
+                self.change_book_engine.build_fetish_prompt_text(
                     protagonist, player_level=current_level,
                 ),
             ]
