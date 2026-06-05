@@ -39,6 +39,10 @@ class EditableResourceManager:
     def event_book_path(self) -> Path:
         return self.root_dir / "event_book" / "default.json"
 
+    @property
+    def monster_book_path(self) -> Path:
+        return self.root_dir / "monster_book" / "default.json"
+
     def get_prompt(self, name: str) -> str:
         relative = self.PROMPT_FILES[name]
         return self.read_text(relative)
@@ -132,6 +136,7 @@ class EditableResourceManager:
             "skill_book/default.json",
             "status_book/default.json",
             "event_book/default.json",
+            "monster_book/default.json",
         }:
             json.loads(content)
         self.write_text(relative_path, content)
@@ -195,6 +200,12 @@ class EditableResourceManager:
                 "category": "world_background",
             },
             {
+                "id": "monster_book/default.json",
+                "label": "魔物书 default.json",
+                "type": "json",
+                "category": "world_background",
+            },
+            {
                 "id": self.PROMPT_FILES["reincarnation_prompt"],
                 "label": "转生卡 Prompt",
                 "type": "text",
@@ -220,6 +231,7 @@ class EditableResourceManager:
             "skill_book/default.json": defaults.SKILL_BOOK_DEFAULT,
             "status_book/default.json": defaults.STATUS_BOOK_DEFAULT,
             "event_book/default.json": defaults.EVENT_BOOK_DEFAULT,
+            "monster_book/default.json": defaults.MONSTER_BOOK_DEFAULT,
             self.PROMPT_FILES["reincarnation_prompt"]: defaults.REINCARNATION_PROMPT,
             self.PROMPT_FILES["battle_diary_prompt"]: defaults.BATTLE_DIARY_PROMPT,
             self.PROMPT_FILES["default_system_prompt"]: defaults.DEFAULT_SYSTEM_PROMPT,
@@ -246,6 +258,11 @@ class EditableResourceManager:
                 "事件书文件。按 /魔法少女转生、/魔法少女战斗、/魔法少女日常 分组。"
                 "当前事件内关键词命中或 always 条目会注入详细介绍；其他事件只在关键词命中且简略介绍不为空时注入简略介绍。"
                 "visible_levels 为可见主角等级，数字 1-7 对应 F、E、D、C、B、A、S；未填写时默认全部可见。排序由网页上的上下位置决定。"
+            ),
+            "monster_book/default.json": (
+                "魔物书文件。这里只负责填写和保存魔物设定，不会自动注入任何 Prompt。"
+                "每个魔物包含 ID、魔物名、可见等级、魔物等级、关键词、通用简单设定、通用详细设定；"
+                "每个已选择的魔物等级都可以单独填写简单设定和详细设定，留空时读取方应回退到通用设定。"
             ),
             self.PROMPT_FILES["reincarnation_prompt"]: (
                 "用于 /魔法少女转生 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"

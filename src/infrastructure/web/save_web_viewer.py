@@ -398,6 +398,14 @@ class SaveWebViewer:
         label = meta.get("label", file_id) if meta else file_id
         title = f"编辑 {label}"
         if self._is_structured_book_file(file_id):
+            if file_id == "monster_book/default.json":
+                return self._monster_book_file_response(
+                    title,
+                    file_id,
+                    back_category,
+                    note,
+                    content,
+                )
             if file_id == "event_book/default.json":
                 return self._event_book_file_response(
                     title,
@@ -928,6 +936,359 @@ class SaveWebViewer:
             """,
         )
 
+    def _monster_book_file_response(
+        self,
+        title: str,
+        file_id: str,
+        back_category: str,
+        note: str,
+        content: str,
+    ) -> web.Response:
+        try:
+            book = self._normalize_monster_book(json.loads(content))
+        except Exception as exc:
+            return self._plain_editable_file_response(
+                title,
+                file_id,
+                back_category,
+                note,
+                content,
+                warning=f"魔物书 JSON 解析失败，请先修复源码 JSON：{exc}",
+            )
+
+        book_json = self._json_script_data(book)
+        storage_key = "qq_mahoushoujo:monster_book:open_entries"
+        source_url = self._url(
+            f"/editable/source?id={quote(file_id, safe='')}&category={self._e(back_category)}"
+        )
+        export_url = self._url(f"/editable/export?id={quote(file_id, safe='')}")
+        return self._html_response(
+            title,
+            f"""
+            <h1>{self._e(title)}</h1>
+            <p><a href="{self._url(f'/editable?category={self._e(back_category)}')}">返回{self._e(self._editable_category_title(back_category))}</a></p>
+            <p class="muted">{self._e(file_id)}</p>
+            <p class="muted">魔物书只负责编辑和保存 JSON，不会自动参与当前项目的 Prompt 或战斗逻辑。等级覆盖设定留空时，读取方应使用通用设定。</p>
+            <div class="source-actions">
+              <a class="button-link secondary-link" href="{source_url}">编辑源码</a>
+              <a class="button-link secondary-link" href="{export_url}">导出 JSON</a>
+              <form class="inline-import-form" method="post" action="{self._url('/editable/import')}" enctype="multipart/form-data">
+                <input type="hidden" name="id" value="{self._e(file_id)}">
+                <input type="hidden" name="category" value="{self._e(back_category)}">
+                <input name="import_file" type="file" accept=".json,application/json">
+                <button class="secondary compact-button" type="submit">导入 JSON</button>
+              </form>
+            </div>
+            <form id="monster-book-form" method="post" action="{self._url('/editable/save')}">
+              <input type="hidden" name="id" value="{self._e(file_id)}">
+              <input type="hidden" name="category" value="{self._e(back_category)}">
+              <input id="monster-book-content" type="hidden" name="content" value="">
+              <label for="note">资源说明 / 注释</label>
+              <textarea id="note" class="note-editor" name="note" spellcheck="false">{self._e(note)}</textarea>
+              <div class="world-book-toolbar">
+                <div>
+                  <h2>魔物列表</h2>
+                  <p class="muted">创建魔物，选择可见等级和魔物等级；每个魔物等级可填写单独的简单设定和详细设定。</p>
+                </div>
+                <button id="add-monster" type="button">+ 添加魔物</button>
+              </div>
+              <div id="monster-book-entries"></div>
+              <div class="actions">
+                <button type="submit">保存</button>
+              </div>
+            </form>
+            <form method="post" action="{self._url('/editable/reset')}" onsubmit="return confirm('确定恢复为当前代码内置默认内容？旧文件会先自动备份。');">
+              <input type="hidden" name="id" value="{self._e(file_id)}">
+              <input type="hidden" name="category" value="{self._e(back_category)}">
+              <button class="secondary" type="submit">恢复当前默认内容</button>
+            </form>
+            <script>
+              const initialMonsterBook = {book_json};
+              const monsterEntriesEl = document.getElementById("monster-book-entries");
+              const monsterForm = document.getElementById("monster-book-form");
+              const monsterContentInput = document.getElementById("monster-book-content");
+              const addMonsterButton = document.getElementById("add-monster");
+              const monsterStorageKey = "{self._e(storage_key)}";
+              const monsterLevelOptions = [
+                {{ value: 1, label: "F" }},
+                {{ value: 2, label: "E" }},
+                {{ value: 3, label: "D" }},
+                {{ value: 4, label: "C" }},
+                {{ value: 5, label: "B" }},
+                {{ value: 6, label: "A" }},
+                {{ value: 7, label: "S" }},
+              ];
+              const monsterState = {{
+                ...initialMonsterBook,
+                entries: Array.isArray(initialMonsterBook.entries) ? initialMonsterBook.entries : [],
+              }};
+              let monsterOpenKeys = new Set();
+              let monsterHasLoadedOpenState = false;
+
+              function monsterDefaults(index) {{
+                return {{
+                  id: `monster_${{index + 1}}`,
+                  name: "",
+                  visible_levels: monsterLevelOptions.map((item) => item.value),
+                  monster_levels: monsterLevelOptions.map((item) => item.value),
+                  keys: [],
+                  brief: "",
+                  content: "",
+                  level_settings: {{}},
+                }};
+              }}
+
+              function monsterNormalizeEntry(entry, index) {{
+                const keys = Array.isArray(entry.keys)
+                  ? entry.keys
+                  : (typeof entry.keys === "string" ? [entry.keys] : []);
+                const rawSettings = entry.level_settings && typeof entry.level_settings === "object"
+                  ? entry.level_settings
+                  : {{}};
+                const monsterLevels = monsterNormalizeLevels(entry.monster_levels, entry.min_monster_level, entry.max_monster_level);
+                const levelSettings = {{}};
+                monsterLevels.forEach((level) => {{
+                  const raw = rawSettings[String(level)] && typeof rawSettings[String(level)] === "object"
+                    ? rawSettings[String(level)]
+                    : {{}};
+                  levelSettings[String(level)] = {{
+                    brief: String(raw.brief || ""),
+                    content: String(raw.content || ""),
+                  }};
+                }});
+                return {{
+                  id: String(entry.id || `monster_${{index + 1}}`).trim(),
+                  name: String(entry.name || entry.title || ""),
+                  visible_levels: monsterNormalizeLevels(entry.visible_levels, entry.min_level, entry.max_level),
+                  monster_levels: monsterLevels,
+                  keys: keys.map((key) => String(key).trim()).filter(Boolean),
+                  brief: String(entry.brief || entry.summary || ""),
+                  content: String(entry.content || entry.detail || ""),
+                  level_settings: levelSettings,
+                }};
+              }}
+
+              function monsterNormalizeLevels(raw, minLevel, maxLevel) {{
+                let selected = [];
+                if (Array.isArray(raw)) {{
+                  selected = raw.map((level) => Number.parseInt(level, 10));
+                }} else if (typeof raw === "string" && raw.trim()) {{
+                  selected = raw.split(/[,，、\\s]+/).map((level) => {{
+                    const trimmed = String(level).trim().toUpperCase();
+                    const byLabel = monsterLevelOptions.find((item) => item.label === trimmed);
+                    return byLabel ? byLabel.value : Number.parseInt(trimmed, 10);
+                  }});
+                }} else {{
+                  const minValue = Number.parseInt(minLevel, 10);
+                  const maxValue = Number.parseInt(maxLevel, 10);
+                  const low = Number.isFinite(minValue) ? Math.max(1, Math.min(7, minValue)) : 1;
+                  const high = Number.isFinite(maxValue) ? Math.max(low, Math.min(7, maxValue)) : 7;
+                  selected = monsterLevelOptions.map((item) => item.value).filter((level) => level >= low && level <= high);
+                }}
+                const clean = monsterLevelOptions.map((item) => item.value).filter((level) => selected.includes(level));
+                return clean.length ? clean : monsterLevelOptions.map((item) => item.value);
+              }}
+
+              function monsterLevelsLabel(levels) {{
+                const normalized = monsterNormalizeLevels(levels);
+                if (normalized.length === monsterLevelOptions.length) return "F-S";
+                return normalized.map((level) => monsterLevelOptions.find((item) => item.value === level)?.label || String(level)).join("/");
+              }}
+
+              function monsterLevelInputs(field, levels) {{
+                const selected = new Set(monsterNormalizeLevels(levels));
+                return monsterLevelOptions.map((item) => `
+                  <label class="summary-check level-choice">
+                    <input data-field="${{field}}" type="checkbox" value="${{item.value}}"${{selected.has(item.value) ? " checked" : ""}}> ${{item.label}}
+                  </label>
+                `).join("");
+              }}
+
+              function monsterSplitKeys(value) {{
+                return String(value || "").split(/[\\n,，、]/).map((key) => key.trim()).filter(Boolean);
+              }}
+
+              function monsterSyncFromDom() {{
+                monsterState.entries = Array.from(monsterEntriesEl.querySelectorAll(".monster-entry")).map((card, index) => {{
+                  const monsterLevels = Array.from(card.querySelectorAll("[data-field='monster_level']:checked")).map((input) => Number.parseInt(input.value, 10));
+                  const levelSettings = {{}};
+                  monsterNormalizeLevels(monsterLevels).forEach((level) => {{
+                    const briefInput = card.querySelector(`[data-field='level_brief_${{level}}']`);
+                    const contentInput = card.querySelector(`[data-field='level_content_${{level}}']`);
+                    levelSettings[String(level)] = {{
+                      brief: briefInput ? briefInput.value : "",
+                      content: contentInput ? contentInput.value : "",
+                    }};
+                  }});
+                  return monsterNormalizeEntry({{
+                    id: card.querySelector("[data-field='id']").value,
+                    name: card.querySelector("[data-field='name']").value,
+                    visible_levels: Array.from(card.querySelectorAll("[data-field='visible_level']:checked")).map((input) => Number.parseInt(input.value, 10)),
+                    monster_levels: monsterLevels,
+                    keys: monsterSplitKeys(card.querySelector("[data-field='keys']").value),
+                    brief: card.querySelector("[data-field='brief']").value,
+                    content: card.querySelector("[data-field='content']").value,
+                    level_settings: levelSettings,
+                  }}, index);
+                }});
+              }}
+
+              function monsterEntryKey(entry, index) {{
+                return String(entry.id || entry.name || `monster_${{index + 1}}`).trim();
+              }}
+
+              function monsterLoadOpenState() {{
+                try {{
+                  const raw = localStorage.getItem(monsterStorageKey);
+                  if (!raw) return;
+                  const data = JSON.parse(raw);
+                  if (data && Array.isArray(data.openKeys)) {{
+                    monsterOpenKeys = new Set(data.openKeys.map(String));
+                    monsterHasLoadedOpenState = true;
+                  }}
+                }} catch (error) {{
+                  console.warn("failed to load monster book open state", error);
+                }}
+              }}
+
+              function monsterPersistOpenState() {{
+                try {{
+                  localStorage.setItem(monsterStorageKey, JSON.stringify({{ openKeys: Array.from(monsterOpenKeys) }}));
+                }} catch (error) {{
+                  console.warn("failed to save monster book open state", error);
+                }}
+              }}
+
+              function monsterCaptureOpenState() {{
+                monsterOpenKeys = new Set();
+                monsterEntriesEl.querySelectorAll(".monster-entry").forEach((card) => {{
+                  const details = card.querySelector("details");
+                  if (card.dataset.entryKey && details && details.open) monsterOpenKeys.add(card.dataset.entryKey);
+                }});
+                monsterHasLoadedOpenState = true;
+                monsterPersistOpenState();
+              }}
+
+              function monsterRenderEntries() {{
+                monsterEntriesEl.innerHTML = "";
+                monsterState.entries.forEach((entry, index) => {{
+                  const normalized = monsterNormalizeEntry(entry, index);
+                  const entryKey = monsterEntryKey(normalized, index);
+                  const isOpen = monsterHasLoadedOpenState && monsterOpenKeys.has(entryKey);
+                  const card = document.createElement("section");
+                  card.className = "world-entry monster-entry";
+                  card.dataset.entryKey = entryKey;
+                  const levelFields = normalized.monster_levels.map((level) => {{
+                    const label = monsterLevelOptions.find((item) => item.value === level)?.label || String(level);
+                    const setting = normalized.level_settings[String(level)] || {{ brief: "", content: "" }};
+                    return `
+                      <div class="monster-level-block">
+                        <h3>${{label}} 级魔物设定</h3>
+                        <label class="block-field">简单设定（留空使用通用简单设定）
+                          <textarea data-field="level_brief_${{level}}" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(setting.brief || "")}}</textarea>
+                        </label>
+                        <label class="block-field">详细设定（留空使用通用详细设定）
+                          <textarea data-field="level_content_${{level}}" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(setting.content || "")}}</textarea>
+                        </label>
+                      </div>
+                    `;
+                  }}).join("");
+                  const summaryTitle = normalized.name || normalized.id || `魔物 ${{index + 1}}`;
+                  card.innerHTML = `
+                    <details${{isOpen ? " open" : ""}}>
+                      <summary class="world-entry-head">
+                        <span class="entry-title">${{monsterEscapeHtml(summaryTitle)}}</span>
+                        <span class="muted" style="margin-left:4px">可见 ${{monsterLevelsLabel(normalized.visible_levels)}} / 魔物 ${{monsterLevelsLabel(normalized.monster_levels)}}</span>
+                        <button class="danger" type="button" data-action="delete">删除</button>
+                      </summary>
+                      <div class="world-entry-body">
+                        <div class="world-entry-grid">
+                          <label class="compact-field"><span>ID</span><input data-field="id" type="text" value="${{monsterEscapeAttr(normalized.id)}}"></label>
+                          <label class="compact-field title-field"><span>魔物名</span><input data-field="name" type="text" value="${{monsterEscapeAttr(normalized.name)}}"></label>
+                          <div class="compact-field level-field"><span>可见等级</span><div class="level-choice-row">${{monsterLevelInputs("visible_level", normalized.visible_levels)}}</div></div>
+                          <div class="compact-field level-field"><span>魔物等级</span><div class="level-choice-row">${{monsterLevelInputs("monster_level", normalized.monster_levels)}}</div></div>
+                        </div>
+                        <label class="block-field">关键词（支持中文逗号、英文逗号、顿号或换行分隔）
+                          <textarea data-field="keys" class="keys-editor" spellcheck="false">${{monsterEscapeHtml(normalized.keys.join("\\n"))}}</textarea>
+                        </label>
+                        <label class="block-field">通用简单设定
+                          <textarea data-field="brief" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(normalized.brief)}}</textarea>
+                        </label>
+                        <label class="block-field">通用详细设定
+                          <textarea data-field="content" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(normalized.content)}}</textarea>
+                        </label>
+                        <div class="monster-level-settings">${{levelFields}}</div>
+                      </div>
+                    </details>
+                  `;
+                  const detailsEl = card.querySelector("details");
+                  detailsEl.addEventListener("toggle", () => {{
+                    if (detailsEl.open) monsterOpenKeys.add(entryKey);
+                    else monsterOpenKeys.delete(entryKey);
+                    monsterHasLoadedOpenState = true;
+                    monsterPersistOpenState();
+                  }});
+                  card.querySelector("[data-action='delete']").addEventListener("click", (event) => {{
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (!confirm("确定删除这个魔物？")) return;
+                    monsterCaptureOpenState();
+                    monsterSyncFromDom();
+                    monsterState.entries.splice(index, 1);
+                    monsterOpenKeys.delete(entryKey);
+                    monsterPersistOpenState();
+                    monsterRenderEntries();
+                  }});
+                  const refreshTitle = () => {{
+                    card.querySelector(".entry-title").textContent =
+                      card.querySelector("[data-field='name']").value.trim()
+                      || card.querySelector("[data-field='id']").value.trim()
+                      || `魔物 ${{index + 1}}`;
+                  }};
+                  card.querySelector("[data-field='name']").addEventListener("input", refreshTitle);
+                  card.querySelector("[data-field='id']").addEventListener("input", refreshTitle);
+                  card.querySelectorAll("[data-field='monster_level']").forEach((input) => {{
+                    input.addEventListener("change", () => {{
+                      monsterCaptureOpenState();
+                      monsterSyncFromDom();
+                      monsterRenderEntries();
+                    }});
+                  }});
+                  monsterEntriesEl.appendChild(card);
+                }});
+              }}
+
+              function monsterEscapeHtml(value) {{
+                return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+              }}
+
+              function monsterEscapeAttr(value) {{
+                return monsterEscapeHtml(value).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+              }}
+
+              addMonsterButton.addEventListener("click", () => {{
+                monsterCaptureOpenState();
+                monsterSyncFromDom();
+                const newEntry = monsterDefaults(monsterState.entries.length);
+                monsterState.entries.push(newEntry);
+                monsterOpenKeys.add(monsterEntryKey(newEntry, monsterState.entries.length - 1));
+                monsterHasLoadedOpenState = true;
+                monsterPersistOpenState();
+                monsterRenderEntries();
+              }});
+
+              monsterForm.addEventListener("submit", () => {{
+                monsterSyncFromDom();
+                monsterContentInput.value = JSON.stringify(monsterState, null, 2);
+              }});
+
+              monsterState.entries = monsterState.entries.map(monsterNormalizeEntry);
+              monsterLoadOpenState();
+              monsterRenderEntries();
+            </script>
+            """,
+        )
+
     def _event_book_file_response(
         self,
         title: str,
@@ -1426,6 +1787,64 @@ class SaveWebViewer:
         return book
 
     @classmethod
+    def _normalize_monster_book(cls, raw: object) -> dict:
+        book = dict(raw) if isinstance(raw, dict) else {}
+        entries = book.get("entries", [])
+        if isinstance(entries, dict):
+            iterable = entries.items()
+        elif isinstance(entries, list):
+            iterable = enumerate(entries)
+        else:
+            iterable = []
+
+        normalized_entries = []
+        for fallback_id, entry in iterable:
+            if not isinstance(entry, dict):
+                continue
+            keys = entry.get("keys", [])
+            if isinstance(keys, str):
+                keys = [keys]
+            if not isinstance(keys, list):
+                keys = []
+
+            monster_levels = normalize_visible_levels(
+                entry.get("monster_levels"),
+                min_level=entry.get("min_monster_level", 1),
+                max_level=entry.get("max_monster_level", 7),
+            )
+            raw_level_settings = (
+                entry.get("level_settings")
+                if isinstance(entry.get("level_settings"), dict)
+                else {}
+            )
+            level_settings: dict[str, dict[str, str]] = {}
+            for level in monster_levels:
+                raw_setting = raw_level_settings.get(str(level), {})
+                if not isinstance(raw_setting, dict):
+                    raw_setting = {}
+                level_settings[str(level)] = {
+                    "brief": str(raw_setting.get("brief") or ""),
+                    "content": str(raw_setting.get("content") or ""),
+                }
+
+            normalized_entries.append(
+                {
+                    "id": str(entry.get("id") or fallback_id).strip(),
+                    "name": str(entry.get("name") or entry.get("title") or ""),
+                    "visible_levels": list(cls._normalize_visible_levels(entry)),
+                    "monster_levels": list(monster_levels),
+                    "keys": [str(key).strip() for key in keys if str(key).strip()],
+                    "brief": str(entry.get("brief") or entry.get("summary") or ""),
+                    "content": str(entry.get("content") or entry.get("detail") or ""),
+                    "level_settings": level_settings,
+                }
+            )
+
+        book["version"] = book.get("version", 1)
+        book["entries"] = normalized_entries
+        return book
+
+    @classmethod
     def _normalize_world_book(cls, raw: object) -> dict:
         book = dict(raw) if isinstance(raw, dict) else {}
         entries = book.get("entries", [])
@@ -1483,6 +1902,8 @@ class SaveWebViewer:
             isinstance(raw, dict) and "events" in raw
         ):
             return cls._format_event_book_key_info(raw)
+        if file_id == "monster_book/default.json":
+            return cls._format_monster_book_key_info(raw)
 
         book = cls._normalize_world_book(raw)
         entries = book.get("entries", [])
@@ -1566,6 +1987,66 @@ class SaveWebViewer:
                 event_blocks.append(f"【{event_name}】\n" + "\n".join(entry_lines))
 
         return "\n\n-----------------------------------------------\n\n".join(event_blocks) + ("\n" if event_blocks else "")
+
+    @classmethod
+    def _format_monster_book_key_info(cls, raw: object) -> str:
+        book = cls._normalize_monster_book(raw)
+        entries = book.get("entries", [])
+        if not isinstance(entries, list):
+            return ""
+
+        blocks: list[str] = []
+        indexed_entries = [
+            (index, entry)
+            for index, entry in enumerate(entries)
+            if isinstance(entry, dict)
+        ]
+        for index, entry in sorted(
+            indexed_entries,
+            key=lambda item: (min(cls._normalize_visible_levels(item[1])), item[0]),
+        ):
+            name = cls._single_line_text(
+                entry.get("name") or entry.get("id") or f"魔物{index + 1}"
+            )
+            lines = [
+                name,
+                f"ID: {cls._single_line_text(entry.get('id'))}",
+                f"可见等级: {visible_levels_label(entry.get('visible_levels'))}",
+                f"魔物等级: {visible_levels_label(entry.get('monster_levels'))}",
+            ]
+            keys = entry.get("keys") if isinstance(entry.get("keys"), list) else []
+            if keys:
+                lines.append("关键词: " + "、".join(str(key) for key in keys))
+
+            brief = str(entry.get("brief") or "").strip()
+            content = str(entry.get("content") or "").strip()
+            if brief:
+                lines.append(f"通用简单设定: {brief}")
+            if content:
+                lines.append(f"通用详细设定: {content}")
+
+            level_settings = (
+                entry.get("level_settings")
+                if isinstance(entry.get("level_settings"), dict)
+                else {}
+            )
+            for level in normalize_visible_levels(entry.get("monster_levels")):
+                setting = level_settings.get(str(level), {})
+                if not isinstance(setting, dict):
+                    continue
+                level_brief = str(setting.get("brief") or "").strip()
+                level_content = str(setting.get("content") or "").strip()
+                if not level_brief and not level_content:
+                    continue
+                lines.append(f"{level_label(level)} 级覆盖:")
+                if level_brief:
+                    lines.append(f"  简单设定: {level_brief}")
+                if level_content:
+                    lines.append(f"  详细设定: {level_content}")
+
+            blocks.append("\n".join(lines))
+
+        return "\n\n-----------------------------------------------\n\n".join(blocks) + ("\n" if blocks else "")
 
     @staticmethod
     def _single_line_text(value: object) -> str:
@@ -2853,6 +3334,7 @@ class SaveWebViewer:
     .world-book-toolbar p {{ margin: 0; }}
     .book-config-grid {{ display: grid; grid-template-columns: minmax(180px, .72fr) minmax(260px, 1.28fr); gap: 12px; align-items: start; }}
     #world-book-entries {{ display: grid; gap: 6px; }}
+    #monster-book-entries {{ display: grid; gap: 6px; }}
     .world-entry {{ margin: 0; background: #fff; border: 1px solid #dde2ea; border-radius: 8px; box-shadow: 0 3px 10px rgba(31, 41, 55, 0.04); transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease, opacity .14s ease; }}
     .world-entry.dragging {{ opacity: .45; transform: scale(.995); }}
     .world-entry.drag-over {{ border-color: #1f6feb; box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.14), 0 12px 28px rgba(31, 41, 55, 0.1); }}
@@ -2885,6 +3367,9 @@ class SaveWebViewer:
     textarea.keys-editor {{ min-height: 48px; font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }}
     textarea.entry-content-editor {{ min-height: 78px; }}
     .status-level-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }}
+    .monster-level-settings {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; margin-top: 12px; }}
+    .monster-level-block {{ padding: 10px; border: 1px solid #dde2ea; border-radius: 8px; background: #f8fafc; }}
+    .monster-level-block h3 {{ margin: 0 0 6px; font-size: 15px; }}
     .hero-card {{ display: flex; gap: 20px; align-items: center; margin: 18px 0 18px; padding: 20px; border: 1px solid #d9e1eb; border-radius: 8px; background: #fff; box-shadow: 0 10px 24px rgba(31, 41, 55, 0.06); }}
     .avatar-large {{ width: 92px; height: 92px; flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; border-radius: 8px; border: 1px solid #d8e0eb; background: #f0f4f8; color: #59636e; font-size: 34px; font-weight: 900; }}
     .avatar-large img {{ width: 100%; height: 100%; object-fit: cover; display: block; }}
@@ -2962,7 +3447,7 @@ class SaveWebViewer:
     @media (max-width: 560px) {{ .state-overview-grid {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .progress-list {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .profile-edit-grid {{ grid-template-columns: 1fr; }} }}
-    @media (max-width: 720px) {{ .world-entry-grid, .book-config-grid {{ grid-template-columns: 1fr; }} .world-book-toolbar {{ flex-direction: column; }} .world-entry-head {{ flex-wrap: wrap; }} .hero-card {{ align-items: flex-start; }} .log-card-head {{ flex-direction: column; }} }}
+    @media (max-width: 720px) {{ .world-entry-grid, .book-config-grid, .monster-level-settings {{ grid-template-columns: 1fr; }} .world-book-toolbar {{ flex-direction: column; }} .world-entry-head {{ flex-wrap: wrap; }} .hero-card {{ align-items: flex-start; }} .log-card-head {{ flex-direction: column; }} }}
     pre {{ overflow: auto; padding: 14px; background: #111827; color: #d1e7dd; border-radius: 6px; line-height: 1.45; }}
   </style>
 </head>
@@ -3017,6 +3502,7 @@ class SaveWebViewer:
             "skill_book/default.json",
             "status_book/default.json",
             "event_book/default.json",
+            "monster_book/default.json",
         }
 
     def _editable_rows(self, items: list[dict[str, str]], category: str) -> list[str]:
