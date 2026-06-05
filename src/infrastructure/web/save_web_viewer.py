@@ -3755,10 +3755,10 @@ class SaveWebViewer:
     main:has(.player-detail-shell) {{ width: 100%; max-width: none; min-height: 100vh; box-sizing: border-box; padding: 0; overflow: hidden; }}
     main:has(.player-detail-shell) .topbar {{ position: absolute; top: 18px; right: 22px; z-index: 5; margin: 0; min-height: 0; }}
     main:has(.player-detail-shell) .topbar button {{ border: 1px solid rgba(255,255,255,.68); background: rgba(112, 72, 156, .72); box-shadow: 0 12px 28px rgba(108, 53, 133, .18); backdrop-filter: blur(10px); }}
-    .player-detail-shell {{ position: relative; min-height: 100vh; padding: 70px clamp(18px, 5vw, 72px) 58px; box-sizing: border-box; overflow: hidden; background: radial-gradient(circle at 13% 16%, rgba(255, 241, 151, .82) 0 7%, transparent 21%), radial-gradient(circle at 82% 18%, rgba(139, 229, 255, .72) 0 8%, transparent 22%), radial-gradient(circle at 80% 82%, rgba(255, 139, 200, .52) 0 11%, transparent 25%), linear-gradient(135deg, #fff5fb 0%, #f7ddff 30%, #dff7ff 66%, #fff6c7 100%); color: #42233f; isolation: isolate; }}
+    .player-detail-shell {{ --player-detail-width: 1180px; position: relative; min-height: 100vh; padding: 70px clamp(18px, 5vw, 72px) 58px; box-sizing: border-box; overflow: hidden; background: radial-gradient(circle at 13% 16%, rgba(255, 241, 151, .82) 0 7%, transparent 21%), radial-gradient(circle at 82% 18%, rgba(139, 229, 255, .72) 0 8%, transparent 22%), radial-gradient(circle at 80% 82%, rgba(255, 139, 200, .52) 0 11%, transparent 25%), linear-gradient(135deg, #fff5fb 0%, #f7ddff 30%, #dff7ff 66%, #fff6c7 100%); color: #42233f; isolation: isolate; }}
     .player-detail-shell::before {{ content: ""; position: absolute; inset: -20%; z-index: -2; background-image: linear-gradient(rgba(255,255,255,.48) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.42) 1px, transparent 1px); background-size: 42px 42px; transform: rotate(-7deg); }}
     .player-detail-shell::after {{ content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 50% 18%, transparent 0 22%, rgba(255,255,255,.32) 23%, transparent 24%), radial-gradient(circle at 50% 18%, transparent 0 39%, rgba(255,255,255,.23) 40%, transparent 41%); }}
-    .player-detail-hero {{ position: relative; max-width: 980px; margin: 0 auto 24px; padding: 32px 128px 30px; border: 1px solid rgba(255,255,255,.72); border-radius: 8px; background: rgba(255,255,255,.48); box-shadow: 0 24px 70px rgba(141, 76, 146, .16), inset 0 0 0 1px rgba(255,255,255,.42); backdrop-filter: blur(14px); text-align: center; }}
+    .player-detail-hero {{ position: relative; width: 100%; max-width: var(--player-detail-width); box-sizing: border-box; margin: 0 auto 24px; padding: 32px 128px 30px; border: 1px solid rgba(255,255,255,.72); border-radius: 8px; background: rgba(255,255,255,.48); box-shadow: 0 24px 70px rgba(141, 76, 146, .16), inset 0 0 0 1px rgba(255,255,255,.42); backdrop-filter: blur(14px); text-align: center; }}
     .player-back-link {{ position: absolute; left: 18px; top: 18px; display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border: 1px solid rgba(212, 93, 166, .28); border-radius: 999px; background: rgba(255,255,255,.68); color: #8d3975; font-size: 13px; font-weight: 900; }}
     .player-back-link:hover {{ text-decoration: none; background: rgba(255,255,255,.9); }}
     .player-detail-emblem {{ position: absolute; top: 18px; right: 24px; width: 86px; height: 86px; display: grid; place-items: center; border-radius: 50%; border: 2px solid rgba(255,255,255,.82); background: conic-gradient(from 20deg, #ff73b7, #ffd66b, #8fe8ff, #b896ff, #ff73b7); color: #fff; font-size: 38px; box-shadow: 0 16px 36px rgba(188, 80, 166, .24), inset 0 0 0 8px rgba(255,255,255,.48); }}
@@ -3768,17 +3768,17 @@ class SaveWebViewer:
     .player-hero-tags span {{ min-height: 28px; display: inline-flex; align-items: center; padding: 3px 10px; border: 1px solid rgba(211, 91, 165, .26); border-radius: 999px; background: rgba(255,255,255,.72); color: #744160; font-size: 13px; font-weight: 900; }}
     .player-detail-hero .player-top-grid {{ max-width: 760px; margin: 22px auto 0; }}
     .player-detail-hero .player-top-item {{ min-height: 82px; background: rgba(255,255,255,.58); box-shadow: inset 0 0 0 1px rgba(255,255,255,.42); text-align: left; }}
-    .player-detail-layout {{ max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }}
-    .player-detail-flow {{ max-width: 1180px; margin: 0 auto; display: grid; gap: 14px; }}
+    .player-detail-layout {{ width: 100%; max-width: var(--player-detail-width); margin: 0 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }}
+    .player-detail-flow {{ width: 100%; max-width: var(--player-detail-width); margin: 0 auto; display: grid; gap: 14px; }}
     .player-top-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }}
     .player-top-item {{ min-height: 96px; padding: 18px 20px; border: 1px solid rgba(221, 91, 169, .28); border-radius: 8px; background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,247,252,.8)); box-shadow: 0 14px 36px rgba(175, 74, 151, .12); }}
     .player-top-item span {{ display: block; color: #c54793; font-size: 12px; font-weight: 900; }}
     .player-top-item strong {{ display: block; margin-top: 8px; color: #4b2447; font-size: clamp(20px, 2.5vw, 28px); line-height: 1.18; overflow-wrap: anywhere; }}
     .player-split-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }}
-    .player-profile-triad {{ display: grid; grid-template-columns: minmax(230px, .92fr) minmax(360px, 1.28fr) minmax(230px, .92fr); gap: 14px; align-items: stretch; }}
-    .player-side-stack {{ display: grid; grid-template-rows: 1fr 1fr; gap: 14px; min-height: 100%; }}
-    .player-profile-main, .player-profile-side {{ display: grid; min-height: 100%; }}
-    .player-profile-triad .player-profile-card {{ height: 100%; padding: 16px; }}
+    .player-profile-triad {{ width: 100%; box-sizing: border-box; display: grid; grid-template-columns: minmax(230px, .92fr) minmax(360px, 1.28fr) minmax(230px, .92fr); gap: 14px; align-items: stretch; }}
+    .player-side-stack {{ display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-self: stretch; }}
+    .player-profile-main, .player-profile-side {{ display: grid; align-self: stretch; }}
+    .player-profile-triad .player-profile-card {{ min-height: 0; padding: 16px; }}
     .player-profile-triad .profile-card-head {{ margin-bottom: 10px; }}
     .player-profile-triad .profile-card-head h2 {{ font-size: 21px; }}
     .player-profile-triad .player-info-grid {{ gap: 8px; }}
@@ -3787,7 +3787,7 @@ class SaveWebViewer:
     .player-profile-triad .player-info-item {{ min-height: 50px; padding: 8px 10px; }}
     .player-profile-triad .player-info-item span {{ font-size: 11px; }}
     .player-profile-triad .player-info-item strong {{ margin-top: 3px; font-size: 14px; line-height: 1.35; }}
-    .player-profile-card, .player-site-section {{ position: relative; padding: 20px; border: 1px solid rgba(221, 91, 169, .28); border-radius: 8px; background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,247,252,.78)); box-shadow: 0 14px 36px rgba(175, 74, 151, .13); overflow: hidden; }}
+    .player-profile-card, .player-site-section {{ position: relative; box-sizing: border-box; padding: 20px; border: 1px solid rgba(221, 91, 169, .28); border-radius: 8px; background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,247,252,.78)); box-shadow: 0 14px 36px rgba(175, 74, 151, .13); overflow: hidden; }}
     .primary-profile-card {{ grid-row: span 2; }}
     .profile-card-head {{ margin-bottom: 14px; }}
     .profile-card-head span {{ display: block; margin: 0 0 6px; color: #c54793; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0; }}
