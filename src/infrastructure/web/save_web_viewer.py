@@ -789,8 +789,8 @@ class SaveWebViewer:
                       <div class="world-entry-body">
                         <div class="world-entry-grid">
                           <label class="compact-field"><span>ID</span><input data-field="id" type="text" value="${{escapeAttr(normalized.id)}}"></label>
-                          <label class="compact-field"><span>标题</span><input data-field="title" type="text" value="${{escapeAttr(normalized.title)}}"></label>
-                          <label class="compact-field level-field"><span>可见等级</span><div class="level-choice-row">${{visibleLevelInputs(normalized.visible_levels)}}</div></label>
+                          <label class="compact-field title-field"><span>标题</span><input data-field="title" type="text" value="${{escapeAttr(normalized.title)}}"></label>
+                          <div class="compact-field level-field"><span>可见等级</span><div class="level-choice-row">${{visibleLevelInputs(normalized.visible_levels)}}</div></div>
                           <label class="compact-field"><span>触发方式</span>
                             <select data-field="strategy">
                               <option value="keyword"${{normalized.strategy === "keyword" ? " selected" : ""}}>关键词命中</option>
@@ -1228,8 +1228,8 @@ class SaveWebViewer:
                           <div class="world-entry-body">
                             <div class="world-entry-grid">
                               <label class="compact-field"><span>ID</span><input data-field="id" type="text" value="${{ebEscapeAttr(eNorm.id)}}"></label>
-                              <label class="compact-field"><span>标题</span><input data-field="title" type="text" value="${{ebEscapeAttr(eNorm.title)}}"></label>
-                              <label class="compact-field level-field"><span>可见等级</span><div class="level-choice-row">${{ebVisibleLevelInputs(eNorm.visible_levels)}}</div></label>
+                              <label class="compact-field title-field"><span>标题</span><input data-field="title" type="text" value="${{ebEscapeAttr(eNorm.title)}}"></label>
+                              <div class="compact-field level-field"><span>可见等级</span><div class="level-choice-row">${{ebVisibleLevelInputs(eNorm.visible_levels)}}</div></div>
                               <label class="compact-field"><span>触发方式</span>
                                 <select data-field="strategy">
                                   <option value="keyword"${{eNorm.strategy === "keyword" ? " selected" : ""}}>关键词命中</option>
@@ -2874,8 +2874,9 @@ class SaveWebViewer:
     .summary-check input {{ width: 15px; height: 15px; }}
     .world-entry-body {{ padding: 10px; background: #fff; border-radius: 0 0 8px 8px; }}
     .world-entry-grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }}
-    .level-field {{ grid-column: 1 / -1; }}
-    .level-choice-row {{ display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 8px 10px; border: 1px solid #d9e1eb; border-radius: 8px; background: #f8fafc; }}
+    .title-field {{ grid-column: span 1; }}
+    .level-field {{ grid-column: span 2; }}
+    .level-choice-row {{ display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; flex: 1 1 auto; min-width: 0; padding: 8px 10px; border: 1px solid #d9e1eb; border-radius: 8px; background: #f8fafc; }}
     .level-choice {{ display: inline-flex; align-items: center; gap: 4px; margin: 0; white-space: nowrap; }}
     .compact-field {{ display: flex; align-items: center; gap: 6px; margin: 0; }}
     .compact-field span {{ flex: 0 0 auto; color: #3a4350; }}
@@ -2955,7 +2956,7 @@ class SaveWebViewer:
     .raw-panel summary {{ padding: 13px 15px; cursor: pointer; font-weight: 800; background: #f8fafc; }}
     .raw-panel pre {{ margin: 0; border-radius: 0; }}
     .empty-state {{ padding: 18px; background: #fff; border: 1px dashed #c8d0dc; border-radius: 8px; }}
-    @media (max-width: 900px) {{ .world-entry-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
+    @media (max-width: 900px) {{ .world-entry-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} .level-field {{ grid-column: 1 / -1; }} }}
     @media (max-width: 900px) {{ .state-overview-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
     @media (max-width: 900px) {{ .detail-grid, .raw-grid {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .state-overview-grid {{ grid-template-columns: 1fr; }} }}
