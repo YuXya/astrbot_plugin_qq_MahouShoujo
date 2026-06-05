@@ -468,11 +468,18 @@ class SaveWebViewer:
             "city_name": self._e(self.repository.get_city_name(group_id_raw)),
             "user_id": self._e(user_id_raw),
             "nickname": self._e(item.get("nickname") or item.get("target_name") or "未命名"),
-            "class_name": self._e(item.get("class_name", "")),
-            "level": self._e(level_label(item.get("level", 1))),
+            "class_name": self._e(self._rank_display(item.get("class_name", ""))),
+            "level": self._e(self._rank_display(level_label(item.get("level", 1)))),
             "updated_at": self._format_time(item.get("updated_at")),
             "href": href,
         }
+
+    @staticmethod
+    def _rank_display(value: object) -> str:
+        text = str(value or "").strip()
+        if re.fullmatch(r"[A-FS]", text, flags=re.IGNORECASE):
+            return f"{text.upper()}级"
+        return text
 
     async def _editable_index(self, request: web.Request) -> web.Response:
         if not self._is_admin(request):
@@ -2655,7 +2662,7 @@ class SaveWebViewer:
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
         city_name = self.repository.get_city_name(group_id)
         magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], "")
-        class_name = self._get_nested(protagonist, ["个人信息", "身份&职业"], "未知职阶")
+        class_name = self._rank_display(self._get_nested(protagonist, ["个人信息", "身份&职业"], "未知职阶"))
         color = self._get_nested(protagonist, ["个人信息", "代表色"], "星光色")
         ability = self._get_nested(protagonist, ["个人信息", "核心能力"], "未记录")
         weapon = self._get_nested(protagonist, ["个人信息", "武装"], "未记录")
@@ -2671,7 +2678,7 @@ class SaveWebViewer:
             ("所在城市", city_name),
             ("城市 ID", group_id),
             ("职阶", class_name),
-            ("等级", level_display(player_data)),
+            ("等级", self._rank_display(level_display(player_data))),
             ("等级经验", f"{level_exp_percent(player_data)}%"),
             ("代表色", color),
             ("核心能力", ability),
@@ -2684,7 +2691,6 @@ class SaveWebViewer:
             identity_cards.append(("使魔关系", familiar_bond))
 
         progress_html = self._progress_overview_html(player_data)
-        state_html = self._player_site_state_html(player_data)
         logs_html = self._player_log_cards(group_id, user_id, logs[:8], allow_delete=False)
         cameo_html = self._player_cameo_memory_cards(
             group_id, user_id, cameo_memories[:8], allow_delete=False
@@ -2704,7 +2710,7 @@ class SaveWebViewer:
                 <h1>{self._e(page_name)}</h1>
                 <p>{self._e(city_name)}记录中的魔法少女档案。这里汇总了你的身份、外观、装备、成长进度与最近的冒险痕迹。</p>
                 <div class="player-hero-tags">
-                  <span>{self._e(level_display(player_data))}</span>
+                  <span>{self._e(self._rank_display(level_display(player_data)))}</span>
                   <span>{self._e(class_name)}</span>
                   <span>{self._e(color)}</span>
                 </div>
@@ -2727,14 +2733,6 @@ class SaveWebViewer:
                   <h2>成长进度</h2>
                 </div>
                 {progress_html or '<p class="player-site-empty">暂无成长进度记录。</p>'}
-              </section>
-
-              <section class="player-site-section">
-                <div class="profile-card-head">
-                  <span>Status</span>
-                  <h2>当前状态</h2>
-                </div>
-                {state_html or '<p class="player-site-empty">暂无额外状态记录。</p>'}
               </section>
 
               <section class="player-memory-grid">
@@ -2967,7 +2965,7 @@ class SaveWebViewer:
 
         # 构建可编辑的人物卡字段
         profile_sections = self._build_profile_edit_sections(protagonist, can_edit)
-        class_name = self._get_nested(protagonist, ["个人信息", "身份&职业"], "未知职阶")
+        class_name = self._rank_display(self._get_nested(protagonist, ["个人信息", "身份&职业"], "未知职阶"))
         target_name = self._get_nested(protagonist, ["个人信息", "姓名"], player_data.get("nickname", ""))
 
         profile_panel = (
@@ -2997,7 +2995,7 @@ class SaveWebViewer:
                 <div class="kicker">城市 {self._e(self.repository.get_city_name(group_id))} / 城市 ID {self._e(group_id)} / 用户 {self._e(user_id)}</div>
                 <h2>{self._e(target_name)}</h2>
                 <div class="identity-line">
-                  <span>{self._e(level_display(player_data))}</span>
+                  <span>{self._e(self._rank_display(level_display(player_data)))}</span>
                   <span>等级经验 {self._e(level_exp_percent(player_data))}%</span>
                   <span>{self._e(class_name)}</span>
                 </div>
