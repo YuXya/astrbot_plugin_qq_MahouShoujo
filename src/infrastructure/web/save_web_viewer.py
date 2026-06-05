@@ -67,6 +67,8 @@ class SaveWebViewer:
         self._add_route(app, "POST", "/login", self._login)
         self._add_route(app, "POST", "/logout", self._logout)
         self._add_route(app, "GET", "/", self._index)
+        self._add_route(app, "GET", "/city", self._city_detail)
+        self._add_route(app, "POST", "/city/name/save", self._city_name_save)
         self._add_route(app, "GET", "/player", self._player_detail)
         self._add_route(app, "POST", "/player/profile/save", self._player_profile_save)
         self._add_route(app, "POST", "/player/delete", self._player_delete)
@@ -288,7 +290,54 @@ class SaveWebViewer:
         if session["role"] == SESSION_USER_ROLE:
             return self._user_index(session["user_id"])
 
-        saves = self.repository.list_saves()
+        cities = self.repository.list_cities()
+        rows = []
+        for city in cities:
+            city_id = str(city.get("city_id") or "")
+            city_name = str(city.get("city_name") or city_id)
+            href = self._url(f"/city?city_id={quote(city_id, safe='')}")
+            rows.append(
+                "<tr>"
+                f"<td><a href=\"{href}\">{self._e(city_name)}</a></td>"
+                f"<td>{self._e(city_id)}</td>"
+                f"<td>{self._e(city.get('player_count', 0))}</td>"
+                f"<td>{self._format_time(city.get('updated_at'))}</td>"
+                f"<td><a class=\"button-link compact-link\" href=\"{href}\">进入城市</a></td>"
+                "</tr>"
+            )
+
+        body = "\n".join(rows) or "<tr><td colspan=\"5\">还没有任何城市存档。</td></tr>"
+        return self._html_response(
+            "魔法少女城市",
+            f"""
+            <h1>魔法少女城市</h1>
+            <p class="muted">管理员页面。每个城市对应一个群，城市 ID 就是群号。</p>
+            <p class="nav-actions">
+              <a class="button-link" href="{self._url('/editable?category=world_background')}">编辑世界背景</a>
+              <a class="button-link" href="{self._url('/editable?category=text_completion')}">编辑文本补全</a>
+              <a class="button-link secondary-link" href="{self._url('/llm-messages')}">最近消息记录</a>
+            </p>
+            <table>
+              <thead>
+                <tr>
+                  <th>城市名</th><th>城市 ID</th><th>魔法少女数量</th><th>最近更新</th><th>操作</th>
+                </tr>
+              </thead>
+              <tbody>{body}</tbody>
+            </table>
+            """,
+        )
+
+    async def _city_detail(self, request: web.Request) -> web.Response:
+        if not self._is_admin(request):
+            return self._forbidden()
+
+        city_id = str(request.query.get("city_id", "")).strip()
+        if not city_id:
+            raise web.HTTPBadRequest(text="missing city_id")
+
+        city_name = self.repository.get_city_name(city_id)
+        saves = self.repository.list_saves_by_city(city_id)
         rows = []
         for item in saves:
             row = self._save_table_row(item)
@@ -302,7 +351,6 @@ class SaveWebViewer:
             )
             rows.append(
                 "<tr>"
-                f"<td>{row['group_id']}</td>"
                 f"<td>{row['user_id']}</td>"
                 f"<td><a href=\"{row['href']}\">{row['nickname']}</a></td>"
                 f"<td>{row['class_name']}</td>"
@@ -312,28 +360,42 @@ class SaveWebViewer:
                 "</tr>"
             )
 
-        body = "\n".join(rows) or "<tr><td colspan=\"7\">还没有任何玩家存档。</td></tr>"
+        body = "\n".join(rows) or "<tr><td colspan=\"6\">这个城市还没有玩家存档。</td></tr>"
         return self._html_response(
-            "魔法少女存档",
+            f"{city_name}魔法少女存档",
             f"""
-            <h1>魔法少女存档</h1>
-            <p class="muted">管理员页面。关闭网页命令会立即使当前网页登录态失效。</p>
-            <p class="nav-actions">
-              <a class="button-link" href="{self._url('/editable?category=world_background')}">编辑世界背景</a>
-              <a class="button-link" href="{self._url('/editable?category=text_completion')}">编辑文本补全</a>
-              <a class="button-link secondary-link" href="{self._url('/llm-messages')}">最近消息记录</a>
-            </p>
+            <p><a href="{self._url('/')}">返回城市列表</a></p>
+            <h1>{self._e(city_name)}</h1>
+            <p class="muted">城市 ID：{self._e(city_id)}</p>
+            <section class="detail-panel city-editor-panel">
+              <h2>城市档案</h2>
+              <form class="inline-import-form city-name-form" method="post" action="{self._url('/city/name/save')}">
+                <input type="hidden" name="city_id" value="{self._e(city_id)}">
+                <label class="inline-label" for="city-name">城市名</label>
+                <input id="city-name" name="city_name" type="text" value="{self._e(city_name)}">
+                <button class="compact-button" type="submit">保存城市名</button>
+              </form>
+            </section>
             <table>
               <thead>
                 <tr>
-                  <th>群</th><th>用户</th><th>角色</th>
-                  <th>职阶</th><th>等级</th><th>更新时间</th><th>操作</th>
+                  <th>用户</th><th>角色</th><th>职阶</th><th>等级</th><th>更新时间</th><th>操作</th>
                 </tr>
               </thead>
               <tbody>{body}</tbody>
             </table>
             """,
         )
+
+    async def _city_name_save(self, request: web.Request) -> web.Response:
+        if not self._is_admin(request):
+            return self._forbidden()
+        data = await request.post()
+        city_id = str(data.get("city_id", "")).strip()
+        if not city_id:
+            raise web.HTTPBadRequest(text="missing city_id")
+        self.repository.update_city_name(city_id, str(data.get("city_name", "")))
+        raise self._redirect(f"/city?city_id={quote(city_id, safe='')}")
 
     def _user_index(self, user_id: str) -> web.Response:
         saves = self.repository.list_saves_by_user(user_id)
@@ -342,7 +404,7 @@ class SaveWebViewer:
             row = self._save_table_row(item)
             rows.append(
                 "<tr>"
-                f"<td>{row['group_id']}</td>"
+                f"<td>{row['city_name']}</td>"
                 f"<td><a href=\"{row['href']}\">{row['nickname']}</a></td>"
                 f"<td>{row['class_name']}</td>"
                 f"<td>{row['level']}</td>"
@@ -359,7 +421,7 @@ class SaveWebViewer:
             <table>
               <thead>
                 <tr>
-                  <th>群</th><th>角色</th><th>职阶</th><th>等级</th><th>更新时间</th>
+                  <th>城市</th><th>角色</th><th>职阶</th><th>等级</th><th>更新时间</th>
                 </tr>
               </thead>
               <tbody>{body}</tbody>
@@ -368,12 +430,15 @@ class SaveWebViewer:
         )
 
     def _save_table_row(self, item: dict[str, Any]) -> dict[str, str]:
-        group_id = self._e(item.get("group_id", ""))
-        user_id = self._e(item.get("user_id", ""))
-        href = self._url(f"/player?group_id={group_id}&user_id={user_id}")
+        group_id_raw = str(item.get("group_id", "") or "")
+        user_id_raw = str(item.get("user_id", "") or "")
+        href = self._url(
+            f"/player?group_id={quote(group_id_raw, safe='')}&user_id={quote(user_id_raw, safe='')}"
+        )
         return {
-            "group_id": group_id,
-            "user_id": user_id,
+            "group_id": self._e(group_id_raw),
+            "city_name": self._e(self.repository.get_city_name(group_id_raw)),
+            "user_id": self._e(user_id_raw),
             "nickname": self._e(item.get("nickname") or item.get("target_name") or "未命名"),
             "class_name": self._e(item.get("class_name", "")),
             "level": self._e(level_label(item.get("level", 1))),
@@ -2691,7 +2756,7 @@ class SaveWebViewer:
             <section class="hero-card">
               <div class="avatar-large">{avatar_html}</div>
               <div class="hero-main">
-                <div class="kicker">群 {self._e(group_id)} / 用户 {self._e(user_id)}</div>
+                <div class="kicker">城市 {self._e(self.repository.get_city_name(group_id))} / 城市 ID {self._e(group_id)} / 用户 {self._e(user_id)}</div>
                 <h2>{self._e(target_name)}</h2>
                 <div class="identity-line">
                   <span>{self._e(level_display(player_data))}</span>
@@ -3345,6 +3410,8 @@ class SaveWebViewer:
     .source-actions {{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px 0 18px; }}
     .source-table td:last-child {{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }}
     .compact-button {{ margin: 0; padding: 6px 10px; font-size: 13px; }}
+    .city-editor-panel {{ margin: 16px 0; }}
+    .city-name-form input[type="text"] {{ width: min(360px, 100%); }}
     label {{ display: block; margin: 18px 0 8px; font-weight: 700; color: #303846; }}
     input[type="text"] {{ width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #c8d0dc; border-radius: 7px; font: inherit; background: #fbfdff; }}
     input[type="number"] {{ width: 76px; box-sizing: border-box; padding: 7px 9px; border: 1px solid #c8d0dc; border-radius: 7px; font: inherit; background: #fbfdff; }}

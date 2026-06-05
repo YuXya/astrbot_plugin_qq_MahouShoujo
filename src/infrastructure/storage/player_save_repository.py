@@ -656,6 +656,60 @@ class PlayerSaveRepository:
         safe_user = self._safe_id(user_id)
         return self.root_dir / "groups" / safe_group / "users" / safe_user
 
+    def list_cities(self) -> list[dict[str, Any]]:
+        groups_dir = self.root_dir / "groups"
+        if not groups_dir.exists():
+            return []
+
+        cities: list[dict[str, Any]] = []
+        for group_dir in sorted(p for p in groups_dir.iterdir() if p.is_dir()):
+            users_dir = group_dir / "users"
+            player_count = 0
+            updated_at = ""
+            if users_dir.exists():
+                for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
+                    player_data = self._load_current_player_data(user_dir)
+                    if not player_data:
+                        continue
+                    player_count += 1
+                    item_updated_at = str(player_data.get("updated_at", "") or "")
+                    if item_updated_at > updated_at:
+                        updated_at = item_updated_at
+            if player_count <= 0:
+                continue
+            city_id = group_dir.name
+            cities.append(
+                {
+                    "city_id": city_id,
+                    "city_name": self.get_city_name(city_id),
+                    "player_count": player_count,
+                    "updated_at": updated_at,
+                }
+            )
+        return cities
+
+    def get_city_name(self, group_id: str) -> str:
+        city_id = self._safe_id(group_id)
+        meta = self._read_json(self._city_meta_path(city_id))
+        name = str(meta.get("city_name") or "").strip()
+        return name or city_id
+
+    def update_city_name(self, group_id: str, city_name: str) -> dict[str, Any]:
+        city_id = self._safe_id(group_id)
+        name = str(city_name or "").strip() or city_id
+        meta = {
+            "schema_version": 1,
+            "city_id": city_id,
+            "city_name": name,
+            "updated_at": self._now_ms(),
+        }
+        self._atomic_write_json(self._city_meta_path(city_id), meta)
+        return meta
+
+    def list_saves_by_city(self, group_id: str) -> list[dict[str, Any]]:
+        city_id = self._safe_id(group_id)
+        return [item for item in self.list_saves() if item.get("group_id") == city_id]
+
     def list_saves(self) -> list[dict[str, Any]]:
         groups_dir = self.root_dir / "groups"
         if not groups_dir.exists():
@@ -691,6 +745,9 @@ class PlayerSaveRepository:
     def list_saves_by_user(self, user_id: str) -> list[dict[str, Any]]:
         safe_user = self._safe_id(user_id)
         return [item for item in self.list_saves() if item.get("user_id") == safe_user]
+
+    def _city_meta_path(self, group_id: str) -> Path:
+        return self.root_dir / "groups" / self._safe_id(group_id) / "city.json"
 
     # ── NPC 查找 ──────────────────────────────────
 
