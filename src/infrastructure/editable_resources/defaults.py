@@ -40,4 +40,6 @@ REINCARNATION_PROMPT = _load_prompt("reincarnation_prompt.txt")
 
 BATTLE_DIARY_PROMPT = _load_prompt("battle_diary_prompt.txt")
 
+RELATIONSHIP_SUMMARY_PROMPT = _load_prompt("relationship_summary_prompt.txt")
+
 DEFAULT_SYSTEM_PROMPT = _load_prompt("default_system_prompt.txt")

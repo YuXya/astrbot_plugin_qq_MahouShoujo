@@ -96,6 +96,9 @@ class ConfigManager:
     def get_llm_provider_id(self) -> str:
         return str(self._get_group("llm").get("llm_provider_id", "")).strip()
 
+    def get_subtask_llm_provider_id(self) -> str:
+        return str(self._get_group("llm").get("subtask_llm_provider_id", "")).strip()
+
     def get_llm_retries(self) -> int:
         return int(self._get_group("llm").get("llm_retries", 2) or 2)
 

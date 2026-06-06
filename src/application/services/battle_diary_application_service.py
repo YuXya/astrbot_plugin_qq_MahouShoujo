@@ -15,12 +15,14 @@ class BattleDiaryApplicationService:
         llm_analyzer: Any,
         card_generator: Any,
         save_repository: Any,
+        relationship_analyzer: Any | None = None,
     ):
         self.config_manager = config_manager
         self.domain_service = domain_service
         self.llm_analyzer = llm_analyzer
         self.card_generator = card_generator
         self.save_repository = save_repository
+        self.relationship_analyzer = relationship_analyzer
 
     async def execute_diary(
         self,
@@ -85,6 +87,13 @@ class BattleDiaryApplicationService:
                 card.level_exp_after,
                 world_day_offset=world_day_offset,
             )
+            await self._maybe_summarize_relationships(
+                group_id=group_id,
+                card=card,
+                umo=umo,
+                world_day_offset=world_day_offset,
+                current_world_date=current_world_date,
+            )
             await self._maybe_compress_battle_logs(
                 group_id=group_id,
                 user_id=user_id,
@@ -127,6 +136,50 @@ class BattleDiaryApplicationService:
                 text=f"魔法少女战斗日记生成失败：{exc}",
                 error=str(exc),
             )
+
+    async def _maybe_summarize_relationships(
+        self,
+        *,
+        group_id: str,
+        card,
+        umo: str | None,
+        world_day_offset: int,
+        current_world_date: str,
+    ) -> None:
+        if self.relationship_analyzer is None:
+            return
+
+        participants: list[str] = []
+        for raw_name in getattr(card, "participants", []) or []:
+            name = str(raw_name or "").strip()
+            if name and name not in participants:
+                participants.append(name)
+        if len(participants) <= 1:
+            return
+
+        try:
+            participants_context = self.save_repository.build_relationship_participants_context(
+                group_id,
+                participants,
+            )
+            relationships, _raw_response = await self.relationship_analyzer.analyze_relationships(
+                card=card,
+                participants_context=participants_context,
+                umo=umo,
+                world_date=current_world_date,
+            )
+            changed = self.save_repository.merge_player_relationships(
+                group_id,
+                relationships,
+                participants=participants,
+                battle_title=card.title,
+                world_day_offset=world_day_offset,
+                world_date=current_world_date,
+            )
+            if changed:
+                logger.info(f"已更新人物关系总结: group={group_id}, count={changed}")
+        except Exception as exc:
+            logger.warning(f"人物关系总结失败，已跳过: group={group_id} {exc}")
 
     async def _append_cameo_memories(
         self,

@@ -15,6 +15,7 @@ class EditableResourceManager:
     PROMPT_FILES = {
         "reincarnation_prompt": "prompts/reincarnation_prompt.txt",
         "battle_diary_prompt": "prompts/battle_diary_prompt.txt",
+        "relationship_summary_prompt": "prompts/relationship_summary_prompt.txt",
         "default_system_prompt": "prompts/default_system_prompt.txt",
     }
 
@@ -255,6 +256,12 @@ class EditableResourceManager:
                 "category": "text_completion",
             },
             {
+                "id": self.PROMPT_FILES["relationship_summary_prompt"],
+                "label": "人物关系总结 Prompt",
+                "type": "text",
+                "category": "text_completion",
+            },
+            {
                 "id": self.PROMPT_FILES["default_system_prompt"],
                 "label": "默认 System Prompt",
                 "type": "text",
@@ -272,6 +279,7 @@ class EditableResourceManager:
             "monster_book/default.json": defaults.MONSTER_BOOK_DEFAULT,
             self.PROMPT_FILES["reincarnation_prompt"]: defaults.REINCARNATION_PROMPT,
             self.PROMPT_FILES["battle_diary_prompt"]: defaults.BATTLE_DIARY_PROMPT,
+            self.PROMPT_FILES["relationship_summary_prompt"]: defaults.RELATIONSHIP_SUMMARY_PROMPT,
             self.PROMPT_FILES["default_system_prompt"]: defaults.DEFAULT_SYSTEM_PROMPT,
         }
 
@@ -319,6 +327,12 @@ class EditableResourceManager:
                 "{{logs_text}}、{{cameo_memories_text}}、{{current_world_date}}、{{action}}、"
                 "{{supplement_text}}（世界书+状态书+事件书+技能书+性癖书命中的补充设定，未命中时为空）、"
                 "{{teammates_json}}（命中其他存档角色名时的队友公开字段 JSON；未命中时为空数组）。"
+            ),
+            self.PROMPT_FILES["relationship_summary_prompt"]: (
+                "用于多人 /魔法少女战斗 结束后的后台人物关系总结。发给 AI 的 user message 就是这个模板渲染后的结果。"
+                "可用变量：{{battle_title}}、{{world_date}}、{{participants_json}}、{{diary}}、{{encounter}}、{{result}}、"
+                "{{update_changes_json}}、{{participants_profile_json}}、{{existing_relationships_json}}。"
+                "要求 AI 返回纯 JSON，relationships 数组中的每一项代表一个单向关系箭头。"
             ),
             self.PROMPT_FILES["default_system_prompt"]: (
                 "用于 /魔法少女转生 和 /魔法少女战斗 的 system message。"

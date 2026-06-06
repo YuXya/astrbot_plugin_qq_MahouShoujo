@@ -37,6 +37,13 @@
         "default": "",
         "hint": "选择用于魔法少女转生人物卡生成的 LLM Provider。留空则使用当前会话的默认 Provider。"
       },
+      "subtask_llm_provider_id": {
+        "type": "string",
+        "description": "子任务 LLM Provider ID（用于人物关系总结等后台分析）",
+        "_special": "select_provider",
+        "default": "",
+        "hint": "选择用于战斗后人物关系总结等子任务的 LLM Provider。留空则沿用主 LLM Provider 或当前会话默认 Provider。"
+      },
       "llm_retries": {
         "type": "int",
         "description": "LLM 重试次数",

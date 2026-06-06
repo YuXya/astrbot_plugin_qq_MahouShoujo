@@ -44,6 +44,7 @@ class PlayerSaveRepository:
     SOURCE_FILE_NAMES = {
         "player_data.json",
         "player_data_update.json",
+        "relationships.json",
         "cameo_memory.jsonl",
         "daily_memory.jsonl",
     }
@@ -1144,6 +1145,223 @@ class PlayerSaveRepository:
                 log_path,
                 limit=recent_record_count,
             ),
+        }
+
+    def build_relationship_participants_context(
+        self,
+        group_id: str,
+        participants: list[str],
+    ) -> dict[str, Any]:
+        resolved = self._resolve_relationship_participants(group_id, participants)
+        return {
+            "participants": [
+                item["profile"] if item.get("profile") else {
+                    "participant_name": item["name"],
+                    "resolved": False,
+                }
+                for item in resolved
+            ],
+            "existing_relationships": self._existing_relationship_summaries(resolved),
+        }
+
+    def merge_player_relationships(
+        self,
+        group_id: str,
+        relationships: list[dict[str, Any]],
+        *,
+        participants: list[str],
+        battle_title: str,
+        world_day_offset: int,
+        world_date: str,
+    ) -> int:
+        if not relationships:
+            return 0
+
+        resolved = self._resolve_relationship_participants(group_id, participants)
+        by_name: dict[str, dict[str, Any]] = {}
+        for item in resolved:
+            user_dir = item.get("user_dir")
+            profile = item.get("profile")
+            if not user_dir or not isinstance(profile, dict):
+                continue
+            for name in self._relationship_names(profile):
+                by_name[name] = item
+
+        changed = 0
+        now = self._now_ms()
+        for relationship in relationships:
+            if not isinstance(relationship, dict):
+                continue
+            source = str(relationship.get("from") or "").strip()
+            target = str(relationship.get("to") or "").strip()
+            source_item = by_name.get(source)
+            target_item = by_name.get(target)
+            if not source_item or not target_item or source_item is target_item:
+                continue
+
+            source_dir = source_item["user_dir"]
+            target_profile = target_item["profile"]
+            owner_profile = source_item["profile"]
+            path = source_dir / "relationships.json"
+            data = self._read_json(path)
+            if not data:
+                data = {
+                    "schema_version": 1,
+                    "owner": self._relationship_owner(owner_profile),
+                    "relationships": {},
+                }
+            data["schema_version"] = 1
+            data["owner"] = self._relationship_owner(owner_profile)
+            relationships_node = data.setdefault("relationships", {})
+            if not isinstance(relationships_node, dict):
+                relationships_node = {}
+                data["relationships"] = relationships_node
+
+            target_key = (
+                target_profile.get("magical_name")
+                or target_profile.get("target_name")
+                or target
+            )
+            current = relationships_node.get(target_key)
+            if not isinstance(current, dict):
+                current = {}
+            history = current.get("history", [])
+            if not isinstance(history, list):
+                history = []
+
+            impression = str(relationship.get("impression") or "").strip()
+            evidence = str(relationship.get("evidence") or "").strip()
+            summary = str(relationship.get("summary") or "").strip()
+            tags = relationship.get("tags", [])
+            if not isinstance(tags, list):
+                tags = [str(tags)]
+            clean_tags = []
+            for tag in tags:
+                text = str(tag or "").strip()
+                if text and text not in clean_tags:
+                    clean_tags.append(text[:20])
+                if len(clean_tags) >= 4:
+                    break
+
+            history.append(
+                {
+                    "world_day_offset": max(0, int(world_day_offset)),
+                    "world_date": world_date,
+                    "battle_title": battle_title,
+                    "impression": impression,
+                    "evidence": evidence,
+                }
+            )
+            current.update(
+                {
+                    "target_user_id": target_profile.get("user_id", ""),
+                    "target_name": target_profile.get("target_name", ""),
+                    "magical_name": target_profile.get("magical_name", ""),
+                    "impression": impression,
+                    "summary": summary,
+                    "tags": clean_tags,
+                    "updated_at": now,
+                    "last_world_date": world_date,
+                    "history": history[-20:],
+                }
+            )
+            relationships_node[target_key] = current
+            self._atomic_write_json(path, data)
+            changed += 1
+        return changed
+
+    def _resolve_relationship_participants(
+        self,
+        group_id: str,
+        participants: list[str],
+    ) -> list[dict[str, Any]]:
+        users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
+        resolved: list[dict[str, Any]] = []
+        seen_names: set[str] = set()
+        seen_users: set[str] = set()
+        for raw_name in participants or []:
+            name = str(raw_name or "").strip()
+            if not name or name in seen_names:
+                continue
+            seen_names.add(name)
+            user_dir = self._find_user_dir_by_target_name(users_dir, name)
+            if user_dir and user_dir.name in seen_users:
+                continue
+            if user_dir:
+                profile = self._build_relationship_player_profile(user_dir)
+                if profile:
+                    seen_users.add(user_dir.name)
+                    resolved.append({"name": name, "user_dir": user_dir, "profile": profile})
+                    continue
+            resolved.append({"name": name, "user_dir": None, "profile": None})
+        return resolved
+
+    def _build_relationship_player_profile(self, user_dir: Path) -> dict[str, Any] | None:
+        player_data = self._load_current_player_data(user_dir)
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+        if not isinstance(protagonist, dict):
+            return None
+        target_name = self._get_nested(protagonist, ["个人信息", "姓名"], user_dir.name)
+        magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], target_name)
+        level_node = protagonist.get("等级", {})
+        level = level_node.get("等级", 1) if isinstance(level_node, dict) else 1
+        return {
+            "resolved": True,
+            "user_id": user_dir.name,
+            "target_name": target_name,
+            "magical_name": magical_name,
+            "武装": self._get_nested(protagonist, ["个人信息", "武装"], ""),
+            "变身服": self._get_nested(protagonist, ["个人信息", "变身服"], ""),
+            "性格特质": self._get_nested(protagonist, ["个人信息", "性格特质"], ""),
+            "代表色": self._get_nested(protagonist, ["个人信息", "代表色"], ""),
+            "核心能力": self._get_nested(protagonist, ["个人信息", "核心能力"], ""),
+            "相貌特征": self._public_nested_value(protagonist.get("相貌特征")),
+            "身材细节": self._public_nested_value(protagonist.get("身材细节")),
+            "等级": level,
+        }
+
+    def _existing_relationship_summaries(
+        self,
+        resolved: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        summaries: dict[str, Any] = {}
+        for item in resolved:
+            user_dir = item.get("user_dir")
+            profile = item.get("profile")
+            if not user_dir or not isinstance(profile, dict):
+                continue
+            data = self._read_json(user_dir / "relationships.json")
+            relationships = data.get("relationships", {}) if isinstance(data, dict) else {}
+            if not isinstance(relationships, dict):
+                relationships = {}
+            owner_name = profile.get("magical_name") or profile.get("target_name") or item["name"]
+            summaries[owner_name] = {
+                target: {
+                    "impression": value.get("impression", ""),
+                    "summary": value.get("summary", ""),
+                    "tags": value.get("tags", []),
+                    "last_world_date": value.get("last_world_date", ""),
+                }
+                for target, value in relationships.items()
+                if isinstance(value, dict)
+            }
+        return summaries
+
+    @staticmethod
+    def _relationship_names(profile: dict[str, Any]) -> list[str]:
+        names: list[str] = []
+        for key in ("target_name", "magical_name"):
+            name = str(profile.get(key) or "").strip()
+            if name and name not in names:
+                names.append(name)
+        return names
+
+    @staticmethod
+    def _relationship_owner(profile: dict[str, Any]) -> dict[str, str]:
+        return {
+            "user_id": str(profile.get("user_id") or ""),
+            "target_name": str(profile.get("target_name") or ""),
+            "magical_name": str(profile.get("magical_name") or ""),
         }
 
     def _replace_protagonist_key(self, value: Any, target_name: str) -> Any:

@@ -22,6 +22,9 @@ from .src.infrastructure.analysis.llm_reincarnation_analyzer import LLMReincarna
 from .src.infrastructure.analysis.llm_battle_diary_analyzer import (
     LLMBattleDiaryAnalyzer,
 )
+from .src.infrastructure.analysis.llm_player_relationship_analyzer import (
+    LLMPlayerRelationshipAnalyzer,
+)
 from .src.infrastructure.config.config_manager import ConfigManager
 from .src.infrastructure.editable_resources import EditableResourceManager
 from .src.infrastructure.messaging.avatar_service import QQAvatarService
@@ -58,6 +61,7 @@ class QQMahouShoujo(Star):
     editable_manager: EditableResourceManager
     llm_analyzer: LLMReincarnationAnalyzer
     diary_llm_analyzer: LLMBattleDiaryAnalyzer
+    relationship_llm_analyzer: LLMPlayerRelationshipAnalyzer
     report_generator: ReportGenerator
     reincarnation_service: ReincarnationApplicationService
     diary_service: BattleDiaryApplicationService
@@ -86,6 +90,11 @@ class QQMahouShoujo(Star):
             self.diary_domain_service,
             self.editable_manager,
         )
+        self.relationship_llm_analyzer = LLMPlayerRelationshipAnalyzer(
+            context,
+            self.config_manager,
+            self.editable_manager,
+        )
         self.report_generator = ReportGenerator(self.config_manager, self.editable_manager)
         self.reincarnation_service = ReincarnationApplicationService(
             self.config_manager,
@@ -104,6 +113,7 @@ class QQMahouShoujo(Star):
             self.diary_llm_analyzer,
             self.report_generator,
             self.save_repository,
+            self.relationship_llm_analyzer,
         )
         self.player_queue = PlayerTaskQueue()
         self.web_viewer = SaveWebViewer(

@@ -20,9 +20,18 @@ async def get_provider_id_with_fallback(
     context,
     config_manager,
     umo: str | None = None,
+    provider_id_override: str | None = None,
 ) -> str | None:
-    configured = config_manager.get_llm_provider_id()
-    if configured:
+    configured_ids: list[str] = []
+    for candidate in (
+        provider_id_override,
+        config_manager.get_llm_provider_id(),
+    ):
+        configured = str(candidate or "").strip()
+        if configured and configured not in configured_ids:
+            configured_ids.append(configured)
+
+    for configured in configured_ids:
         try:
             provider = context.get_provider_by_id(provider_id=configured)
             if provider:
@@ -65,6 +74,7 @@ async def call_provider_with_retry(
     umo: str | None = None,
     system_prompt: str | None = None,
     purpose: str = "文本补全",
+    provider_id_override: str | None = None,
 ):
     retries = max(1, config_manager.get_llm_retries())
     backoff = max(1, config_manager.get_llm_backoff())
@@ -72,7 +82,12 @@ async def call_provider_with_retry(
 
     for attempt in range(1, retries + 1):
         try:
-            provider_id = await get_provider_id_with_fallback(context, config_manager, umo)
+            provider_id = await get_provider_id_with_fallback(
+                context,
+                config_manager,
+                umo,
+                provider_id_override=provider_id_override,
+            )
             if not provider_id:
                 raise RuntimeError("没有可用的 LLM Provider")
 
