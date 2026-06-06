@@ -251,6 +251,7 @@ class PlayerSaveRepository:
         # 确保等级节点存在
         if "等级" not in protagonist_tree.get("主角", {}):
             protagonist_tree.setdefault("主角", {})["等级"] = {"等级": 1, "经验": 0}
+        self._ensure_battle_count(protagonist_tree)
 
         player_data: dict[str, Any] = {
             "schema_version": 2,
@@ -304,6 +305,7 @@ class PlayerSaveRepository:
         self._remove_location_state(player_data)
         self._remove_economy_state(player_data)
         self._normalize_status_progress_in_data(player_data)
+        self._ensure_battle_count(player_data)
 
         return {
             "group_id": self._safe_id(group_id),
@@ -350,6 +352,7 @@ class PlayerSaveRepository:
         level_node["等级"] = max(1, min(int(new_level), 7))
         level_node["经验"] = max(0, min(int(new_level_exp), 99))
         protagonist["等级"] = level_node
+        self._ensure_battle_count(player_data)
 
         player_data["updated_at"] = _now_date_str()
         self._remove_economy_state(player_data)
@@ -362,6 +365,7 @@ class PlayerSaveRepository:
             card.update_changes,
             teammate_names=teammate_names,
         )
+        self._increment_battle_count(player_data)
         card.state_snapshot = dict(player_data)
         self._save_current_player_data(user_dir, player_data)
 
@@ -384,6 +388,12 @@ class PlayerSaveRepository:
                     level_exp_delta,
                     mentioned_names,
                 )
+
+        self._increment_participant_teammate_battle_counts(
+            group_id,
+            card,
+            protagonist_name=card.target_name,
+        )
 
         self.append_log(
             group_id,
@@ -881,6 +891,38 @@ class PlayerSaveRepository:
                 npcs.append(npc)
         return npcs
 
+    def find_participant_npcs(
+        self,
+        group_id: str,
+        user_id: str,
+        participants: list[str],
+        *,
+        recent_record_count: int = 1,
+    ) -> list[dict[str, Any]]:
+        users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
+        if not users_dir.exists():
+            return []
+
+        current_user = self._safe_id(user_id)
+        npcs: list[dict[str, Any]] = []
+        seen_users: set[str] = set()
+        for raw_name in participants or []:
+            name = str(raw_name or "").strip()
+            if not name:
+                continue
+            user_dir = self._find_user_dir_by_target_name(users_dir, name)
+            if not user_dir or user_dir.name == current_user or user_dir.name in seen_users:
+                continue
+            npc = self._build_npc_package(
+                user_dir,
+                source="participant",
+                recent_record_count=recent_record_count,
+            )
+            if npc:
+                seen_users.add(user_dir.name)
+                npcs.append(npc)
+        return npcs
+
     def read_save_detail(self, group_id: str, user_id: str) -> dict[str, Any] | None:
         user_dir = self.get_user_dir(group_id, user_id)
         if not user_dir.exists():
@@ -1121,8 +1163,36 @@ class PlayerSaveRepository:
             "updated_at": _now_date_str(),
             "主角": {
                 "等级": {"等级": 1, "经验": 0},
+                "战斗": {"战斗次数": 0},
             },
         }
+
+    @classmethod
+    def _ensure_battle_count(cls, player_data: dict[str, Any]) -> int:
+        protagonist = player_data.setdefault("主角", {})
+        if not isinstance(protagonist, dict):
+            protagonist = {}
+            player_data["主角"] = protagonist
+        battle_node = protagonist.setdefault("战斗", {})
+        if not isinstance(battle_node, dict):
+            battle_node = {}
+            protagonist["战斗"] = battle_node
+        count = max(0, cls._safe_int(battle_node.get("战斗次数"), 0))
+        battle_node["战斗次数"] = count
+        return count
+
+    @classmethod
+    def _increment_battle_count(cls, player_data: dict[str, Any]) -> int:
+        count = cls._ensure_battle_count(player_data) + 1
+        player_data["主角"]["战斗"]["战斗次数"] = count
+        return count
+
+    @staticmethod
+    def _safe_int(value: object, default: int = 0) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
 
     @staticmethod
     def _get_nested(data: dict, keys: list[str], default: str = "") -> str:
@@ -1212,6 +1282,7 @@ class PlayerSaveRepository:
         magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], target_name)
         level_node = protagonist.get("等级", {})
         level = level_node.get("等级", 1) if isinstance(level_node, dict) else 1
+        battle_count = self._ensure_battle_count(player_data)
 
         log_path = user_dir / "daily_memory.jsonl"
         if not log_path.exists():
@@ -1234,6 +1305,7 @@ class PlayerSaveRepository:
             "身材细节": self._public_nested_value(protagonist.get("身材细节")),
             "性器官特征": self._public_nested_value(protagonist.get("性器官特征")),
             "等级": level,
+            "战斗次数": battle_count,
             "最近记录": self._read_recent_battle_summaries(
                 log_path,
                 limit=recent_record_count,
@@ -1785,6 +1857,45 @@ class PlayerSaveRepository:
                 f"base={level_exp_delta}, adjusted={adjusted}, "
                 f"Lv.{teammate_level}->Lv.{level}"
             )
+
+    def _increment_participant_teammate_battle_counts(
+        self,
+        group_id: str,
+        card: BattleDiaryCard,
+        *,
+        protagonist_name: str,
+    ) -> None:
+        users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
+        if not users_dir.exists():
+            return
+
+        protagonist_name = str(protagonist_name or "").strip()
+        seen_users: set[str] = set()
+        for raw_name in getattr(card, "participants", []) or []:
+            name = str(raw_name or "").strip()
+            if not name or name == protagonist_name:
+                continue
+            target_user_dir = self._find_user_dir_by_target_name(users_dir, name)
+            if not target_user_dir or target_user_dir.name in seen_users:
+                continue
+            player_data = self._load_current_player_data(target_user_dir)
+            if not isinstance(player_data, dict):
+                continue
+            protagonist_tree = player_data.get("主角", {})
+            primary_name = self._get_nested(
+                protagonist_tree,
+                ["个人信息", "姓名"],
+                "",
+            )
+            if primary_name == protagonist_name:
+                continue
+            seen_users.add(target_user_dir.name)
+            self._remove_economy_state(player_data)
+            self._remove_location_state(player_data)
+            self._increment_battle_count(player_data)
+            player_data["updated_at"] = _now_date_str()
+            self._save_current_player_data(target_user_dir, player_data)
+            logger.info(f"已增加队友 {name} 的战斗次数")
 
     def _find_mentioned_teammate_names(
         self,

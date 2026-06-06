@@ -100,13 +100,19 @@ class BattleDiaryApplicationService:
                 user_id=user_id,
                 umo=umo,
             )
+            participant_players = self.save_repository.find_participant_npcs(
+                group_id,
+                user_id,
+                getattr(card, "participants", []),
+                recent_record_count=self.config_manager.get_teammate_recent_record_count(),
+            )
             await self._append_cameo_memories(
                 group_id=group_id,
                 user_id=user_id,
                 source_target_name=card.target_name,
                 source_profile=self._source_profile_from_player_data(player_data, card.target_name),
                 card=card,
-                nearby_players=nearby_players,
+                nearby_players=self._merge_nearby_players(participant_players, nearby_players),
                 umo=umo,
                 world_day_offset=world_day_offset,
                 current_world_date=current_world_date,
@@ -206,7 +212,8 @@ class BattleDiaryApplicationService:
             mention_names = [name for name in (npc_target_name, npc_magical_name) if name]
             if not npc_user_id or not mention_names:
                 continue
-            if not any(name in mention_text for name in mention_names):
+            is_participant = self._is_participant_npc(card, mention_names)
+            if not is_participant and not any(name in mention_text for name in mention_names):
                 continue
             try:
                 self.save_repository.append_cameo_memory(
@@ -235,6 +242,15 @@ class BattleDiaryApplicationService:
                 )
             except Exception as exc:
                 logger.warning(f"写入客串记忆失败: {npc_user_id} {exc}")
+
+    @staticmethod
+    def _is_participant_npc(card, names: list[str]) -> bool:
+        participants = {
+            str(name or "").strip()
+            for name in getattr(card, "participants", []) or []
+            if str(name or "").strip()
+        }
+        return any(name in participants for name in names)
 
     async def _maybe_compress_battle_logs(
         self,

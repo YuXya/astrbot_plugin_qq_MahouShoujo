@@ -430,6 +430,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             "身材细节",
             "性器官特征",
             "等级",
+            "战斗次数",
             "最近记录",
         ]
         teammates: list[dict[str, object]] = []
