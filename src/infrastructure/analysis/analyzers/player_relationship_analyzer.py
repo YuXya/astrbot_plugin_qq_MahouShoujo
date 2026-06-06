@@ -109,6 +109,9 @@ class PlayerRelationshipAnalyzer(BaseAnalyzer[list[dict[str, Any]]]):
                 {
                     "from": source,
                     "to": target,
+                    "relationship": cls._clean_text(
+                        item.get("relationship") or item.get("关系")
+                    )[:12],
                     "impression": cls._clean_text(item.get("impression"))[:80],
                     "evidence": cls._clean_text(item.get("evidence"))[:240],
                     "summary": cls._clean_text(item.get("summary"))[:360],

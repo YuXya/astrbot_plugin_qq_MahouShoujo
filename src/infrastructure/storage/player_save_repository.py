@@ -816,6 +816,7 @@ class PlayerSaveRepository:
                             or profiles_by_user[target_user_id].get("target_name")
                             or target_user_id
                         ),
+                        "relationship": str(value.get("relationship") or "")[:12],
                         "impression": str(value.get("impression") or ""),
                         "evidence": str(value.get("evidence") or ""),
                         "summary": str(value.get("summary") or ""),
@@ -1215,6 +1216,9 @@ class PlayerSaveRepository:
             "_user_id": user_dir.name,
             "_source": source,
             "target_name": target_name,
+            "姓名": target_name,
+            "年龄": self._get_nested(protagonist, ["个人信息", "年龄"], ""),
+            "身份&职业": self._get_nested(protagonist, ["个人信息", "身份&职业"], ""),
             "魔法少女名": magical_name,
             "武装": self._get_nested(protagonist, ["个人信息", "武装"], ""),
             "变身服": self._get_nested(protagonist, ["个人信息", "变身服"], ""),
@@ -1313,6 +1317,9 @@ class PlayerSaveRepository:
             if not isinstance(history, list):
                 history = []
 
+            relationship_label = str(
+                relationship.get("relationship") or relationship.get("关系") or ""
+            ).strip()[:12]
             impression = str(relationship.get("impression") or "").strip()
             evidence = str(relationship.get("evidence") or "").strip()
             summary = str(relationship.get("summary") or "").strip()
@@ -1332,6 +1339,7 @@ class PlayerSaveRepository:
                     "world_day_offset": max(0, int(world_day_offset)),
                     "world_date": world_date,
                     "battle_title": battle_title,
+                    "relationship": relationship_label,
                     "impression": impression,
                     "evidence": evidence,
                 }
@@ -1341,6 +1349,7 @@ class PlayerSaveRepository:
                     "target_user_id": target_profile.get("user_id", ""),
                     "target_name": target_profile.get("target_name", ""),
                     "magical_name": target_profile.get("magical_name", ""),
+                    "relationship": relationship_label,
                     "impression": impression,
                     "summary": summary,
                     "tags": clean_tags,
@@ -1422,6 +1431,7 @@ class PlayerSaveRepository:
             summaries[owner_name] = {
                 target: {
                     "impression": value.get("impression", ""),
+                    "relationship": value.get("relationship", ""),
                     "summary": value.get("summary", ""),
                     "tags": value.get("tags", []),
                     "last_world_date": value.get("last_world_date", ""),
@@ -2132,6 +2142,10 @@ class PlayerSaveRepository:
                 "type": item.get("type", ""),
                 "created_at": item.get("created_at", 0),
                 "source_target_name": item.get("source_target_name", ""),
+                "source_name": item.get("source_name", ""),
+                "source_age": item.get("source_age", ""),
+                "source_identity": item.get("source_identity", ""),
+                "source_magical_name": item.get("source_magical_name", ""),
                 "encounter": item.get("encounter", ""),
                 "result": item.get("result", ""),
                 "title": item.get("title", ""),

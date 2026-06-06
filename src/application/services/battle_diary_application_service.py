@@ -103,6 +103,7 @@ class BattleDiaryApplicationService:
                 group_id=group_id,
                 user_id=user_id,
                 source_target_name=card.target_name,
+                source_profile=self._source_profile_from_player_data(player_data, card.target_name),
                 card=card,
                 nearby_players=nearby_players,
                 umo=umo,
@@ -187,6 +188,7 @@ class BattleDiaryApplicationService:
         group_id: str,
         user_id: str,
         source_target_name: str,
+        source_profile: dict[str, str],
         card,
         nearby_players: list[dict],
         umo: str | None,
@@ -213,6 +215,10 @@ class BattleDiaryApplicationService:
                         "source_group_id": str(group_id),
                         "source_user_id": str(user_id),
                         "source_target_name": source_target_name,
+                        "source_name": source_profile.get("姓名", source_target_name),
+                        "source_age": source_profile.get("年龄", ""),
+                        "source_identity": source_profile.get("身份&职业", ""),
+                        "source_magical_name": source_profile.get("魔法少女名", ""),
                         "npc_target_name": npc_magical_name or npc_target_name,
                         "encounter": card.encounter,
                         "result": card.result,
@@ -319,6 +325,19 @@ class BattleDiaryApplicationService:
                 if source == "mentioned_by_action":
                     existing["_source"] = source
         return merged
+
+    @staticmethod
+    def _source_profile_from_player_data(player_data: dict, fallback_name: str) -> dict[str, str]:
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+        info = protagonist.get("个人信息", {}) if isinstance(protagonist, dict) else {}
+        if not isinstance(info, dict):
+            info = {}
+        return {
+            "姓名": str(info.get("姓名") or fallback_name or "").strip(),
+            "年龄": str(info.get("年龄") or "").strip(),
+            "身份&职业": str(info.get("身份&职业") or "").strip(),
+            "魔法少女名": str(info.get("魔法少女名") or "").strip(),
+        }
 
     @staticmethod
     def _logs_text_for_teammate_scan(logs: list[dict]) -> str:

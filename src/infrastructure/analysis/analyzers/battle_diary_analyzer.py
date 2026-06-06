@@ -365,15 +365,15 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             return "（暂无其他人与主角的交互。）"
         lines = []
         for index, item in enumerate(cameo_memories[-8:], start=1):
-            source_name = (
+            source_label = (
                 "多条交互摘要"
                 if item.get("type") == "cameo_summary"
-                else item.get("source_target_name", "")
+                else BattleDiaryAnalyzer._cameo_source_label(item)
             )
             title = BattleDiaryAnalyzer._world_diary_title(item)
             encounter = item.get("encounter", "")
             result = item.get("result", "")
-            line = f"{index}. {source_name or '未知'}在{title}"
+            line = f"{index}. {source_label or '未知'}在{title}"
             if encounter:
                 line += f"；遭遇：{encounter}"
             if result:
@@ -400,7 +400,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                     "\n".join(
                         [
                             f"【{title}】",
-                            f"来源角色：{item.get('source_target_name', '')}",
+                            f"来源角色：{BattleDiaryAnalyzer._cameo_source_label(item)}",
                             f"遭遇：{item.get('encounter', '')}",
                             f"结算：{item.get('result', '')}",
                         ]
@@ -417,6 +417,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "json": "[]",
             }
         fields = [
+            "姓名",
+            "年龄",
+            "身份&职业",
             "魔法少女名",
             "武装",
             "变身服",
@@ -439,6 +442,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 continue
             seen.add(name)
             public_item = {key: item.get(key, "") for key in fields}
+            public_item["姓名"] = item.get("姓名") or item.get("target_name", "")
             public_item["魔法少女名"] = name
             teammates.append(public_item)
         if not teammates:
@@ -452,6 +456,24 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             "recent_record_count": recent_record_count,
             "json": self._json_dump(teammates),
         }
+
+    @staticmethod
+    def _cameo_source_label(item: dict) -> str:
+        source_name = str(
+            item.get("source_name") or item.get("source_target_name") or ""
+        ).strip()
+        magical_name = str(item.get("source_magical_name") or "").strip()
+        age = str(item.get("source_age") or "").strip()
+        identity = str(item.get("source_identity") or "").strip()
+
+        details = [value for value in (magical_name, age, identity) if value]
+        if source_name and details:
+            return f"{source_name}（{'，'.join(details)}）"
+        if source_name:
+            return source_name
+        if details:
+            return "（" + "，".join(details) + "）"
+        return ""
 
     @staticmethod
     def _world_diary_title(item: dict) -> str:

@@ -267,7 +267,7 @@ class QQMahouShoujo(Star):
                     f"请按以下格式重新发送：\n\n{REINCARNATION_TEMPLATE}"
                 )
             else:
-                message = f"请按以下格式填写转生信息：\n\n{REINCARNATION_TEMPLATE}"
+                message = f"请按以下格式填写转生信息(最少填写三个字段)：\n\n{REINCARNATION_TEMPLATE}"
             yield event.plain_result(message)
             return
 

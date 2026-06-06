@@ -2701,6 +2701,14 @@ class SaveWebViewer:
                     <h2 id="relationshipCardName">未选择</h2>
                   </div>
                   <p id="relationshipCardPlayer" class="relationship-card-subtitle"></p>
+                  <div class="relationship-perspective" role="group" aria-label="印象视角">
+                    <button id="relationshipPerspectiveOut" class="active" type="button">我眼里的TA</button>
+                    <button id="relationshipPerspectiveIn" type="button">TA眼里的我</button>
+                  </div>
+                  <div class="relationship-card-section">
+                    <span>Relationship</span>
+                    <p id="relationshipCardRelationship">-</p>
+                  </div>
                   <div class="relationship-card-section">
                     <span>Impression</span>
                     <p id="relationshipCardImpression">点击圈圈查看关系。</p>
@@ -3365,7 +3373,7 @@ class SaveWebViewer:
             source_name = self._e(
                 "多条交互摘要"
                 if memory.get("type") == "cameo_summary"
-                else memory.get("source_target_name") or "未知角色"
+                else self._cameo_source_label(memory) or "未知角色"
             )
             encounter = self._e(memory.get("encounter") or "")
             result = self._e(memory.get("result") or "")
@@ -3418,6 +3426,24 @@ class SaveWebViewer:
                 """
             )
         return "\n".join(cards)
+
+    @staticmethod
+    def _cameo_source_label(memory: dict[str, Any]) -> str:
+        source_name = str(
+            memory.get("source_name") or memory.get("source_target_name") or ""
+        ).strip()
+        magical_name = str(memory.get("source_magical_name") or "").strip()
+        age = str(memory.get("source_age") or "").strip()
+        identity = str(memory.get("source_identity") or "").strip()
+
+        details = [value for value in (magical_name, age, identity) if value]
+        if source_name and details:
+            return f"{source_name}（{'，'.join(details)}）"
+        if source_name:
+            return source_name
+        if details:
+            return "（" + "，".join(details) + "）"
+        return ""
 
     def _progress_overview_html(self, state: dict[str, Any]) -> str:
         sections = build_progress_sections(
@@ -3761,27 +3787,51 @@ class SaveWebViewer:
   const viewerEdges = new Map(
     edges.filter((edge) => String(edge.from_user_id) === viewerId).map((edge) => [String(edge.to_user_id), edge])
   );
+  const targetEdges = new Map(
+    edges.filter((edge) => String(edge.to_user_id) === viewerId).map((edge) => [String(edge.from_user_id), edge])
+  );
   let selectedId = viewerEdges.keys().next().value || viewerId || (nodes[0] && String(nodes[0].user_id)) || "";
+  let selectedPerspective = "out";
 
   const card = {
     name: document.getElementById("relationshipCardName"),
     player: document.getElementById("relationshipCardPlayer"),
+    relationship: document.getElementById("relationshipCardRelationship"),
     impression: document.getElementById("relationshipCardImpression"),
     evidence: document.getElementById("relationshipCardEvidence"),
     summary: document.getElementById("relationshipCardSummary"),
     tags: document.getElementById("relationshipCardTags"),
+    outButton: document.getElementById("relationshipPerspectiveOut"),
+    inButton: document.getElementById("relationshipPerspectiveIn"),
   };
   const text = (value, fallback = "") => String(value || fallback || "").trim();
   const displayName = (node) => text(node && (node.magical_name || node.target_name || node.user_id), "Unknown");
+  const directEdge = (node, perspective = selectedPerspective) => {
+    const nodeId = String(node && node.user_id);
+    return perspective === "in" ? targetEdges.get(nodeId) : viewerEdges.get(nodeId);
+  };
+  const setButtonState = (button, active, disabled, label) => {
+    if (!button) return;
+    button.textContent = label;
+    button.classList.toggle("active", active);
+    button.disabled = disabled;
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  };
 
   function updateCard(node) {
     if (!node) return;
-    const edge = viewerEdges.get(String(node.user_id));
+    const outbound = directEdge(node, "out");
+    const inbound = directEdge(node, "in");
+    const targetName = displayName(node);
+    const edge = directEdge(node);
     card.name.textContent = displayName(node);
     card.player.textContent = text(node.target_name) ? `玩家名：${node.target_name}` : "";
+    card.relationship.textContent = edge ? text(edge.relationship, "-") : "-";
     card.impression.textContent = edge ? text(edge.impression, "暂无直接印象记录。") : "暂无直接印象记录。";
     card.evidence.textContent = edge ? text(edge.evidence, "-") : "-";
     card.summary.textContent = edge ? text(edge.summary, "-") : "-";
+    setButtonState(card.outButton, selectedPerspective === "out", !outbound, `我眼里的${targetName}`);
+    setButtonState(card.inButton, selectedPerspective === "in", !inbound, `${targetName}眼里的我`);
     card.tags.innerHTML = "";
     const tags = edge && Array.isArray(edge.tags) ? edge.tags : [];
     tags.forEach((tag) => {
@@ -3875,8 +3925,9 @@ class SaveWebViewer:
       const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
       label.setAttribute("x", (a.x + b.x) / 2);
       label.setAttribute("y", (a.y + b.y) / 2 - 8);
-      label.textContent = text(edge.impression).slice(0, 18);
-      group.append(line, label);
+      label.textContent = String(edge.from_user_id) === viewerId ? text(edge.relationship).slice(0, 12) : "";
+      group.append(line);
+      if (label.textContent) group.appendChild(label);
       svg.appendChild(group);
     });
 
@@ -3900,6 +3951,7 @@ class SaveWebViewer:
       group.append(circle, name, level);
       group.addEventListener("click", () => {
         selectedId = String(node.user_id);
+        selectedPerspective = "out";
         updateCard(node);
         render();
       });
@@ -3912,6 +3964,19 @@ class SaveWebViewer:
       svg.appendChild(group);
     });
     updateCard(byId.get(String(selectedId)) || nodes[0]);
+  }
+
+  if (card.outButton) {
+    card.outButton.addEventListener("click", () => {
+      selectedPerspective = "out";
+      updateCard(byId.get(String(selectedId)));
+    });
+  }
+  if (card.inButton) {
+    card.inButton.addEventListener("click", () => {
+      selectedPerspective = "in";
+      updateCard(byId.get(String(selectedId)));
+    });
   }
 
   render();
@@ -4096,6 +4161,10 @@ class SaveWebViewer:
     .relationship-node .node-level {{ fill: #744160; font-size: 11px; font-weight: 900; }}
     .relationship-card {{ align-self: stretch; padding: 20px; overflow: auto; }}
     .relationship-card-subtitle {{ margin: -6px 0 18px; color: #76506c; font-size: 13px; font-weight: 800; overflow-wrap: anywhere; }}
+    .relationship-perspective {{ display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }}
+    .relationship-perspective button {{ flex: 1 1 132px; min-height: 34px; margin: 0; padding: 7px 10px; border: 1px solid rgba(211,91,165,.3); border-radius: 6px; background: rgba(255,255,255,.74); color: #744160; font-size: 12px; font-weight: 900; line-height: 1.2; overflow-wrap: anywhere; }}
+    .relationship-perspective button.active {{ border-color: rgba(181,83,156,.7); background: #b5539c; color: #fff; box-shadow: 0 8px 18px rgba(181,83,156,.18); }}
+    .relationship-perspective button:disabled {{ cursor: not-allowed; opacity: .45; box-shadow: none; }}
     .relationship-card-section {{ padding: 13px 0; border-top: 1px solid rgba(211,91,165,.22); }}
     .relationship-card-section span {{ display: block; margin-bottom: 6px; color: #c54793; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0; }}
     .relationship-card-section p {{ margin: 0; color: #4b2447; line-height: 1.65; overflow-wrap: anywhere; }}
