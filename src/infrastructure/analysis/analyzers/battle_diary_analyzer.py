@@ -66,6 +66,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         nickname: str | None = None,
         umo: str | None = None,
         current_world_date: str = "",
+        event_command: str = "/魔法少女战斗",
+        prompt_name: str = "battle_diary_prompt",
+        default_action: str = "自由战斗",
     ) -> tuple[BattleDiaryCard | None, TokenUsage, str]:
         prompt = self.build_diary_prompt(
             action_text=action_text,
@@ -76,6 +79,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             user_id=user_id,
             nickname=nickname,
             current_world_date=current_world_date,
+            event_command=event_command,
+            prompt_name=prompt_name,
+            default_action=default_action,
         )
         system_prompt = self.editable_manager.get_prompt("default_system_prompt")
         if self.config_manager.get_debug_mode():
@@ -123,13 +129,16 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         user_id: str | None,
         nickname: str | None,
         current_world_date: str,
+        event_command: str = "/魔法少女战斗",
+        prompt_name: str = "battle_diary_prompt",
+        default_action: str = "自由战斗",
     ) -> str:
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
         current_level = self.domain_service.get_current_level(protagonist)
-        action = action_text.strip() or "玩家没有指定行动，请根据当前状态自由生成一次小战斗。"
+        action = action_text.strip() or f"玩家没有指定行动，请根据当前状态自由生成一次{default_action}。"
         scan_parts = [
-            "/魔法少女战斗",
-            "魔法少女战斗",
+            event_command,
+            event_command.lstrip("/"),
             action,
             self._format_logs_for_scan(logs),
         ]
@@ -142,7 +151,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         )
         event_book_result = self.event_book_engine.build_prompt_text(
             scan_parts,
-            current_event="/魔法少女战斗",
+            current_event=event_command,
             player_level=current_level,
         )
         cross_hit_parts: list[str] = []
@@ -162,7 +171,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             )
             event_book_result = self.event_book_engine.build_prompt_text(
                 enriched_scan_parts,
-                current_event="/魔法少女战斗",
+                current_event=event_command,
                 player_level=current_level,
             )
 
@@ -188,7 +197,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         teammate_info = self._format_teammate_info(nearby_players)
 
         return self.editable_manager.render_prompt(
-            "battle_diary_prompt",
+            prompt_name,
             {
                 "player_data_update_json": self._json_dump(player_data),
                 "player_name": self._get_nested(protagonist, ["个人信息", "姓名"], "") or "主角",

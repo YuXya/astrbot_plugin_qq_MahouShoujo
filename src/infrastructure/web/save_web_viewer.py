@@ -1501,6 +1501,8 @@ class SaveWebViewer:
                 {{ id: "reincarnation", command: "/魔法少女转生", name: "魔法少女转生" }},
                 {{ id: "battle", command: "/魔法少女战斗", name: "魔法少女战斗" }},
                 {{ id: "daily", command: "/魔法少女日常", name: "魔法少女日常" }},
+                {{ id: "corruption", command: "/魔法少女黑化", name: "魔法少女黑化" }},
+                {{ id: "villain_officer_battle", command: "/反派干部战斗", name: "反派干部战斗" }},
               ];
               const ebLevelOptions = [
                 {{ value: 1, label: "F" }},
@@ -1858,6 +1860,16 @@ class SaveWebViewer:
                 "id": "daily",
                 "command": "/魔法少女日常",
                 "name": "魔法少女日常",
+            },
+            {
+                "id": "corruption",
+                "command": "/魔法少女黑化",
+                "name": "魔法少女黑化",
+            },
+            {
+                "id": "villain_officer_battle",
+                "command": "/反派干部战斗",
+                "name": "反派干部战斗",
             },
         ]
         raw_events = book.get("events", [])

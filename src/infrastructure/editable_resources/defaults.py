@@ -40,6 +40,12 @@ REINCARNATION_PROMPT = _load_prompt("reincarnation_prompt.txt")
 
 BATTLE_DIARY_PROMPT = _load_prompt("battle_diary_prompt.txt")
 
+DAILY_DIARY_PROMPT = _load_prompt("daily_diary_prompt.txt")
+
+CORRUPTION_DIARY_PROMPT = _load_prompt("corruption_diary_prompt.txt")
+
+VILLAIN_OFFICER_BATTLE_PROMPT = _load_prompt("villain_officer_battle_prompt.txt")
+
 RELATIONSHIP_SUMMARY_PROMPT = _load_prompt("relationship_summary_prompt.txt")
 
 TEAMMATE_COMPLETION_PROMPT = _load_prompt("teammate_completion_prompt.txt")

@@ -32,6 +32,9 @@ class LLMBattleDiaryAnalyzer:
         nickname: str | None = None,
         umo: str | None = None,
         current_world_date: str = "",
+        event_command: str = "/魔法少女战斗",
+        prompt_name: str = "battle_diary_prompt",
+        default_action: str = "自由战斗",
     ) -> BattleDiaryAnalysisResult:
         card, usage, raw_response = await self.analyzer.analyze_diary(
             action_text=action_text,
@@ -43,6 +46,9 @@ class LLMBattleDiaryAnalyzer:
             nickname=nickname,
             umo=umo,
             current_world_date=current_world_date,
+            event_command=event_command,
+            prompt_name=prompt_name,
+            default_action=default_action,
         )
         if card is None:
             raise ValueError("LLM 响应无法解析为魔法少女战斗日记卡 JSON")

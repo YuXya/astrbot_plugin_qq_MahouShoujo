@@ -34,6 +34,9 @@ class BattleDiaryApplicationService:
         umo: str | None,
         html_render_func,
         avatar_url: str | None = None,
+        event_command: str = "/魔法少女战斗",
+        prompt_name: str = "battle_diary_prompt",
+        default_action: str = "自由战斗",
     ) -> BattleDiaryExecutionResult:
         try:
             save_data = self.save_repository.load_player_save(group_id, user_id)
@@ -76,6 +79,9 @@ class BattleDiaryApplicationService:
                 nickname=nickname,
                 umo=umo,
                 current_world_date=current_world_date,
+                event_command=event_command,
+                prompt_name=prompt_name,
+                default_action=default_action,
             )
             card = analysis.card
 
