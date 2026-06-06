@@ -86,6 +86,7 @@ class BattleDiaryApplicationService:
                 new_level,
                 card.level_exp_after,
                 world_day_offset=world_day_offset,
+                mention_scan_texts=action_text,
             )
             await self._maybe_summarize_relationships(
                 group_id=group_id,

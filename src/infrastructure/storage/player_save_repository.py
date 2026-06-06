@@ -329,6 +329,7 @@ class PlayerSaveRepository:
         new_level: int,
         new_level_exp: int = 0,
         world_day_offset: int | None = None,
+        mention_scan_texts: str | list[str] | None = None,
     ) -> None:
         user_dir = self.get_user_dir(group_id, user_id)
         user_dir.mkdir(parents=True, exist_ok=True)
@@ -371,7 +372,11 @@ class PlayerSaveRepository:
         # 应用队友等级经验（纯代码，AI 无需输出）
         level_exp_delta = self._extract_level_exp_delta(card.update_changes)
         if level_exp_delta > 0:
-            mentioned_names = self._find_mentioned_teammate_names(group_id, card)
+            mentioned_names = self._find_mentioned_teammate_names(
+                group_id,
+                card,
+                mention_scan_texts=mention_scan_texts,
+            )
             if mentioned_names:
                 self._apply_teammate_level_exp(
                     group_id,
@@ -1785,13 +1790,19 @@ class PlayerSaveRepository:
         self,
         group_id: str,
         card: BattleDiaryCard,
+        mention_scan_texts: str | list[str] | None = None,
     ) -> set[str]:
         text_parts = [
+            str(card.action or ""),
             str(card.encounter or ""),
             str(card.result or ""),
         ]
         if isinstance(card.reason, list):
             text_parts.extend(str(c) for c in card.reason)
+        if isinstance(mention_scan_texts, list):
+            text_parts.extend(str(item or "") for item in mention_scan_texts)
+        elif mention_scan_texts:
+            text_parts.append(str(mention_scan_texts))
         mention_text = "\n".join(text_parts)
         if not mention_text.strip():
             return set()
