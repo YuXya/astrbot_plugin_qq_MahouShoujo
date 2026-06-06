@@ -5,6 +5,7 @@ import hmac
 import json
 import re
 import secrets
+import time
 from typing import Any
 from urllib.parse import quote
 
@@ -71,6 +72,8 @@ class SaveWebViewer:
         self._add_route(app, "POST", "/city/name/save", self._city_name_save)
         self._add_route(app, "GET", "/player", self._player_detail)
         self._add_route(app, "GET", "/player/relationships", self._player_relationships)
+        self._add_route(app, "GET", "/player/monsters", self._player_monsters)
+        self._add_route(app, "POST", "/player/monsters/save", self._player_monsters_save)
         self._add_route(app, "POST", "/player/profile/save", self._player_profile_save)
         self._add_route(app, "POST", "/player/delete", self._player_delete)
         self._add_route(app, "POST", "/player/log/delete", self._player_log_delete)
@@ -94,6 +97,7 @@ class SaveWebViewer:
         self._add_route(app, "GET", "/editable/export", self._editable_export)
         self._add_route(app, "GET", "/editable/export/key-info", self._editable_export_key_info)
         self._add_route(app, "POST", "/editable/import", self._editable_import)
+        self._add_route(app, "POST", "/editable/monster/import-player", self._editable_monster_import_player)
         self._add_route(app, "GET", "/health", self._health)
 
         self._runner = web.AppRunner(app)
@@ -1090,6 +1094,7 @@ class SaveWebViewer:
             )
 
         book_json = self._json_script_data(book)
+        player_monster_json = self._json_script_data(self._player_monster_submissions())
         storage_key = "qq_mahoushoujo:monster_book:open_entries"
         source_url = self._url(
             f"/editable/source?id={quote(file_id, safe='')}&category={self._e(back_category)}"
@@ -1105,12 +1110,26 @@ class SaveWebViewer:
             <div class="source-actions">
               <a class="button-link secondary-link" href="{source_url}">编辑源码</a>
               <a class="button-link secondary-link" href="{export_url}">导出 JSON</a>
+              <button id="show-player-monsters" class="secondary compact-button" type="button">查看玩家创建的魔物</button>
               <form class="inline-import-form" method="post" action="{self._url('/editable/import')}" enctype="multipart/form-data">
                 <input type="hidden" name="id" value="{self._e(file_id)}">
                 <input type="hidden" name="category" value="{self._e(back_category)}">
                 <input name="import_file" type="file" accept=".json,application/json">
                 <button class="secondary compact-button" type="submit">导入 JSON</button>
               </form>
+            </div>
+            <div id="player-monster-modal" class="monster-modal" hidden>
+              <div class="monster-modal-backdrop" data-action="close-player-monsters"></div>
+              <section class="monster-modal-panel" role="dialog" aria-modal="true" aria-labelledby="player-monster-modal-title">
+                <div class="monster-modal-head">
+                  <div>
+                    <span>Player Workshop</span>
+                    <h2 id="player-monster-modal-title">玩家创建的魔物</h2>
+                  </div>
+                  <button class="secondary compact-button" type="button" data-action="close-player-monsters">关闭</button>
+                </div>
+                <div id="player-monster-submissions" class="player-monster-submissions"></div>
+              </section>
             </div>
             <form id="monster-book-form" method="post" action="{self._url('/editable/save')}">
               <input type="hidden" name="id" value="{self._e(file_id)}">
@@ -1137,10 +1156,14 @@ class SaveWebViewer:
             </form>
             <script>
               const initialMonsterBook = {book_json};
+              const playerMonsterSubmissions = {player_monster_json};
               const monsterEntriesEl = document.getElementById("monster-book-entries");
               const monsterForm = document.getElementById("monster-book-form");
               const monsterContentInput = document.getElementById("monster-book-content");
               const addMonsterButton = document.getElementById("add-monster");
+              const showPlayerMonstersButton = document.getElementById("show-player-monsters");
+              const playerMonsterModal = document.getElementById("player-monster-modal");
+              const playerMonsterSubmissionsEl = document.getElementById("player-monster-submissions");
               const monsterStorageKey = "{self._e(storage_key)}";
               const monsterLevelOptions = [
                 {{ value: 1, label: "F" }},
@@ -1397,6 +1420,78 @@ class SaveWebViewer:
 
               function monsterEscapeAttr(value) {{
                 return monsterEscapeHtml(value).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+              }}
+
+              function monsterRenderPlayerSubmissions() {{
+                if (!playerMonsterSubmissionsEl) return;
+                const submissions = Array.isArray(playerMonsterSubmissions) ? playerMonsterSubmissions : [];
+                if (!submissions.length) {{
+                  playerMonsterSubmissionsEl.innerHTML = '<div class="empty-state">暂时没有玩家创建的魔物。</div>';
+                  return;
+                }}
+                playerMonsterSubmissionsEl.innerHTML = submissions.map((item, index) => {{
+                  const entry = monsterNormalizeEntry(item.entry || {{}}, index);
+                  const title = entry.name || entry.id || `玩家魔物 ${{index + 1}}`;
+                  const keys = entry.keys.length ? entry.keys.join("、") : "未填写";
+                  const source = `${{item.city_name || item.group_id || "未知城市"}} / ${{item.player_name || item.user_id || "未知玩家"}}`;
+                  return `
+                    <article class="player-monster-submission">
+                      <div class="player-monster-submission-head">
+                        <div>
+                          <span>${{monsterEscapeHtml(source)}}</span>
+                          <h3>${{monsterEscapeHtml(title)}}</h3>
+                        </div>
+                        <button type="button" data-import-player-monster="${{index}}">录入魔物书</button>
+                      </div>
+                      <div class="log-meta">
+                        <span>ID: ${{monsterEscapeHtml(entry.id || "未填写")}}</span>
+                        <span>可见 ${{monsterLevelsLabel(entry.visible_levels)}}</span>
+                        <span>魔物 ${{monsterLevelsLabel(entry.monster_levels)}}</span>
+                      </div>
+                      <p><strong>别名：</strong>${{monsterEscapeHtml(keys)}}</p>
+                      <details>
+                        <summary>查看设定</summary>
+                        <pre>${{monsterEscapeHtml(JSON.stringify(entry, null, 2))}}</pre>
+                      </details>
+                    </article>
+                  `;
+                }}).join("");
+                playerMonsterSubmissionsEl.querySelectorAll("[data-import-player-monster]").forEach((button) => {{
+                  button.addEventListener("click", () => {{
+                    const index = Number.parseInt(button.dataset.importPlayerMonster, 10);
+                    const source = submissions[index];
+                    if (!source || !source.entry) return;
+                    monsterCaptureOpenState();
+                    monsterSyncFromDom();
+                    const imported = monsterNormalizeEntry(source.entry, monsterState.entries.length);
+                    const existingIds = new Set(monsterState.entries.map((entry) => String(entry.id || "").trim()).filter(Boolean));
+                    if (existingIds.has(imported.id)) {{
+                      imported.id = `${{imported.id}}_player_${{Date.now().toString(36)}}`;
+                    }}
+                    monsterState.entries.push(imported);
+                    monsterOpenKeys.add(monsterEntryKey(imported, monsterState.entries.length - 1));
+                    monsterHasLoadedOpenState = true;
+                    monsterPersistOpenState();
+                    monsterRenderEntries();
+                    alert("已加入当前魔物书编辑区，请点击页面底部“保存”写入 default.json。");
+                  }});
+                }});
+              }}
+
+              function monsterOpenPlayerModal() {{
+                monsterRenderPlayerSubmissions();
+                playerMonsterModal.hidden = false;
+              }}
+
+              function monsterClosePlayerModal() {{
+                playerMonsterModal.hidden = true;
+              }}
+
+              if (showPlayerMonstersButton && playerMonsterModal) {{
+                showPlayerMonstersButton.addEventListener("click", monsterOpenPlayerModal);
+                playerMonsterModal.querySelectorAll("[data-action='close-player-monsters']").forEach((button) => {{
+                  button.addEventListener("click", monsterClosePlayerModal);
+                }});
               }}
 
               addMonsterButton.addEventListener("click", () => {{
@@ -2380,6 +2475,56 @@ class SaveWebViewer:
             self._url(f"/editable/file?id={quote(file_id, safe='')}&category={self._e(category)}")
         )
 
+    async def _editable_monster_import_player(self, request: web.Request) -> web.Response:
+        if not self._is_admin(request):
+            return self._forbidden()
+
+        data = await request.post()
+        group_id = str(data.get("group_id", "")).strip()
+        user_id = str(data.get("user_id", "")).strip()
+        entry_index = int(str(data.get("entry_index", "0") or "0"))
+        category = self._editable_back_category(str(data.get("category", "")), "monster_book/default.json")
+        try:
+            player_content = self.repository.read_player_source_file(
+                group_id,
+                user_id,
+                "player_monster_book.json",
+            )
+            player_book = self._normalize_monster_book(json.loads(player_content or "{}"))
+            player_entries = player_book.get("entries", [])
+            if entry_index < 0 or entry_index >= len(player_entries):
+                raise ValueError("玩家魔物不存在")
+            imported = self._normalize_monster_book({"entries": [player_entries[entry_index]]})["entries"][0]
+            current = self._normalize_monster_book(
+                json.loads(self.editable_manager.read_text("monster_book/default.json"))
+            )
+            existing_ids = {
+                str(entry.get("id") or "").strip()
+                for entry in current.get("entries", [])
+                if isinstance(entry, dict)
+            }
+            if imported.get("id") in existing_ids:
+                imported["id"] = f"{imported.get('id')}_player_{int(time.time())}"
+            current.setdefault("entries", []).append(imported)
+            self.editable_manager.write_json_book(
+                "monster_book/default.json",
+                json.dumps(current, ensure_ascii=False, indent=2),
+            )
+        except Exception as exc:
+            return self._html_response(
+                "录入玩家魔物失败",
+                f"""
+                <h1>录入玩家魔物失败</h1>
+                <p class="error">{self._e(exc)}</p>
+                <p><a href="{self._url(f'/editable/file?id=monster_book%2Fdefault.json&category={self._e(category)}')}">返回魔物书</a></p>
+                """,
+                status=400,
+            )
+
+        raise web.HTTPFound(
+            self._url(f"/editable/file?id=monster_book%2Fdefault.json&category={self._e(category)}")
+        )
+
     async def _editable_reset(self, request: web.Request) -> web.Response:
         if not self._is_admin(request):
             return self._forbidden()
@@ -2742,6 +2887,384 @@ class SaveWebViewer:
             """,
         )
 
+    async def _player_monsters(self, request: web.Request) -> web.Response:
+        session = self._session(request)
+        if not session or session["role"] != SESSION_USER_ROLE:
+            return self._forbidden()
+
+        group_id = request.query.get("group_id", "")
+        user_id = request.query.get("user_id", "")
+        if not self._can_access_player(session, user_id):
+            return self._forbidden()
+
+        detail = self.repository.read_save_detail(group_id, user_id)
+        if detail is None:
+            raise web.HTTPNotFound(text="save not found")
+
+        player_data = detail.get("player_data", {})
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+        title_name = self._get_nested(
+            protagonist,
+            ["个人信息", "姓名"],
+            player_data.get("nickname", ""),
+        ) or user_id
+        content = self.repository.read_player_source_file(
+            group_id,
+            user_id,
+            "player_monster_book.json",
+        )
+        try:
+            book = self._normalize_monster_book(json.loads(content or "{}"))
+        except Exception:
+            book = {"version": 1, "entries": []}
+
+        back_url = self._url(
+            f"/player?group_id={quote(group_id, safe='')}&user_id={quote(user_id, safe='')}"
+        )
+        save_url = self._url("/player/monsters/save")
+        book_json = self._json_script_data(book)
+
+        return self._html_response(
+            f"魔物制作 - {title_name}",
+            f"""
+            <section class="villain-monster-shell" aria-label="玩家魔物制作">
+              <div class="villain-grid" aria-hidden="true"></div>
+              <header class="villain-monster-head">
+                <a class="player-back-link" href="{back_url}">返回个人档案</a>
+                <p class="player-kicker">Villain Workshop</p>
+                <h1>魔物制作</h1>
+                <p>{self._e(title_name)}的私人反派干部档案。这里创建的魔物只会保存到你的个人文件夹，不会直接应用进游戏；管理员审核录入后才会进入公共魔物书。</p>
+              </header>
+
+              <form id="player-monster-form" class="villain-workbench" method="post" action="{save_url}">
+                <input type="hidden" name="group_id" value="{self._e(group_id)}">
+                <input type="hidden" name="user_id" value="{self._e(user_id)}">
+                <input id="player-monster-content" type="hidden" name="content" value="">
+                <aside class="villain-menu">
+                  <div class="villain-menu-head">
+                    <span>Created</span>
+                    <button id="player-add-monster" type="button">创建魔物</button>
+                  </div>
+                  <div id="player-monster-tabs" class="villain-tabs"></div>
+                </aside>
+                <section id="player-monster-editor" class="villain-editor"></section>
+                <div class="villain-savebar">
+                  <p>注释：ID 用来给管理员和系统识别条目，建议只用英文、数字、下划线；别名就是管理员魔物书里的“关键词”，可写多个称呼方便之后检索。</p>
+                  <button type="submit">保存魔物档案</button>
+                </div>
+              </form>
+              <script>
+                const playerMonsterInitial = {book_json};
+                const playerMonsterForm = document.getElementById("player-monster-form");
+                const playerMonsterContent = document.getElementById("player-monster-content");
+                const playerMonsterTabs = document.getElementById("player-monster-tabs");
+                const playerMonsterEditor = document.getElementById("player-monster-editor");
+                const playerAddMonster = document.getElementById("player-add-monster");
+                const playerMonsterLevels = [
+                  {{ value: 1, label: "F" }},
+                  {{ value: 2, label: "E" }},
+                  {{ value: 3, label: "D" }},
+                  {{ value: 4, label: "C" }},
+                  {{ value: 5, label: "B" }},
+                  {{ value: 6, label: "A" }},
+                  {{ value: 7, label: "S" }},
+                ];
+                const playerMonsterState = {{
+                  ...playerMonsterInitial,
+                  entries: Array.isArray(playerMonsterInitial.entries) ? playerMonsterInitial.entries : [],
+                }};
+                let playerMonsterActive = 0;
+
+                function pmEscapeHtml(value) {{
+                  return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                }}
+                function pmEscapeAttr(value) {{
+                  return pmEscapeHtml(value).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+                }}
+                function pmSplitKeys(value) {{
+                  return String(value || "").split(/[\\n,，、]/).map((item) => item.trim()).filter(Boolean);
+                }}
+                function pmNormalizeLevels(raw, minLevel, maxLevel) {{
+                  let selected = [];
+                  if (Array.isArray(raw)) {{
+                    selected = raw.map((level) => Number.parseInt(level, 10));
+                  }} else if (typeof raw === "string" && raw.trim()) {{
+                    selected = raw.split(/[,，、\\s]+/).map((level) => {{
+                      const text = String(level).trim().toUpperCase();
+                      const byLabel = playerMonsterLevels.find((item) => item.label === text);
+                      return byLabel ? byLabel.value : Number.parseInt(text, 10);
+                    }});
+                  }} else {{
+                    const minValue = Number.parseInt(minLevel, 10);
+                    const maxValue = Number.parseInt(maxLevel, 10);
+                    const low = Number.isFinite(minValue) ? Math.max(1, Math.min(7, minValue)) : 1;
+                    const high = Number.isFinite(maxValue) ? Math.max(low, Math.min(7, maxValue)) : 7;
+                    selected = playerMonsterLevels.map((item) => item.value).filter((level) => level >= low && level <= high);
+                  }}
+                  const clean = playerMonsterLevels.map((item) => item.value).filter((level) => selected.includes(level));
+                  return clean.length ? clean : playerMonsterLevels.map((item) => item.value);
+                }}
+                function pmNormalizeEntry(entry, index) {{
+                  const rawSettings = entry && typeof entry.level_settings === "object" ? entry.level_settings : {{}};
+                  const monsterLevels = pmNormalizeLevels(entry?.monster_levels, entry?.min_monster_level, entry?.max_monster_level);
+                  const levelSettings = {{}};
+                  monsterLevels.forEach((level) => {{
+                    const raw = rawSettings[String(level)] && typeof rawSettings[String(level)] === "object" ? rawSettings[String(level)] : {{}};
+                    levelSettings[String(level)] = {{
+                      brief: String(raw.brief || ""),
+                      content: String(raw.content || ""),
+                    }};
+                  }});
+                  const keys = Array.isArray(entry?.keys) ? entry.keys : (typeof entry?.keys === "string" ? [entry.keys] : []);
+                  const hasLevelSettingContent = Object.values(levelSettings).some((setting) => (
+                    String(setting.brief || "").trim() || String(setting.content || "").trim()
+                  ));
+                  return {{
+                    id: String(entry?.id || `player_monster_${{index + 1}}`).trim(),
+                    name: String(entry?.name || entry?.title || ""),
+                    visible_levels: pmNormalizeLevels(entry?.visible_levels, entry?.min_level, entry?.max_level),
+                    monster_levels: monsterLevels,
+                    keys: keys.map((key) => String(key).trim()).filter(Boolean),
+                    brief: String(entry?.brief || entry?.summary || ""),
+                    content: String(entry?.content || entry?.detail || ""),
+                    level_settings: levelSettings,
+                    use_level_settings: entry?.use_level_settings === true || Boolean(hasLevelSettingContent),
+                  }};
+                }}
+                function pmDefaultEntry(index) {{
+                  return pmNormalizeEntry({{
+                    id: `player_monster_${{Date.now().toString(36)}}_${{index + 1}}`,
+                    name: "",
+                    visible_levels: playerMonsterLevels.map((item) => item.value),
+                    monster_levels: playerMonsterLevels.map((item) => item.value),
+                    keys: [],
+                    brief: "",
+                    content: "",
+                    level_settings: {{}},
+                    use_level_settings: false,
+                  }}, index);
+                }}
+                function pmLevelLabel(level) {{
+                  return playerMonsterLevels.find((item) => item.value === level)?.label || String(level);
+                }}
+                function pmLevelInputs(field, levels) {{
+                  const selected = new Set(pmNormalizeLevels(levels));
+                  return playerMonsterLevels.map((item) => `
+                    <label class="summary-check level-choice">
+                      <input data-field="${{field}}" type="checkbox" value="${{item.value}}"${{selected.has(item.value) ? " checked" : ""}}> ${{item.label}}
+                    </label>
+                  `).join("");
+                }}
+                function pmSyncActiveFromDom() {{
+                  const entry = playerMonsterState.entries[playerMonsterActive];
+                  if (!entry || !playerMonsterEditor.firstElementChild) return;
+                  const levelSettings = {{}};
+                  const monsterLevels = Array.from(playerMonsterEditor.querySelectorAll("[data-field='monster_level']:checked")).map((input) => Number.parseInt(input.value, 10));
+                  pmNormalizeLevels(monsterLevels).forEach((level) => {{
+                    levelSettings[String(level)] = {{
+                      brief: playerMonsterEditor.querySelector(`[data-field='level_brief_${{level}}']`)?.value || "",
+                      content: playerMonsterEditor.querySelector(`[data-field='level_content_${{level}}']`)?.value || "",
+                    }};
+                  }});
+                  playerMonsterState.entries[playerMonsterActive] = pmNormalizeEntry({{
+                    id: playerMonsterEditor.querySelector("[data-field='id']")?.value || "",
+                    name: playerMonsterEditor.querySelector("[data-field='name']")?.value || "",
+                    visible_levels: Array.from(playerMonsterEditor.querySelectorAll("[data-field='visible_level']:checked")).map((input) => Number.parseInt(input.value, 10)),
+                    monster_levels: monsterLevels,
+                    keys: pmSplitKeys(playerMonsterEditor.querySelector("[data-field='keys']")?.value || ""),
+                    brief: playerMonsterEditor.querySelector("[data-field='brief']")?.value || "",
+                    content: playerMonsterEditor.querySelector("[data-field='content']")?.value || "",
+                    level_settings: levelSettings,
+                    use_level_settings: playerMonsterEditor.querySelector("[data-mode='levels']")?.classList.contains("active"),
+                  }}, playerMonsterActive);
+                }}
+                function pmRenderTabs() {{
+                  playerMonsterTabs.innerHTML = "";
+                  if (!playerMonsterState.entries.length) {{
+                    playerMonsterTabs.innerHTML = '<p class="villain-empty">还没有魔物。先创建一个空档案。</p>';
+                    return;
+                  }}
+                  playerMonsterState.entries.forEach((entry, index) => {{
+                    const normalized = pmNormalizeEntry(entry, index);
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.className = index === playerMonsterActive ? "active" : "";
+                    button.textContent = normalized.name || normalized.id || `魔物 ${{index + 1}}`;
+                    button.addEventListener("click", () => {{
+                      pmSyncActiveFromDom();
+                      playerMonsterActive = index;
+                      pmRender();
+                    }});
+                    playerMonsterTabs.appendChild(button);
+                  }});
+                }}
+                function pmRenderEditor() {{
+                  const entry = playerMonsterState.entries[playerMonsterActive];
+                  if (!entry) {{
+                    playerMonsterEditor.innerHTML = `
+                      <div class="villain-empty-editor">
+                        <h2>尚未创建魔物</h2>
+                        <p>点击“创建魔物”会生成一个空白魔物档案，你可以先写名字和别名，再慢慢补设定。</p>
+                      </div>
+                    `;
+                    return;
+                  }}
+                  const normalized = pmNormalizeEntry(entry, playerMonsterActive);
+                  const modeGeneral = !normalized.use_level_settings;
+                  const levelBlocks = normalized.monster_levels.map((level) => {{
+                    const setting = normalized.level_settings[String(level)] || {{ brief: "", content: "" }};
+                    return `
+                      <section class="villain-level-panel">
+                        <h3>${{pmLevelLabel(level)}} 级魔物设定</h3>
+                        <label class="block-field">简单设定
+                          <textarea data-field="level_brief_${{level}}" class="entry-content-editor" spellcheck="false">${{pmEscapeHtml(setting.brief)}}</textarea>
+                        </label>
+                        <label class="block-field">详细设定
+                          <textarea data-field="level_content_${{level}}" class="entry-content-editor" spellcheck="false">${{pmEscapeHtml(setting.content)}}</textarea>
+                        </label>
+                      </section>
+                    `;
+                  }}).join("");
+                  playerMonsterEditor.innerHTML = `
+                    <article class="villain-card">
+                      <div class="villain-editor-head">
+                        <div>
+                          <span>Monster File</span>
+                          <h2>${{pmEscapeHtml(normalized.name || normalized.id || "未命名魔物")}}</h2>
+                        </div>
+                        <button class="danger" data-action="delete" type="button">删除</button>
+                      </div>
+                      <div class="world-entry-grid">
+                        <label class="compact-field"><span>ID</span><input data-field="id" type="text" value="${{pmEscapeAttr(normalized.id)}}"></label>
+                        <label class="compact-field title-field"><span>魔物名</span><input data-field="name" type="text" value="${{pmEscapeAttr(normalized.name)}}"></label>
+                        <div class="compact-field level-field"><span>可见等级</span><div class="level-choice-row">${{pmLevelInputs("visible_level", normalized.visible_levels)}}</div></div>
+                        <div class="compact-field level-field"><span>魔物等级</span><div class="level-choice-row">${{pmLevelInputs("monster_level", normalized.monster_levels)}}</div></div>
+                      </div>
+                      <p class="villain-help">可见等级决定管理员在公共魔物书里通常会让哪些玩家等级看到；魔物等级表示这个魔物本身可以对应哪些强度档位。</p>
+                      <label class="block-field">魔物别名 / 关键词（支持中文逗号、英文逗号、顿号或换行分隔）
+                        <textarea data-field="keys" class="keys-editor" spellcheck="false">${{pmEscapeHtml(normalized.keys.join("\\n"))}}</textarea>
+                      </label>
+                      <div class="villain-mode-row" role="group" aria-label="设定模式">
+                        <button data-mode="general" class="${{modeGeneral ? "active" : ""}}" type="button">通用设定</button>
+                        <button data-mode="levels" class="${{!modeGeneral ? "active" : ""}}" type="button">按等级细分</button>
+                      </div>
+                      <div class="villain-mode-note" data-note="general"${{modeGeneral ? "" : " hidden"}}>通用设定适合一个魔物在不同等级下差异不大时使用，只需要填写简单设定和详细设定。</div>
+                      <div class="villain-mode-note" data-note="levels"${{modeGeneral ? " hidden" : ""}}>按等级细分适合同名魔物会随等级出现不同形态、能力或剧情定位时使用；每个选中的魔物等级都能单独填写设定，留空时管理员可参考通用设定。</div>
+                      <section class="villain-general-panel">
+                        <label class="block-field">简单设定
+                          <textarea data-field="brief" class="entry-content-editor" spellcheck="false">${{pmEscapeHtml(normalized.brief)}}</textarea>
+                        </label>
+                        <label class="block-field">详细设定
+                          <textarea data-field="content" class="entry-content-editor" spellcheck="false">${{pmEscapeHtml(normalized.content)}}</textarea>
+                        </label>
+                      </section>
+                      <section class="villain-level-settings"${{modeGeneral ? " hidden" : ""}}>${{levelBlocks}}</section>
+                    </article>
+                  `;
+                  playerMonsterEditor.querySelector("[data-action='delete']").addEventListener("click", () => {{
+                    if (!confirm("确定删除这个魔物？")) return;
+                    playerMonsterState.entries.splice(playerMonsterActive, 1);
+                    playerMonsterActive = Math.max(0, Math.min(playerMonsterActive, playerMonsterState.entries.length - 1));
+                    pmRender();
+                  }});
+                  playerMonsterEditor.querySelectorAll("[data-mode]").forEach((button) => {{
+                    button.addEventListener("click", () => {{
+                      playerMonsterEditor.querySelectorAll("[data-mode]").forEach((item) => item.classList.remove("active"));
+                      button.classList.add("active");
+                      const useLevels = button.dataset.mode === "levels";
+                      playerMonsterEditor.querySelector("[data-note='general']").hidden = useLevels;
+                      playerMonsterEditor.querySelector("[data-note='levels']").hidden = !useLevels;
+                      playerMonsterEditor.querySelector(".villain-level-settings").hidden = !useLevels;
+                    }});
+                  }});
+                  playerMonsterEditor.querySelectorAll("[data-field='monster_level']").forEach((input) => {{
+                    input.addEventListener("change", () => {{
+                      pmSyncActiveFromDom();
+                      pmRender();
+                    }});
+                  }});
+                  playerMonsterEditor.querySelector("[data-field='name']").addEventListener("input", (event) => {{
+                    const title = playerMonsterEditor.querySelector(".villain-editor-head h2");
+                    title.textContent = event.target.value.trim() || playerMonsterEditor.querySelector("[data-field='id']").value.trim() || "未命名魔物";
+                  }});
+                }}
+                function pmRender() {{
+                  playerMonsterState.entries = playerMonsterState.entries.map(pmNormalizeEntry);
+                  if (playerMonsterActive >= playerMonsterState.entries.length) playerMonsterActive = Math.max(0, playerMonsterState.entries.length - 1);
+                  pmRenderTabs();
+                  pmRenderEditor();
+                }}
+                playerAddMonster.addEventListener("click", () => {{
+                  pmSyncActiveFromDom();
+                  playerMonsterState.entries.push(pmDefaultEntry(playerMonsterState.entries.length));
+                  playerMonsterActive = playerMonsterState.entries.length - 1;
+                  pmRender();
+                }});
+                playerMonsterForm.addEventListener("submit", () => {{
+                  pmSyncActiveFromDom();
+                  const payload = {{
+                    version: playerMonsterState.version || 1,
+                    entries: playerMonsterState.entries.map((entry, index) => {{
+                      const normalized = pmNormalizeEntry(entry, index);
+                      return {{
+                        id: normalized.id,
+                        name: normalized.name,
+                        visible_levels: normalized.visible_levels,
+                        monster_levels: normalized.monster_levels,
+                        keys: normalized.keys,
+                        brief: normalized.brief,
+                        content: normalized.content,
+                        level_settings: normalized.use_level_settings ? normalized.level_settings : Object.fromEntries(
+                          normalized.monster_levels.map((level) => [String(level), {{ brief: "", content: "" }}])
+                        ),
+                      }};
+                    }}),
+                  }};
+                  playerMonsterContent.value = JSON.stringify(payload, null, 2);
+                }});
+                pmRender();
+              </script>
+            </section>
+            """,
+        )
+
+    async def _player_monsters_save(self, request: web.Request) -> web.Response:
+        session = self._session(request)
+        if not session or session["role"] != SESSION_USER_ROLE:
+            return self._forbidden()
+
+        data = await request.post()
+        group_id = str(data.get("group_id", "")).strip()
+        user_id = str(data.get("user_id", "")).strip()
+        content = str(data.get("content", "")).strip() or "{}"
+        if not group_id or not user_id:
+            raise web.HTTPBadRequest(text="missing group_id or user_id")
+        if not self._can_access_player(session, user_id):
+            return self._forbidden()
+
+        try:
+            normalized = self._normalize_monster_book(json.loads(content))
+            self.repository.write_player_source_file(
+                group_id,
+                user_id,
+                "player_monster_book.json",
+                json.dumps(normalized, ensure_ascii=False, indent=2),
+            )
+        except Exception as exc:
+            return self._html_response(
+                "保存魔物制作失败",
+                f"""
+                <h1>保存魔物制作失败</h1>
+                <p class="error">{self._e(exc)}</p>
+                <p><a class="button-link secondary-link" href="{self._url(f'/player/monsters?group_id={quote(group_id, safe="")}&user_id={quote(user_id, safe="")}')}">返回魔物制作</a></p>
+                """,
+                status=400,
+            )
+
+        raise self._redirect(
+            f"/player/monsters?group_id={quote(group_id, safe='')}&user_id={quote(user_id, safe='')}"
+        )
+
     def _player_site_detail_response(
         self,
         group_id: str,
@@ -2813,6 +3336,9 @@ class SaveWebViewer:
         relationship_url = self._url(
             f"/player/relationships?group_id={quote(group_id, safe='')}&user_id={quote(user_id, safe='')}"
         )
+        monster_url = self._url(
+            f"/player/monsters?group_id={quote(group_id, safe='')}&user_id={quote(user_id, safe='')}"
+        )
 
         return self._html_response(
             page_name,
@@ -2823,6 +3349,7 @@ class SaveWebViewer:
               </div>
               <nav class="player-floating-actions" aria-label="档案操作">
                 <a class="player-floating-action" href="{relationship_url}" title="关系图">关系图</a>
+                <a class="player-floating-action villain-action" href="{monster_url}" title="魔物制作">魔物制作</a>
               </nav>
               <header class="player-detail-hero">
                 <a class="player-back-link" href="{self._url('/')}">返回个人档案</a>
@@ -3541,6 +4068,42 @@ class SaveWebViewer:
             </section>
         """
 
+    def _player_monster_submissions(self) -> list[dict[str, Any]]:
+        submissions: list[dict[str, Any]] = []
+        for save in self.repository.list_saves():
+            group_id = str(save.get("group_id") or "")
+            user_id = str(save.get("user_id") or "")
+            if not group_id or not user_id:
+                continue
+            try:
+                content = self.repository.read_player_source_file(
+                    group_id,
+                    user_id,
+                    "player_monster_book.json",
+                )
+                if not content.strip():
+                    continue
+                book = self._normalize_monster_book(json.loads(content))
+            except Exception as exc:
+                logger.warning(f"读取玩家魔物书失败: group={group_id} user={user_id} {exc}")
+                continue
+            for index, entry in enumerate(book.get("entries", [])):
+                if not isinstance(entry, dict):
+                    continue
+                submissions.append(
+                    {
+                        "group_id": group_id,
+                        "user_id": user_id,
+                        "city_name": self.repository.get_city_name(group_id),
+                        "player_name": save.get("target_name")
+                        or save.get("nickname")
+                        or user_id,
+                        "entry_index": index,
+                        "entry": entry,
+                    }
+                )
+        return submissions
+
     def _player_clear_form(
         self,
         group_id: str,
@@ -4183,6 +4746,47 @@ class SaveWebViewer:
     .relationship-card-section p {{ margin: 0; color: #4b2447; line-height: 1.65; overflow-wrap: anywhere; }}
     .relationship-tag-row {{ display: flex; flex-wrap: wrap; gap: 8px; padding-top: 14px; border-top: 1px solid rgba(211,91,165,.22); }}
     .relationship-tag-row span {{ min-height: 26px; display: inline-flex; align-items: center; padding: 3px 9px; border: 1px solid rgba(211,91,165,.26); border-radius: 999px; background: rgba(255,255,255,.72); color: #744160; font-size: 12px; font-weight: 900; }}
+    main:has(.villain-monster-shell) {{ width: 100%; max-width: none; min-height: 100vh; box-sizing: border-box; padding: 0; overflow: hidden; }}
+    main:has(.villain-monster-shell) .topbar {{ position: absolute; top: 18px; right: 22px; z-index: 6; margin: 0; min-height: 0; }}
+    main:has(.villain-monster-shell) .topbar button {{ border: 1px solid rgba(235, 231, 255, .34); background: rgba(44, 20, 64, .78); box-shadow: 0 12px 28px rgba(9, 6, 20, .32); backdrop-filter: blur(10px); }}
+    .villain-monster-shell {{ position: relative; min-height: 100vh; padding: 70px clamp(16px, 4vw, 54px) 42px; box-sizing: border-box; overflow: auto; background: radial-gradient(circle at 14% 16%, rgba(170, 24, 84, .42) 0 8%, transparent 22%), radial-gradient(circle at 84% 18%, rgba(62, 188, 195, .28) 0 9%, transparent 24%), linear-gradient(135deg, #170b20 0%, #321233 42%, #171b32 100%); color: #f7edf8; isolation: isolate; }}
+    .villain-grid {{ position: absolute; inset: -20%; z-index: -2; background-image: linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px); background-size: 38px 38px; transform: rotate(-6deg); }}
+    .villain-monster-shell::after {{ content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(255,255,255,.04), transparent 18%, transparent 82%, rgba(255,255,255,.04)); pointer-events: none; }}
+    .villain-monster-head {{ position: relative; max-width: 1180px; margin: 0 auto 14px; padding: 26px 128px 24px; border: 1px solid rgba(226, 214, 255, .22); border-radius: 8px; background: rgba(23, 9, 34, .7); box-shadow: 0 22px 58px rgba(0,0,0,.32), inset 0 0 0 1px rgba(255,255,255,.06); backdrop-filter: blur(14px); text-align: center; }}
+    .villain-monster-head .player-back-link {{ border-color: rgba(115, 229, 226, .26); background: rgba(255,255,255,.08); color: #bff7f4; }}
+    .villain-monster-head .player-kicker {{ color: #79e2df; }}
+    .villain-monster-head h1 {{ margin: 0 0 10px; color: #fff4fb; font-size: clamp(31px, 4.8vw, 58px); line-height: 1.05; text-shadow: 0 0 22px rgba(184, 53, 129, .52); overflow-wrap: anywhere; }}
+    .villain-monster-head p:last-child {{ max-width: 56em; margin: 0 auto; color: #dcc9e5; line-height: 1.7; }}
+    .villain-workbench {{ max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: 14px; }}
+    .villain-menu, .villain-editor, .villain-savebar {{ border: 1px solid rgba(226, 214, 255, .18); border-radius: 8px; background: rgba(20, 10, 31, .78); box-shadow: 0 18px 44px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.05); backdrop-filter: blur(12px); }}
+    .villain-menu {{ padding: 14px; align-self: start; }}
+    .villain-menu-head {{ display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }}
+    .villain-menu-head span, .villain-editor-head span {{ color: #79e2df; font-size: 12px; font-weight: 900; text-transform: uppercase; }}
+    .villain-menu-head button, .villain-savebar button {{ margin-top: 0; border: 1px solid rgba(255,255,255,.14); background: linear-gradient(135deg, #b51f62, #5e2ca5 58%, #1a9aa3); box-shadow: 0 12px 24px rgba(0,0,0,.22); }}
+    .villain-tabs {{ display: grid; gap: 8px; }}
+    .villain-tabs button {{ width: 100%; margin: 0; padding: 10px 11px; border: 1px solid rgba(226,214,255,.16); background: rgba(255,255,255,.07); color: #f4e8fa; text-align: left; overflow-wrap: anywhere; }}
+    .villain-tabs button.active {{ border-color: rgba(121,226,223,.62); background: rgba(121,226,223,.16); color: #fff; box-shadow: inset 3px 0 0 #79e2df; }}
+    .villain-editor {{ min-height: 420px; padding: 14px; }}
+    .villain-card {{ padding: 4px; }}
+    .villain-editor-head {{ display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 14px; }}
+    .villain-editor-head h2 {{ margin: 3px 0 0; color: #fff4fb; font-size: 24px; overflow-wrap: anywhere; }}
+    .villain-monster-shell .compact-field span, .villain-monster-shell label, .villain-help {{ color: #dcc9e5; }}
+    .villain-monster-shell input[type="text"], .villain-monster-shell textarea, .villain-monster-shell .level-choice-row {{ border-color: rgba(226,214,255,.2); background: rgba(255,255,255,.08); color: #fff; }}
+    .villain-monster-shell textarea::placeholder, .villain-monster-shell input::placeholder {{ color: rgba(255,255,255,.48); }}
+    .villain-help {{ margin: 10px 0 0; font-size: 13px; line-height: 1.6; }}
+    .villain-mode-row {{ display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 8px; }}
+    .villain-mode-row button {{ margin: 0; border: 1px solid rgba(226,214,255,.18); background: rgba(255,255,255,.08); color: #f7edf8; }}
+    .villain-mode-row button.active {{ border-color: rgba(181,31,98,.72); background: #b51f62; box-shadow: 0 10px 22px rgba(181,31,98,.24); }}
+    .villain-mode-note {{ padding: 10px 12px; border: 1px solid rgba(121,226,223,.24); border-radius: 8px; background: rgba(121,226,223,.1); color: #d8fffd; font-size: 13px; line-height: 1.6; }}
+    .villain-general-panel, .villain-level-settings {{ margin-top: 12px; }}
+    .villain-level-settings {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }}
+    .villain-level-panel {{ padding: 10px; border: 1px solid rgba(226,214,255,.18); border-radius: 8px; background: rgba(255,255,255,.06); }}
+    .villain-level-panel h3 {{ margin: 0 0 6px; color: #fff4fb; font-size: 15px; }}
+    .villain-savebar {{ grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 14px; }}
+    .villain-savebar p, .villain-empty, .villain-empty-editor p {{ margin: 0; color: #d9cbe2; line-height: 1.6; }}
+    .villain-empty-editor {{ min-height: 320px; display: grid; place-content: center; text-align: center; }}
+    .villain-empty-editor h2 {{ margin: 0 0 8px; color: #fff4fb; }}
+    .villain-action {{ background: linear-gradient(135deg, #57215c, #b51f62 52%, #1b9da5); }}
     label {{ display: block; margin: 18px 0 8px; font-weight: 700; color: #303846; }}
     input[type="text"] {{ width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #c8d0dc; border-radius: 7px; font: inherit; background: #fbfdff; }}
     input[type="number"] {{ width: 76px; box-sizing: border-box; padding: 7px 9px; border: 1px solid #c8d0dc; border-radius: 7px; font: inherit; background: #fbfdff; }}
@@ -4289,6 +4893,20 @@ class SaveWebViewer:
     .monster-level-settings {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; margin-top: 12px; }}
     .monster-level-block {{ padding: 10px; border: 1px solid #dde2ea; border-radius: 8px; background: #f8fafc; }}
     .monster-level-block h3 {{ margin: 0 0 6px; font-size: 15px; }}
+    .monster-modal[hidden] {{ display: none; }}
+    .monster-modal {{ position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 24px; }}
+    .monster-modal-backdrop {{ position: absolute; inset: 0; background: rgba(15, 23, 42, .54); backdrop-filter: blur(4px); }}
+    .monster-modal-panel {{ position: relative; width: min(980px, 100%); max-height: min(760px, calc(100vh - 48px)); display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid #d9e1eb; border-radius: 8px; background: #fff; box-shadow: 0 24px 70px rgba(15, 23, 42, .32); }}
+    .monster-modal-head {{ display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #e5ebf2; background: #f8fafc; }}
+    .monster-modal-head span {{ display: block; color: #68707d; font-size: 12px; font-weight: 900; text-transform: uppercase; }}
+    .monster-modal-head h2 {{ margin: 2px 0 0; color: #172033; }}
+    .player-monster-submissions {{ display: grid; gap: 10px; padding: 14px; overflow: auto; }}
+    .player-monster-submission {{ padding: 12px; border: 1px solid #dde2ea; border-radius: 8px; background: #fff; }}
+    .player-monster-submission-head {{ display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }}
+    .player-monster-submission-head span {{ color: #68707d; font-size: 12px; font-weight: 800; }}
+    .player-monster-submission-head h3 {{ margin: 3px 0 0; color: #172033; }}
+    .player-monster-submission p {{ margin: 8px 0; color: #303846; }}
+    .player-monster-submission pre {{ max-height: 260px; }}
     .hero-card {{ display: flex; gap: 20px; align-items: center; margin: 18px 0 18px; padding: 20px; border: 1px solid #d9e1eb; border-radius: 8px; background: #fff; box-shadow: 0 10px 24px rgba(31, 41, 55, 0.06); }}
     .avatar-large {{ width: 92px; height: 92px; flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; border-radius: 8px; border: 1px solid #d8e0eb; background: #f0f4f8; color: #59636e; font-size: 34px; font-weight: 900; }}
     .avatar-large img {{ width: 100%; height: 100%; object-fit: cover; display: block; }}
@@ -4365,9 +4983,11 @@ class SaveWebViewer:
     @media (max-width: 900px) {{ .detail-grid, .raw-grid {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 960px) {{ .player-detail-layout, .player-profile-triad, .player-split-grid, .player-memory-grid {{ grid-template-columns: 1fr; }} .player-profile-main {{ order: -1; }} .player-side-stack {{ grid-template-rows: auto; }} .player-profile-main .player-info-grid {{ grid-template-columns: 1fr; }} .primary-profile-card {{ grid-row: auto; }} .player-state-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
     @media (max-width: 960px) {{ .relationship-layout {{ grid-template-columns: 1fr; min-height: 0; }} .relationship-card {{ max-height: none; }} }}
+    @media (max-width: 960px) {{ .villain-workbench {{ grid-template-columns: 1fr; }} .villain-menu {{ position: static; }} .villain-tabs {{ grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }} }}
     @media (max-width: 720px) {{ .player-shell {{ padding: 76px 16px 34px; }} .player-hero {{ padding: 6px 74px 0 0; text-align: left; margin-bottom: 22px; }} .player-hero::before {{ width: 60px; height: 60px; font-size: 27px; }} .player-city-section {{ padding: 16px; }} .player-section-head {{ display: block; }} .player-city-card {{ grid-template-columns: 52px 1fr; padding: 15px; }} .city-card-orb {{ width: 46px; height: 46px; }} }}
     @media (max-width: 720px) {{ .player-detail-shell {{ --player-detail-width: 100%; padding: 62px 10px 24px; overflow: auto; }} .player-detail-shell .topbar {{ top: 10px; right: 10px; }} .player-detail-shell .topbar button {{ min-height: 30px; padding: 5px 8px; font-size: 12px; }} .player-detail-hero {{ margin-bottom: 12px; padding: 42px 54px 14px 12px; text-align: left; }} .player-detail-hero h1 {{ margin-bottom: 8px; font-size: clamp(24px, 9vw, 34px); }} .player-detail-hero p {{ font-size: 13px; line-height: 1.55; }} .player-detail-emblem {{ top: 12px; right: 12px; width: 42px; height: 42px; font-size: 21px; box-shadow: 0 10px 22px rgba(188, 80, 166, .2), inset 0 0 0 5px rgba(255,255,255,.48); }} .player-back-link {{ left: 10px; top: 10px; min-height: 28px; padding: 0 9px; font-size: 12px; }} .player-kicker, .player-section-head span, .city-card-label, .profile-card-head span {{ margin-bottom: 4px; font-size: 10px; }} .player-hero-tags {{ justify-content: flex-start; gap: 6px; margin-top: 10px; }} .player-hero-tags span {{ min-height: 22px; padding: 2px 7px; font-size: 11px; }} .player-detail-hero .player-top-grid {{ grid-template-columns: 1fr; gap: 7px; margin-top: 12px; }} .player-detail-hero .player-top-item, .player-top-item {{ min-height: 46px; padding: 8px 10px; }} .player-top-item span {{ font-size: 10px; }} .player-top-item strong {{ margin-top: 3px; font-size: 16px; }} .player-detail-flow, .player-profile-triad, .player-side-stack, .player-info-grid, .player-state-grid, .log-list {{ gap: 8px; }} .player-info-grid, .player-state-grid {{ grid-template-columns: 1fr; }} .player-profile-card, .player-site-section {{ padding: 10px; }} .player-profile-triad .player-profile-card {{ padding: 10px; }} .profile-card-head {{ margin-bottom: 8px; }} .profile-card-head h2, .player-profile-triad .profile-card-head h2 {{ font-size: 17px; }} .player-info-item, .player-state-item, .player-profile-triad .player-info-item {{ min-height: 40px; padding: 7px 8px; }} .player-info-item span, .player-state-item span, .player-profile-triad .player-info-item span {{ font-size: 10px; }} .player-info-item strong, .player-state-item strong, .player-profile-triad .player-info-item strong {{ margin-top: 2px; font-size: 12px; line-height: 1.35; }} .player-site-empty {{ padding: 12px; font-size: 12px; }} .player-memory-row .log-card-summary, .log-card-summary {{ padding: 9px 10px; }} .player-memory-row .log-card-body, .log-card-body {{ padding: 0 10px 10px; }} .log-card h3 {{ font-size: 14px; }} .log-meta, .log-result, .log-action {{ font-size: 12px; line-height: 1.55; }} .progress-list {{ gap: 10px; }} .progress-name {{ font-size: 14px; }} .progress-head {{ gap: 8px; margin-bottom: 5px; }} .progress-name::before {{ width: 12px; height: 12px; border-width: 2px; }} .progress-xp {{ font-size: 12px; }} .player-floating-actions {{ right: 10px; top: 50%; bottom: auto; transform: translateY(-50%); }} .player-floating-action {{ min-width: 48px; min-height: 34px; padding: 0 8px; font-size: 11px; border-radius: 7px; }} }}
     @media (max-width: 720px) {{ .relationship-shell {{ padding: 76px 14px 28px; overflow: auto; }} .relationship-head {{ padding: 58px 18px 20px; }} .relationship-head .player-kicker {{ display: none; }} .relationship-graph-panel {{ min-height: 430px; }} .relationship-graph {{ min-height: 430px; }} .relationship-card {{ padding: 16px; }} }}
+    @media (max-width: 720px) {{ .villain-monster-shell {{ padding: 76px 10px 24px; }} .villain-monster-head {{ padding: 58px 14px 18px; text-align: left; }} .villain-monster-head h1 {{ font-size: clamp(27px, 9vw, 38px); }} .villain-level-settings {{ grid-template-columns: 1fr; }} .villain-savebar {{ display: grid; }} }}
     @media (max-width: 560px) {{ .state-overview-grid {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .progress-list {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .profile-edit-grid {{ grid-template-columns: 1fr; }} }}

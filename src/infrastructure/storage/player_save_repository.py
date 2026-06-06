@@ -44,6 +44,7 @@ class PlayerSaveRepository:
     SOURCE_FILE_NAMES = {
         "player_data.json",
         "player_data_update.json",
+        "player_monster_book.json",
         "relationships.json",
         "cameo_memory.jsonl",
         "daily_memory.jsonl",
