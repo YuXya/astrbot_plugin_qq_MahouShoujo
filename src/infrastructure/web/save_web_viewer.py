@@ -70,6 +70,7 @@ class SaveWebViewer:
         self._add_route(app, "GET", "/city", self._city_detail)
         self._add_route(app, "POST", "/city/name/save", self._city_name_save)
         self._add_route(app, "GET", "/player", self._player_detail)
+        self._add_route(app, "GET", "/player/relationships", self._player_relationships)
         self._add_route(app, "POST", "/player/profile/save", self._player_profile_save)
         self._add_route(app, "POST", "/player/delete", self._player_delete)
         self._add_route(app, "POST", "/player/log/delete", self._player_log_delete)
@@ -2648,6 +2649,79 @@ class SaveWebViewer:
             """,
         )
 
+    async def _player_relationships(self, request: web.Request) -> web.Response:
+        session = self._session(request)
+        if not session or session["role"] != SESSION_USER_ROLE:
+            return self._forbidden()
+
+        group_id = request.query.get("group_id", "")
+        user_id = request.query.get("user_id", "")
+        if not self._can_access_player(session, user_id):
+            return self._forbidden()
+
+        detail = self.repository.read_save_detail(group_id, user_id)
+        if detail is None:
+            raise web.HTTPNotFound(text="save not found")
+
+        graph_data = self.repository.read_relationship_graph(group_id, user_id)
+        player_data = detail.get("player_data", {})
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+        title_name = self._get_nested(
+            protagonist,
+            ["个人信息", "姓名"],
+            player_data.get("nickname", ""),
+        ) or user_id
+        graph_json = json.dumps(graph_data, ensure_ascii=False).replace("<", "\\u003c")
+        back_url = self._url(
+            f"/player?group_id={quote(group_id, safe='')}&user_id={quote(user_id, safe='')}"
+        )
+
+        return self._html_response(
+            f"Relationship Graph - {title_name}",
+            f"""
+            <section class="relationship-shell" aria-label="Relationship Graph">
+              <div class="player-stars" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <header class="relationship-head">
+                <a class="player-back-link" href="{back_url}">返回个人档案</a>
+                <p class="player-kicker">Relationship Graph</p>
+                <h1>魔法少女关系图</h1>
+                <p>{self._e(title_name)}的城市关系网络。点击圈圈，右侧会显示你对她的当前印象。</p>
+              </header>
+
+              <section class="relationship-layout">
+                <div class="relationship-graph-panel">
+                  <svg id="relationshipGraph" class="relationship-graph" role="img" aria-label="玩家关系图"></svg>
+                  <p id="relationshipEmpty" class="relationship-empty" hidden>还没有关系记录。</p>
+                </div>
+                <aside class="relationship-card" aria-live="polite">
+                  <div class="profile-card-head">
+                    <span>Selected</span>
+                    <h2 id="relationshipCardName">未选择</h2>
+                  </div>
+                  <p id="relationshipCardPlayer" class="relationship-card-subtitle"></p>
+                  <div class="relationship-card-section">
+                    <span>Impression</span>
+                    <p id="relationshipCardImpression">点击圈圈查看关系。</p>
+                  </div>
+                  <div class="relationship-card-section">
+                    <span>Evidence</span>
+                    <p id="relationshipCardEvidence">-</p>
+                  </div>
+                  <div class="relationship-card-section">
+                    <span>Summary</span>
+                    <p id="relationshipCardSummary">-</p>
+                  </div>
+                  <div id="relationshipCardTags" class="relationship-tag-row"></div>
+                </aside>
+              </section>
+              <script id="relationshipGraphData" type="application/json">{graph_json}</script>
+              <script>{self._relationship_graph_script()}</script>
+            </section>
+            """,
+        )
+
     def _player_site_detail_response(
         self,
         group_id: str,
@@ -2716,6 +2790,9 @@ class SaveWebViewer:
             ("体毛状况", ["性器官特征", "体毛状况"]),
             ("天生敏感度", ["性器官特征", "天生敏感度"]),
         ])
+        relationship_url = self._url(
+            f"/player/relationships?group_id={quote(group_id, safe='')}&user_id={quote(user_id, safe='')}"
+        )
 
         return self._html_response(
             page_name,
@@ -2724,6 +2801,9 @@ class SaveWebViewer:
               <div class="player-stars" aria-hidden="true">
                 <span></span><span></span><span></span><span></span><span></span>
               </div>
+              <nav class="player-floating-actions" aria-label="档案操作">
+                <a class="player-floating-action" href="{relationship_url}" title="关系图">关系图</a>
+              </nav>
               <header class="player-detail-hero">
                 <a class="player-back-link" href="{self._url('/')}">返回个人档案</a>
                 <div class="player-detail-emblem" aria-hidden="true">✦</div>
@@ -3665,6 +3745,180 @@ class SaveWebViewer:
         response.headers["Content-Disposition"] = f'attachment; filename="{safe_name}"'
         return response
 
+    def _relationship_graph_script(self) -> str:
+        return r"""
+(() => {
+  const dataEl = document.getElementById("relationshipGraphData");
+  const svg = document.getElementById("relationshipGraph");
+  const empty = document.getElementById("relationshipEmpty");
+  if (!dataEl || !svg) return;
+
+  const graph = JSON.parse(dataEl.textContent || "{}");
+  const nodes = (graph.nodes || []).map((node, index) => ({ ...node, index, x: 0, y: 0, vx: 0, vy: 0 }));
+  const edges = graph.edges || [];
+  const viewerId = String(graph.viewer_user_id || "");
+  const byId = new Map(nodes.map((node) => [String(node.user_id), node]));
+  const viewerEdges = new Map(
+    edges.filter((edge) => String(edge.from_user_id) === viewerId).map((edge) => [String(edge.to_user_id), edge])
+  );
+  let selectedId = viewerEdges.keys().next().value || viewerId || (nodes[0] && String(nodes[0].user_id)) || "";
+
+  const card = {
+    name: document.getElementById("relationshipCardName"),
+    player: document.getElementById("relationshipCardPlayer"),
+    impression: document.getElementById("relationshipCardImpression"),
+    evidence: document.getElementById("relationshipCardEvidence"),
+    summary: document.getElementById("relationshipCardSummary"),
+    tags: document.getElementById("relationshipCardTags"),
+  };
+  const text = (value, fallback = "") => String(value || fallback || "").trim();
+  const displayName = (node) => text(node && (node.magical_name || node.target_name || node.user_id), "Unknown");
+
+  function updateCard(node) {
+    if (!node) return;
+    const edge = viewerEdges.get(String(node.user_id));
+    card.name.textContent = displayName(node);
+    card.player.textContent = text(node.target_name) ? `玩家名：${node.target_name}` : "";
+    card.impression.textContent = edge ? text(edge.impression, "暂无直接印象记录。") : "暂无直接印象记录。";
+    card.evidence.textContent = edge ? text(edge.evidence, "-") : "-";
+    card.summary.textContent = edge ? text(edge.summary, "-") : "-";
+    card.tags.innerHTML = "";
+    const tags = edge && Array.isArray(edge.tags) ? edge.tags : [];
+    tags.forEach((tag) => {
+      const span = document.createElement("span");
+      span.textContent = text(tag);
+      if (span.textContent) card.tags.appendChild(span);
+    });
+  }
+
+  function layout(width, height) {
+    const cx = width / 2;
+    const cy = height / 2;
+    const radius = Math.max(80, Math.min(width, height) * 0.34);
+    nodes.forEach((node, index) => {
+      const angle = (Math.PI * 2 * index) / Math.max(1, nodes.length);
+      node.x = cx + Math.cos(angle) * radius;
+      node.y = cy + Math.sin(angle) * radius;
+      node.vx = 0;
+      node.vy = 0;
+    });
+    for (let step = 0; step < 260; step += 1) {
+      for (let i = 0; i < nodes.length; i += 1) {
+        for (let j = i + 1; j < nodes.length; j += 1) {
+          const a = nodes[i];
+          const b = nodes[j];
+          let dx = b.x - a.x;
+          let dy = b.y - a.y;
+          let dist2 = Math.max(1, dx * dx + dy * dy);
+          const dist = Math.sqrt(dist2);
+          const force = 5600 / dist2;
+          dx /= dist;
+          dy /= dist;
+          a.vx -= dx * force;
+          a.vy -= dy * force;
+          b.vx += dx * force;
+          b.vy += dy * force;
+        }
+      }
+      edges.forEach((edge) => {
+        const a = byId.get(String(edge.from_user_id));
+        const b = byId.get(String(edge.to_user_id));
+        if (!a || !b) return;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+        const force = (dist - 190) * 0.018;
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        a.vx += fx;
+        a.vy += fy;
+        b.vx -= fx;
+        b.vy -= fy;
+      });
+      nodes.forEach((node) => {
+        node.vx += (cx - node.x) * 0.006;
+        node.vy += (cy - node.y) * 0.006;
+        node.vx *= 0.82;
+        node.vy *= 0.82;
+        node.x = Math.min(width - 76, Math.max(76, node.x + node.vx));
+        node.y = Math.min(height - 58, Math.max(58, node.y + node.vy));
+      });
+    }
+  }
+
+  function render() {
+    const rect = svg.getBoundingClientRect();
+    const width = Math.max(320, rect.width || 720);
+    const height = Math.max(360, rect.height || 560);
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.innerHTML = "";
+    empty.hidden = nodes.length > 0 && edges.length > 0;
+    if (!nodes.length) return;
+    layout(width, height);
+
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    defs.innerHTML = '<marker id="relationshipArrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#b5539c"></path></marker>';
+    svg.appendChild(defs);
+
+    edges.forEach((edge) => {
+      const a = byId.get(String(edge.from_user_id));
+      const b = byId.get(String(edge.to_user_id));
+      if (!a || !b) return;
+      const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      group.setAttribute("class", "relationship-edge");
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", a.x);
+      line.setAttribute("y1", a.y);
+      line.setAttribute("x2", b.x);
+      line.setAttribute("y2", b.y);
+      line.setAttribute("marker-end", "url(#relationshipArrow)");
+      const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      label.setAttribute("x", (a.x + b.x) / 2);
+      label.setAttribute("y", (a.y + b.y) / 2 - 8);
+      label.textContent = text(edge.impression).slice(0, 18);
+      group.append(line, label);
+      svg.appendChild(group);
+    });
+
+    nodes.forEach((node) => {
+      const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      group.setAttribute("class", `relationship-node${String(node.user_id) === String(selectedId) ? " selected" : ""}`);
+      group.setAttribute("tabindex", "0");
+      group.setAttribute("role", "button");
+      group.setAttribute("aria-label", displayName(node));
+      group.setAttribute("transform", `translate(${node.x}, ${node.y})`);
+      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      circle.setAttribute("r", String(String(node.user_id) === viewerId ? 46 : 39));
+      const name = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      name.setAttribute("class", "node-name");
+      name.setAttribute("y", "-2");
+      name.textContent = displayName(node).slice(0, 8);
+      const level = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      level.setAttribute("class", "node-level");
+      level.setAttribute("y", "18");
+      level.textContent = `Lv.${text(node.level, "1")}`;
+      group.append(circle, name, level);
+      group.addEventListener("click", () => {
+        selectedId = String(node.user_id);
+        updateCard(node);
+        render();
+      });
+      group.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          group.dispatchEvent(new Event("click"));
+        }
+      });
+      svg.appendChild(group);
+    });
+    updateCard(byId.get(String(selectedId)) || nodes[0]);
+  }
+
+  render();
+  window.addEventListener("resize", () => window.requestAnimationFrame(render));
+})();
+"""
+
     def _html_response(
         self,
         title: str,
@@ -3758,6 +4012,9 @@ class SaveWebViewer:
     .player-detail-shell {{ --player-detail-width: 1180px; position: relative; min-height: 100vh; padding: 70px clamp(18px, 5vw, 72px) 58px; box-sizing: border-box; overflow: hidden; background: radial-gradient(circle at 13% 16%, rgba(255, 241, 151, .82) 0 7%, transparent 21%), radial-gradient(circle at 82% 18%, rgba(139, 229, 255, .72) 0 8%, transparent 22%), radial-gradient(circle at 80% 82%, rgba(255, 139, 200, .52) 0 11%, transparent 25%), linear-gradient(135deg, #fff5fb 0%, #f7ddff 30%, #dff7ff 66%, #fff6c7 100%); color: #42233f; isolation: isolate; }}
     .player-detail-shell::before {{ content: ""; position: absolute; inset: -20%; z-index: -2; background-image: linear-gradient(rgba(255,255,255,.48) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.42) 1px, transparent 1px); background-size: 42px 42px; transform: rotate(-7deg); }}
     .player-detail-shell::after {{ content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 50% 18%, transparent 0 22%, rgba(255,255,255,.32) 23%, transparent 24%), radial-gradient(circle at 50% 18%, transparent 0 39%, rgba(255,255,255,.23) 40%, transparent 41%); }}
+    .player-floating-actions {{ position: fixed; right: 22px; top: 50%; z-index: 10; display: grid; gap: 10px; transform: translateY(-50%); }}
+    .player-floating-action {{ min-width: 66px; min-height: 42px; display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; border: 1px solid rgba(255,255,255,.78); border-radius: 8px; background: linear-gradient(135deg, #ff5fae, #b56bff 52%, #45c9ee); color: #fff; font-size: 13px; font-weight: 900; box-shadow: 0 16px 34px rgba(180, 70, 176, .28), inset 0 1px 0 rgba(255,255,255,.42); text-shadow: 0 1px 8px rgba(89,31,116,.35); }}
+    .player-floating-action:hover {{ text-decoration: none; filter: brightness(1.04); transform: translateY(-1px); }}
     .player-detail-hero {{ position: relative; width: 100%; max-width: var(--player-detail-width); box-sizing: border-box; margin: 0 auto 24px; padding: 32px 128px 30px; border: 1px solid rgba(255,255,255,.72); border-radius: 8px; background: rgba(255,255,255,.48); box-shadow: 0 24px 70px rgba(141, 76, 146, .16), inset 0 0 0 1px rgba(255,255,255,.42); backdrop-filter: blur(14px); text-align: center; }}
     .player-back-link {{ position: absolute; left: 18px; top: 18px; display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border: 1px solid rgba(212, 93, 166, .28); border-radius: 999px; background: rgba(255,255,255,.68); color: #8d3975; font-size: 13px; font-weight: 900; }}
     .player-back-link:hover {{ text-decoration: none; background: rgba(255,255,255,.9); }}
@@ -3812,6 +4069,38 @@ class SaveWebViewer:
     .player-detail-shell .log-card {{ border-color: rgba(221, 91, 169, .22); background: rgba(255,255,255,.72); box-shadow: 0 8px 22px rgba(175, 74, 151, .08); }}
     .player-detail-shell .log-card-summary, .player-detail-shell .log-card[open] .log-card-summary {{ background: rgba(255,255,255,.62); }}
     .player-site-empty {{ margin: 0; padding: 18px; border: 1px dashed rgba(207, 84, 161, .42); border-radius: 8px; background: rgba(255,255,255,.64); color: #76506c; }}
+    main:has(.relationship-shell) {{ width: 100%; max-width: none; min-height: 100vh; box-sizing: border-box; padding: 0; overflow: hidden; }}
+    main:has(.relationship-shell) .topbar {{ position: absolute; top: 18px; right: 22px; z-index: 5; margin: 0; min-height: 0; }}
+    main:has(.relationship-shell) .topbar button {{ border: 1px solid rgba(255,255,255,.68); background: rgba(112, 72, 156, .72); box-shadow: 0 12px 28px rgba(108, 53, 133, .18); backdrop-filter: blur(10px); }}
+    .relationship-shell {{ position: relative; min-height: 100vh; padding: 70px clamp(16px, 4vw, 54px) 42px; box-sizing: border-box; overflow: hidden; background: radial-gradient(circle at 13% 16%, rgba(255,241,151,.82) 0 7%, transparent 21%), radial-gradient(circle at 82% 18%, rgba(139,229,255,.72) 0 8%, transparent 22%), radial-gradient(circle at 80% 82%, rgba(255,139,200,.52) 0 11%, transparent 25%), linear-gradient(135deg, #fff5fb 0%, #f7ddff 30%, #dff7ff 66%, #fff6c7 100%); color: #42233f; isolation: isolate; }}
+    .relationship-shell::before {{ content: ""; position: absolute; inset: -20%; z-index: -2; background-image: linear-gradient(rgba(255,255,255,.48) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.42) 1px, transparent 1px); background-size: 42px 42px; transform: rotate(-7deg); }}
+    .relationship-shell::after {{ content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 48% 38%, transparent 0 28%, rgba(255,255,255,.28) 29%, transparent 30%); }}
+    .relationship-head {{ position: relative; max-width: 1180px; margin: 0 auto 18px; padding: 26px 128px 24px 28px; border: 1px solid rgba(255,255,255,.72); border-radius: 8px; background: rgba(255,255,255,.5); box-shadow: 0 22px 64px rgba(141,76,146,.15), inset 0 0 0 1px rgba(255,255,255,.42); backdrop-filter: blur(14px); }}
+    .relationship-head h1 {{ margin: 0 0 10px; color: #64204f; font-size: clamp(30px, 4vw, 52px); line-height: 1.05; text-shadow: 0 2px 0 #fff, 0 18px 40px rgba(204,70,157,.18); overflow-wrap: anywhere; }}
+    .relationship-head p:last-child {{ max-width: 54em; margin: 0; color: #67425e; line-height: 1.7; }}
+    .relationship-layout {{ position: relative; max-width: 1360px; min-height: min(680px, calc(100vh - 250px)); margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); gap: 14px; }}
+    .relationship-graph-panel, .relationship-card {{ border: 1px solid rgba(221,91,169,.28); border-radius: 8px; background: linear-gradient(180deg, rgba(255,255,255,.88), rgba(255,247,252,.76)); box-shadow: 0 18px 46px rgba(175,74,151,.14); backdrop-filter: blur(12px); }}
+    .relationship-graph-panel {{ position: relative; min-height: 560px; overflow: hidden; }}
+    .relationship-graph {{ width: 100%; height: 100%; min-height: 560px; display: block; }}
+    .relationship-empty {{ position: absolute; left: 50%; top: 50%; margin: 0; padding: 18px 22px; border: 1px dashed rgba(207,84,161,.42); border-radius: 8px; background: rgba(255,255,255,.72); color: #76506c; transform: translate(-50%, -50%); }}
+    .relationship-edge line {{ stroke: rgba(181,83,156,.58); stroke-width: 2; }}
+    .relationship-edge text {{ paint-order: stroke; stroke: rgba(255,255,255,.92); stroke-width: 5px; fill: #7f3b73; font-size: 13px; font-weight: 900; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }}
+    .relationship-node {{ cursor: pointer; outline: none; }}
+    .relationship-node circle {{ fill: url(#unused); stroke: rgba(255,255,255,.92); stroke-width: 3; filter: drop-shadow(0 12px 18px rgba(147,73,145,.22)); }}
+    .relationship-node circle {{ fill: #ff8bc6; }}
+    .relationship-node:nth-of-type(3n) circle {{ fill: #8fe8ff; }}
+    .relationship-node:nth-of-type(3n+1) circle {{ fill: #ffd66b; }}
+    .relationship-node.selected circle {{ stroke: #b56bff; stroke-width: 5; }}
+    .relationship-node text {{ text-anchor: middle; dominant-baseline: middle; pointer-events: none; }}
+    .relationship-node .node-name {{ fill: #4b2447; font-size: 13px; font-weight: 900; }}
+    .relationship-node .node-level {{ fill: #744160; font-size: 11px; font-weight: 900; }}
+    .relationship-card {{ align-self: stretch; padding: 20px; overflow: auto; }}
+    .relationship-card-subtitle {{ margin: -6px 0 18px; color: #76506c; font-size: 13px; font-weight: 800; overflow-wrap: anywhere; }}
+    .relationship-card-section {{ padding: 13px 0; border-top: 1px solid rgba(211,91,165,.22); }}
+    .relationship-card-section span {{ display: block; margin-bottom: 6px; color: #c54793; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0; }}
+    .relationship-card-section p {{ margin: 0; color: #4b2447; line-height: 1.65; overflow-wrap: anywhere; }}
+    .relationship-tag-row {{ display: flex; flex-wrap: wrap; gap: 8px; padding-top: 14px; border-top: 1px solid rgba(211,91,165,.22); }}
+    .relationship-tag-row span {{ min-height: 26px; display: inline-flex; align-items: center; padding: 3px 9px; border: 1px solid rgba(211,91,165,.26); border-radius: 999px; background: rgba(255,255,255,.72); color: #744160; font-size: 12px; font-weight: 900; }}
     label {{ display: block; margin: 18px 0 8px; font-weight: 700; color: #303846; }}
     input[type="text"] {{ width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #c8d0dc; border-radius: 7px; font: inherit; background: #fbfdff; }}
     input[type="number"] {{ width: 76px; box-sizing: border-box; padding: 7px 9px; border: 1px solid #c8d0dc; border-radius: 7px; font: inherit; background: #fbfdff; }}
@@ -3993,8 +4282,10 @@ class SaveWebViewer:
     @media (max-width: 900px) {{ .state-overview-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
     @media (max-width: 900px) {{ .detail-grid, .raw-grid {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 960px) {{ .player-detail-layout, .player-profile-triad, .player-split-grid, .player-memory-grid {{ grid-template-columns: 1fr; }} .player-profile-main {{ order: -1; }} .player-side-stack {{ grid-template-rows: auto; }} .player-profile-main .player-info-grid {{ grid-template-columns: 1fr; }} .primary-profile-card {{ grid-row: auto; }} .player-state-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
+    @media (max-width: 960px) {{ .relationship-layout {{ grid-template-columns: 1fr; min-height: 0; }} .relationship-card {{ max-height: none; }} }}
     @media (max-width: 720px) {{ .player-shell {{ padding: 76px 16px 34px; }} .player-hero {{ padding: 6px 74px 0 0; text-align: left; margin-bottom: 22px; }} .player-hero::before {{ width: 60px; height: 60px; font-size: 27px; }} .player-city-section {{ padding: 16px; }} .player-section-head {{ display: block; }} .player-city-card {{ grid-template-columns: 52px 1fr; padding: 15px; }} .city-card-orb {{ width: 46px; height: 46px; }} }}
-    @media (max-width: 720px) {{ .player-detail-shell {{ padding: 76px 16px 34px; }} .player-detail-hero {{ padding: 58px 82px 22px 18px; text-align: left; }} .player-detail-emblem {{ top: 16px; right: 16px; width: 58px; height: 58px; font-size: 27px; }} .player-back-link {{ left: 14px; top: 14px; }} .player-hero-tags {{ justify-content: flex-start; }} .player-detail-hero .player-top-grid {{ grid-template-columns: 1fr; }} .player-info-grid, .player-state-grid {{ grid-template-columns: 1fr; }} .player-profile-card, .player-site-section {{ padding: 16px; }} }}
+    @media (max-width: 720px) {{ .player-detail-shell {{ padding: 76px 16px 34px; }} .player-detail-hero {{ padding: 58px 82px 22px 18px; text-align: left; }} .player-detail-emblem {{ top: 16px; right: 16px; width: 58px; height: 58px; font-size: 27px; }} .player-back-link {{ left: 14px; top: 14px; }} .player-hero-tags {{ justify-content: flex-start; }} .player-detail-hero .player-top-grid {{ grid-template-columns: 1fr; }} .player-info-grid, .player-state-grid {{ grid-template-columns: 1fr; }} .player-profile-card, .player-site-section {{ padding: 16px; }} .player-floating-actions {{ right: 14px; top: auto; bottom: 16px; transform: none; }} .player-floating-action {{ min-width: 58px; min-height: 38px; font-size: 12px; }} }}
+    @media (max-width: 720px) {{ .relationship-shell {{ padding: 76px 14px 28px; overflow: auto; }} .relationship-head {{ padding: 58px 18px 20px; text-align: left; }} .relationship-graph-panel {{ min-height: 430px; }} .relationship-graph {{ min-height: 430px; }} .relationship-card {{ padding: 16px; }} }}
     @media (max-width: 560px) {{ .state-overview-grid {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .progress-list {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .profile-edit-grid {{ grid-template-columns: 1fr; }} }}

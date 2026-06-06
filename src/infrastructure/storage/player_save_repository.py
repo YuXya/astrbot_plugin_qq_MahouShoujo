@@ -747,6 +747,90 @@ class PlayerSaveRepository:
         safe_user = self._safe_id(user_id)
         return [item for item in self.list_saves() if item.get("user_id") == safe_user]
 
+    def read_relationship_graph(
+        self,
+        group_id: str,
+        viewer_user_id: str,
+    ) -> dict[str, Any]:
+        city_id = self._safe_id(group_id)
+        viewer_id = self._safe_id(viewer_user_id)
+        users_dir = self.root_dir / "groups" / city_id / "users"
+        if not users_dir.exists():
+            return {"viewer_user_id": viewer_id, "nodes": [], "edges": []}
+
+        nodes: list[dict[str, Any]] = []
+        profiles_by_user: dict[str, dict[str, Any]] = {}
+        user_by_name: dict[str, str] = {}
+        for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
+            profile = self._build_relationship_player_profile(user_dir)
+            if not profile:
+                continue
+            user_id = str(profile.get("user_id") or user_dir.name)
+            profiles_by_user[user_id] = profile
+            for name in self._relationship_names(profile):
+                user_by_name[name] = user_id
+            nodes.append(
+                {
+                    "user_id": user_id,
+                    "target_name": str(profile.get("target_name") or user_id),
+                    "magical_name": str(profile.get("magical_name") or ""),
+                    "level": profile.get("等级", 1),
+                }
+            )
+
+        edges: list[dict[str, Any]] = []
+        seen_edges: set[tuple[str, str]] = set()
+        for source_user_id, profile in profiles_by_user.items():
+            user_dir = users_dir / source_user_id
+            data = self._read_json(user_dir / "relationships.json")
+            relationships = data.get("relationships", {}) if isinstance(data, dict) else {}
+            if not isinstance(relationships, dict):
+                continue
+            for target_key, value in relationships.items():
+                if not isinstance(value, dict):
+                    continue
+                target_user_id = str(value.get("target_user_id") or "").strip()
+                if not target_user_id or target_user_id not in profiles_by_user:
+                    target_user_id = user_by_name.get(str(target_key or "").strip(), "")
+                if (
+                    not target_user_id
+                    or target_user_id not in profiles_by_user
+                    or target_user_id == source_user_id
+                ):
+                    continue
+                edge_key = (source_user_id, target_user_id)
+                if edge_key in seen_edges:
+                    continue
+                seen_edges.add(edge_key)
+                edges.append(
+                    {
+                        "from_user_id": source_user_id,
+                        "to_user_id": target_user_id,
+                        "from_name": (
+                            profile.get("magical_name")
+                            or profile.get("target_name")
+                            or source_user_id
+                        ),
+                        "to_name": (
+                            profiles_by_user[target_user_id].get("magical_name")
+                            or profiles_by_user[target_user_id].get("target_name")
+                            or target_user_id
+                        ),
+                        "impression": str(value.get("impression") or ""),
+                        "evidence": str(value.get("evidence") or ""),
+                        "summary": str(value.get("summary") or ""),
+                        "tags": value.get("tags") if isinstance(value.get("tags"), list) else [],
+                        "updated_at": value.get("updated_at", ""),
+                        "last_world_date": str(value.get("last_world_date") or ""),
+                    }
+                )
+
+        return {
+            "viewer_user_id": viewer_id,
+            "nodes": nodes,
+            "edges": edges,
+        }
+
     def _city_meta_path(self, group_id: str) -> Path:
         return self.root_dir / "groups" / self._safe_id(group_id) / "city.json"
 
