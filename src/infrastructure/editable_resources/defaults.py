@@ -42,4 +42,6 @@ BATTLE_DIARY_PROMPT = _load_prompt("battle_diary_prompt.txt")
 
 RELATIONSHIP_SUMMARY_PROMPT = _load_prompt("relationship_summary_prompt.txt")
 
+TEAMMATE_COMPLETION_PROMPT = _load_prompt("teammate_completion_prompt.txt")
+
 DEFAULT_SYSTEM_PROMPT = _load_prompt("default_system_prompt.txt")

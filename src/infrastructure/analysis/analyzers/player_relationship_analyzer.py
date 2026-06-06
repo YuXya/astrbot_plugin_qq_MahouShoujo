@@ -9,7 +9,7 @@ from ..utils.llm_utils import call_provider_with_retry, extract_response_text
 from .base_analyzer import BaseAnalyzer
 
 
-class PlayerRelationshipAnalyzer(BaseAnalyzer[list[dict[str, Any]]]):
+class PlayerRelationshipAnalyzer(BaseAnalyzer[dict[str, Any]]):
     def get_data_type(self) -> str:
         return "人物关系总结"
 
@@ -24,8 +24,8 @@ class PlayerRelationshipAnalyzer(BaseAnalyzer[list[dict[str, Any]]]):
     def create_data_object(
         self,
         data: dict,
-    ) -> list[dict[str, Any]]:
-        return self._normalize_relationships(data)
+    ) -> dict[str, Any]:
+        return self._normalize_result(data)
 
     async def analyze_relationships(
         self,
@@ -34,7 +34,7 @@ class PlayerRelationshipAnalyzer(BaseAnalyzer[list[dict[str, Any]]]):
         participants_context: dict[str, Any],
         umo: str | None = None,
         world_date: str = "",
-    ) -> tuple[list[dict[str, Any]], str]:
+    ) -> tuple[dict[str, Any], str]:
         prompt = self.build_relationship_prompt(
             card=card,
             participants_context=participants_context,
@@ -58,10 +58,10 @@ class PlayerRelationshipAnalyzer(BaseAnalyzer[list[dict[str, Any]]]):
             self._save_debug_file("relationship_response", result_text)
 
         success, parsed, error = parse_json_object_response(result_text)
-        if not success or not parsed:
+        if not success or not isinstance(parsed, dict):
             logger.error(f"{self.get_data_type()} JSON 解析失败: {error}")
-            return [], result_text
-        return self._normalize_relationships(parsed), result_text
+            return {"relationships": [], "public_reputations": []}, result_text
+        return self._normalize_result(parsed), result_text
 
     def build_relationship_prompt(
         self,
@@ -88,8 +88,18 @@ class PlayerRelationshipAnalyzer(BaseAnalyzer[list[dict[str, Any]]]):
                 "existing_relationships_json": self._json_dump(
                     participants_context.get("existing_relationships", {})
                 ),
+                "city_players_json": self._json_dump(
+                    participants_context.get("city_players", [])
+                ),
             },
         )
+
+    @classmethod
+    def _normalize_result(cls, data: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "relationships": cls._normalize_relationships(data),
+            "public_reputations": cls._normalize_public_reputations(data),
+        }
 
     @classmethod
     def _normalize_relationships(cls, data: dict[str, Any]) -> list[dict[str, Any]]:
@@ -119,6 +129,32 @@ class PlayerRelationshipAnalyzer(BaseAnalyzer[list[dict[str, Any]]]):
                 }
             )
         return relationships
+
+    @classmethod
+    def _normalize_public_reputations(cls, data: dict[str, Any]) -> list[dict[str, Any]]:
+        raw_items = data.get("public_reputations", [])
+        if not isinstance(raw_items, list):
+            return []
+
+        reputations: list[dict[str, Any]] = []
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            target = cls._clean_text(item.get("target"))
+            summary = cls._clean_text(
+                item.get("public_reputation") or item.get("summary") or item.get("城市风评")
+            )
+            if not target or not summary:
+                continue
+            reputations.append(
+                {
+                    "target": target[:40],
+                    "public_reputation": summary[:360],
+                    "evidence": cls._clean_text(item.get("evidence"))[:240],
+                    "tags": cls._clean_tags(item.get("tags")),
+                }
+            )
+        return reputations
 
     @staticmethod
     def _clean_text(value: object) -> str:

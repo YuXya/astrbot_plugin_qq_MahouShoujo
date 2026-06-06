@@ -923,6 +923,51 @@ class PlayerSaveRepository:
                 npcs.append(npc)
         return npcs
 
+    def find_npcs_by_names(
+        self,
+        group_id: str,
+        user_id: str,
+        names: list[str],
+        *,
+        recent_record_count: int = 1,
+    ) -> list[dict[str, Any]]:
+        return self.find_participant_npcs(
+            group_id,
+            user_id,
+            names,
+            recent_record_count=recent_record_count,
+        )
+
+    def build_city_teammate_candidates(
+        self,
+        group_id: str,
+        user_id: str,
+        *,
+        recent_record_count: int = 1,
+    ) -> list[dict[str, Any]]:
+        users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
+        if not users_dir.exists():
+            return []
+
+        current_user = self._safe_id(user_id)
+        candidates: list[dict[str, Any]] = []
+        for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
+            if user_dir.name == current_user:
+                continue
+            npc = self._build_npc_package(
+                user_dir,
+                source="city_candidate",
+                recent_record_count=recent_record_count,
+            )
+            if not npc:
+                continue
+            public_reputation = self._read_public_reputation(user_dir)
+            if public_reputation:
+                npc["城市风评"] = public_reputation
+                npc["public_reputation"] = public_reputation
+            candidates.append(npc)
+        return candidates
+
     def read_save_detail(self, group_id: str, user_id: str) -> dict[str, Any] | None:
         user_dir = self.get_user_dir(group_id, user_id)
         if not user_dir.exists():
@@ -1327,21 +1372,20 @@ class PlayerSaveRepository:
                 for item in resolved
             ],
             "existing_relationships": self._existing_relationship_summaries(resolved),
+            "city_players": self._city_relationship_player_summaries(group_id),
         }
 
     def merge_player_relationships(
         self,
         group_id: str,
         relationships: list[dict[str, Any]],
+        public_reputations: list[dict[str, Any]] | None = None,
         *,
         participants: list[str],
         battle_title: str,
         world_day_offset: int,
         world_date: str,
     ) -> int:
-        if not relationships:
-            return 0
-
         resolved = self._resolve_relationship_participants(group_id, participants)
         by_name: dict[str, dict[str, Any]] = {}
         for item in resolved:
@@ -1438,6 +1482,72 @@ class PlayerSaveRepository:
             relationships_node[target_key] = current
             self._atomic_write_json(path, data)
             changed += 1
+        changed += self._merge_public_reputations(
+            public_reputations or [],
+            by_name=by_name,
+            battle_title=battle_title,
+            world_day_offset=world_day_offset,
+            world_date=world_date,
+            now=now,
+        )
+        return changed
+
+    def _merge_public_reputations(
+        self,
+        public_reputations: list[dict[str, Any]],
+        *,
+        by_name: dict[str, dict[str, Any]],
+        battle_title: str,
+        world_day_offset: int,
+        world_date: str,
+        now: int,
+    ) -> int:
+        changed = 0
+        for item in public_reputations:
+            if not isinstance(item, dict):
+                continue
+            target = str(item.get("target") or "").strip()
+            summary = str(
+                item.get("public_reputation") or item.get("summary") or item.get("城市风评") or ""
+            ).strip()
+            if not target or not summary:
+                continue
+            target_item = by_name.get(target)
+            if not target_item:
+                continue
+            user_dir = target_item["user_dir"]
+            owner_profile = target_item["profile"]
+            path = user_dir / "relationships.json"
+            data = self._read_json(path)
+            if not data:
+                data = {
+                    "schema_version": 1,
+                    "owner": self._relationship_owner(owner_profile),
+                    "relationships": {},
+                }
+            data["schema_version"] = 1
+            data["owner"] = self._relationship_owner(owner_profile)
+            tags = item.get("tags", [])
+            if not isinstance(tags, list):
+                tags = [str(tags)]
+            clean_tags: list[str] = []
+            for tag in tags:
+                text = str(tag or "").strip()
+                if text and text not in clean_tags:
+                    clean_tags.append(text[:20])
+                if len(clean_tags) >= 4:
+                    break
+            data["public_reputation"] = {
+                "summary": summary[:360],
+                "evidence": str(item.get("evidence") or "").strip()[:240],
+                "tags": clean_tags,
+                "updated_at": now,
+                "world_day_offset": max(0, int(world_day_offset)),
+                "last_world_date": world_date,
+                "last_battle_title": battle_title,
+            }
+            self._atomic_write_json(path, data)
+            changed += 1
         return changed
 
     def _resolve_relationship_participants(
@@ -1517,6 +1627,41 @@ class PlayerSaveRepository:
                 if isinstance(value, dict)
             }
         return summaries
+
+    def _city_relationship_player_summaries(self, group_id: str) -> list[dict[str, Any]]:
+        users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
+        if not users_dir.exists():
+            return []
+
+        players: list[dict[str, Any]] = []
+        for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
+            profile = self._build_relationship_player_profile(user_dir)
+            if not profile:
+                continue
+            public_reputation = self._read_public_reputation(user_dir)
+            players.append(
+                {
+                    "user_id": profile.get("user_id", user_dir.name),
+                    "target_name": profile.get("target_name", ""),
+                    "magical_name": profile.get("magical_name", ""),
+                    "level": profile.get("等级", 1),
+                    "public_reputation": public_reputation,
+                }
+            )
+        return players
+
+    def _read_public_reputation(self, user_dir: Path) -> dict[str, Any]:
+        data = self._read_json(user_dir / "relationships.json")
+        reputation = data.get("public_reputation", {}) if isinstance(data, dict) else {}
+        if not isinstance(reputation, dict):
+            return {}
+        return {
+            "summary": str(reputation.get("summary") or ""),
+            "evidence": str(reputation.get("evidence") or ""),
+            "tags": reputation.get("tags") if isinstance(reputation.get("tags"), list) else [],
+            "last_world_date": str(reputation.get("last_world_date") or ""),
+            "last_battle_title": str(reputation.get("last_battle_title") or ""),
+        }
 
     @staticmethod
     def _relationship_names(profile: dict[str, Any]) -> list[str]:

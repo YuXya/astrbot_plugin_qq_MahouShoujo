@@ -25,7 +25,7 @@ class LLMPlayerRelationshipAnalyzer:
         participants_context: dict[str, Any],
         umo: str | None = None,
         world_date: str = "",
-    ) -> tuple[list[dict[str, Any]], str]:
+    ) -> tuple[dict[str, Any], str]:
         return await self.analyzer.analyze_relationships(
             card=card,
             participants_context=participants_context,

@@ -67,3 +67,22 @@ class LLMBattleDiaryAnalyzer:
         umo: str | None = None,
     ) -> str:
         return await self.analyzer.compress_cameo_memories(memories=memories, umo=umo)
+
+    async def infer_teammate_names(
+        self,
+        *,
+        action_text: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict] | None = None,
+        candidates: list[dict] | None = None,
+        umo: str | None = None,
+    ) -> list[str]:
+        return await self.analyzer.infer_teammate_names(
+            action_text=action_text,
+            player_data=player_data,
+            logs=logs,
+            cameo_memories=cameo_memories,
+            candidates=candidates or [],
+            umo=umo,
+        )

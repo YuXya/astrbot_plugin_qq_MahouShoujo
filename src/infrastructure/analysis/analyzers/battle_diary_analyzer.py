@@ -274,6 +274,80 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             self._save_debug_file("cameo_compress_response", result_text)
         return result_text.strip()
 
+    async def infer_teammate_names(
+        self,
+        *,
+        action_text: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict] | None,
+        candidates: list[dict],
+        umo: str | None = None,
+    ) -> list[str]:
+        if not candidates:
+            return []
+        prompt = self.build_teammate_completion_prompt(
+            action_text=action_text,
+            player_data=player_data,
+            logs=logs,
+            cameo_memories=cameo_memories,
+            candidates=candidates,
+        )
+        system_prompt = self.editable_manager.get_prompt("default_system_prompt")
+        if self.config_manager.get_debug_mode():
+            self._save_debug_file("teammate_completion_prompt", prompt)
+
+        response = await call_provider_with_retry(
+            self.context,
+            self.config_manager,
+            prompt=prompt,
+            umo=umo,
+            system_prompt=system_prompt,
+            purpose="队友语义识别",
+            provider_id_override=self.config_manager.get_subtask_llm_provider_id(),
+        )
+        result_text = extract_response_text(response)
+        if self.config_manager.get_debug_mode():
+            self._save_debug_file("teammate_completion_response", result_text)
+
+        success, parsed, error = parse_json_object_response(result_text)
+        if not success or not isinstance(parsed, dict):
+            logger.warning(f"队友语义识别 JSON 解析失败，已跳过: {error}")
+            return []
+        return self._normalize_teammate_names(parsed)
+
+    def build_teammate_completion_prompt(
+        self,
+        *,
+        action_text: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict] | None,
+        candidates: list[dict],
+    ) -> str:
+        return self.editable_manager.render_prompt(
+            "teammate_completion_prompt",
+            {
+                "action": action_text.strip() or "自由战斗",
+                "player_data_update_json": self._json_dump(player_data),
+                "logs_text": self._format_logs(logs),
+                "cameo_memories_text": self._format_cameo_memories(cameo_memories),
+                "candidates_json": self._json_dump(candidates),
+            },
+        )
+
+    @staticmethod
+    def _normalize_teammate_names(data: dict[str, object]) -> list[str]:
+        raw_names = data.get("names", [])
+        if not isinstance(raw_names, list):
+            raw_names = str(raw_names or "").replace("，", ",").split(",")
+        names: list[str] = []
+        for raw_name in raw_names:
+            name = str(raw_name or "").strip()
+            if name and name not in names:
+                names.append(name[:40])
+        return names[:8]
+
     @staticmethod
     def _get_nested(data: dict, keys: list[str], default: str = "") -> str:
         current = data

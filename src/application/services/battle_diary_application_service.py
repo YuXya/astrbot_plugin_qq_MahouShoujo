@@ -56,7 +56,16 @@ class BattleDiaryApplicationService:
                 [action_text, self._logs_text_for_teammate_scan(logs)],
                 recent_record_count=self.config_manager.get_teammate_recent_record_count(),
             )
-            nearby_players = self._merge_nearby_players(mentioned_players)
+            semantic_players = await self._infer_semantic_teammates(
+                group_id=group_id,
+                user_id=user_id,
+                player_data=player_data,
+                logs=logs,
+                cameo_memories=cameo_memories,
+                action_text=action_text,
+                umo=umo,
+            )
+            nearby_players = self._merge_nearby_players(mentioned_players, semantic_players)
             analysis = await self.llm_analyzer.analyze_diary(
                 action_text=action_text,
                 player_data=player_data,
@@ -170,15 +179,22 @@ class BattleDiaryApplicationService:
                 group_id,
                 participants,
             )
-            relationships, _raw_response = await self.relationship_analyzer.analyze_relationships(
+            relationship_result, _raw_response = await self.relationship_analyzer.analyze_relationships(
                 card=card,
                 participants_context=participants_context,
                 umo=umo,
                 world_date=current_world_date,
             )
+            if isinstance(relationship_result, dict):
+                relationships = relationship_result.get("relationships", [])
+                public_reputations = relationship_result.get("public_reputations", [])
+            else:
+                relationships = relationship_result
+                public_reputations = []
             changed = self.save_repository.merge_player_relationships(
                 group_id,
                 relationships,
+                public_reputations=public_reputations,
                 participants=participants,
                 battle_title=card.title,
                 world_day_offset=world_day_offset,
@@ -188,6 +204,46 @@ class BattleDiaryApplicationService:
                 logger.info(f"已更新人物关系总结: group={group_id}, count={changed}")
         except Exception as exc:
             logger.warning(f"人物关系总结失败，已跳过: group={group_id} {exc}")
+
+    async def _infer_semantic_teammates(
+        self,
+        *,
+        group_id: str,
+        user_id: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict],
+        action_text: str,
+        umo: str | None,
+    ) -> list[dict]:
+        try:
+            recent_record_count = self.config_manager.get_teammate_recent_record_count()
+            candidates = self.save_repository.build_city_teammate_candidates(
+                group_id,
+                user_id,
+                recent_record_count=recent_record_count,
+            )
+            if not candidates:
+                return []
+            names = await self.llm_analyzer.infer_teammate_names(
+                action_text=action_text,
+                player_data=player_data,
+                logs=logs,
+                cameo_memories=cameo_memories,
+                candidates=candidates,
+                umo=umo,
+            )
+            if not names:
+                return []
+            return self.save_repository.find_npcs_by_names(
+                group_id,
+                user_id,
+                names,
+                recent_record_count=recent_record_count,
+            )
+        except Exception as exc:
+            logger.warning(f"队友语义识别失败，已回退直接点名扫描: group={group_id} {exc}")
+            return []
 
     async def _append_cameo_memories(
         self,

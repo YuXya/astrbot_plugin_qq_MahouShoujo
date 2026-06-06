@@ -16,6 +16,7 @@ class EditableResourceManager:
         "reincarnation_prompt": "prompts/reincarnation_prompt.txt",
         "battle_diary_prompt": "prompts/battle_diary_prompt.txt",
         "relationship_summary_prompt": "prompts/relationship_summary_prompt.txt",
+        "teammate_completion_prompt": "prompts/teammate_completion_prompt.txt",
         "default_system_prompt": "prompts/default_system_prompt.txt",
     }
 
@@ -262,6 +263,12 @@ class EditableResourceManager:
                 "category": "text_completion",
             },
             {
+                "id": self.PROMPT_FILES["teammate_completion_prompt"],
+                "label": "队友语义识别 Prompt",
+                "type": "text",
+                "category": "text_completion",
+            },
+            {
                 "id": self.PROMPT_FILES["default_system_prompt"],
                 "label": "默认 System Prompt",
                 "type": "text",
@@ -280,6 +287,7 @@ class EditableResourceManager:
             self.PROMPT_FILES["reincarnation_prompt"]: defaults.REINCARNATION_PROMPT,
             self.PROMPT_FILES["battle_diary_prompt"]: defaults.BATTLE_DIARY_PROMPT,
             self.PROMPT_FILES["relationship_summary_prompt"]: defaults.RELATIONSHIP_SUMMARY_PROMPT,
+            self.PROMPT_FILES["teammate_completion_prompt"]: defaults.TEAMMATE_COMPLETION_PROMPT,
             self.PROMPT_FILES["default_system_prompt"]: defaults.DEFAULT_SYSTEM_PROMPT,
         }
 
@@ -331,8 +339,13 @@ class EditableResourceManager:
             self.PROMPT_FILES["relationship_summary_prompt"]: (
                 "用于多人 /魔法少女战斗 结束后的后台人物关系总结。发给 AI 的 user message 就是这个模板渲染后的结果。"
                 "可用变量：{{battle_title}}、{{world_date}}、{{participants_json}}、{{diary}}、{{encounter}}、{{result}}、"
-                "{{update_changes_json}}、{{participants_profile_json}}、{{existing_relationships_json}}。"
-                "要求 AI 返回纯 JSON，relationships 数组中的每一项代表一个单向关系箭头。"
+                "{{update_changes_json}}、{{participants_profile_json}}、{{existing_relationships_json}}、{{city_players_json}}。"
+                "要求 AI 返回纯 JSON，relationships 数组代表单向关系箭头，public_reputations 数组代表城市风评。"
+            ),
+            self.PROMPT_FILES["teammate_completion_prompt"]: (
+                "用于 /魔法少女战斗 生成前的后台队友语义识别。发给 AI 的 user message 就是这个模板渲染后的结果。"
+                "可用变量：{{action}}、{{player_data_update_json}}、{{logs_text}}、{{cameo_memories_text}}、{{candidates_json}}。"
+                "要求 AI 返回纯 JSON，names 数组中的每一项是候选玩家名或魔法少女名。"
             ),
             self.PROMPT_FILES["default_system_prompt"]: (
                 "用于 /魔法少女转生 和 /魔法少女战斗 的 system message。"
