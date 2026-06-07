@@ -564,7 +564,6 @@ class QQMahouShoujo(Star):
                     default_action="自由反派日常",
                     action_label="反派干部日常",
                     card_label="反派干部日常日记卡",
-                    allow_other_players=False,
                 ):
                     yield result
 

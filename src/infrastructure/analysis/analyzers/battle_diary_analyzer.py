@@ -695,14 +695,23 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         for item in nearby_players:
             if not isinstance(item, dict):
                 continue
-            name = str(item.get("魔法少女名") or item.get("target_name") or "").strip()
+            name = str(
+                item.get("角色名")
+                or item.get("魔法少女名")
+                or item.get("反派干部名")
+                or item.get("target_name")
+                or ""
+            ).strip()
             if not name or name in seen:
                 continue
             seen.add(name)
             teammates.append(
                 {
+                    "角色名": name,
+                    "阵营": item.get("阵营", ""),
                     "姓名": item.get("姓名") or item.get("target_name", ""),
-                    "魔法少女名": name,
+                    "魔法少女名": item.get("魔法少女名", ""),
+                    "反派干部名": item.get("反派干部名", ""),
                     "主角": item.get("主角", {}),
                     "最近记录": item.get("最近记录", []),
                 }

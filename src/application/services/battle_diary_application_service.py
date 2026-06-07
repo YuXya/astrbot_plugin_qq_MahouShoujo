@@ -361,7 +361,10 @@ class BattleDiaryApplicationService:
             npc_user_id = str(npc.get("_user_id") or "").strip()
             npc_target_name = str(npc.get("target_name") or "").strip()
             npc_magical_name = str(npc.get("魔法少女名") or "").strip()
-            mention_names = [name for name in (npc_target_name, npc_magical_name) if name]
+            npc_villain_name = str(npc.get("反派干部名") or "").strip()
+            mention_names = [
+                name for name in (npc_target_name, npc_magical_name, npc_villain_name) if name
+            ]
             if not npc_user_id or not mention_names:
                 continue
             is_participant = self._is_participant_npc(card, mention_names)
@@ -378,8 +381,12 @@ class BattleDiaryApplicationService:
                         "source_name": source_profile.get("姓名", source_target_name),
                         "source_age": source_profile.get("年龄", ""),
                         "source_identity": source_profile.get("身份&职业", ""),
-                        "source_magical_name": source_profile.get("魔法少女名", ""),
-                        "npc_target_name": npc_magical_name or npc_target_name,
+                        "source_magical_name": (
+                            source_profile.get("魔法少女名", "")
+                            or source_profile.get("反派干部名", "")
+                        ),
+                        "source_villain_name": source_profile.get("反派干部名", ""),
+                        "npc_target_name": npc_magical_name or npc_villain_name or npc_target_name,
                         "encounter": card.encounter,
                         "result": card.result,
                         "title": card.title,
@@ -506,6 +513,7 @@ class BattleDiaryApplicationService:
             "年龄": str(info.get("年龄") or "").strip(),
             "身份&职业": str(info.get("身份&职业") or "").strip(),
             "魔法少女名": str(info.get("魔法少女名") or "").strip(),
+            "反派干部名": str(info.get("反派干部名") or "").strip(),
         }
 
     @staticmethod

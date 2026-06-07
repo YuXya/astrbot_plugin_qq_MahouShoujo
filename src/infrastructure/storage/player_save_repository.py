@@ -1534,8 +1534,10 @@ class PlayerSaveRepository:
             return None
 
         target_name = self._get_nested(protagonist, ["个人信息", "姓名"], user_dir.name)
-        magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], target_name)
+        magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], "")
+        villain_name = self._get_nested(protagonist, ["个人信息", "反派干部名"], "")
         faction = self._get_nested(protagonist, ["阵营", "身份"], "魔法少女")
+        role_name = magical_name or villain_name or target_name
         level_node = protagonist.get("等级", {})
         level = level_node.get("等级", 1) if isinstance(level_node, dict) else 1
         battle_count = self._ensure_battle_count(player_data)
@@ -1550,10 +1552,12 @@ class PlayerSaveRepository:
             "target_name": target_name,
             "主角": protagonist,
             "阵营": faction,
+            "角色名": role_name,
             "姓名": target_name,
             "年龄": self._get_nested(protagonist, ["个人信息", "年龄"], ""),
             "身份&职业": self._get_nested(protagonist, ["个人信息", "身份&职业"], ""),
             "魔法少女名": magical_name,
+            "反派干部名": villain_name,
             "武装": self._get_nested(protagonist, ["个人信息", "武装"], ""),
             "变身服": self._get_nested(protagonist, ["个人信息", "变身服"], ""),
             "性格特质": self._get_nested(protagonist, ["个人信息", "性格特质"], ""),
@@ -1950,7 +1954,11 @@ class PlayerSaveRepository:
 
     def _player_public_names(self, protagonist: dict[str, Any]) -> list[str]:
         names: list[str] = []
-        for keys in (["个人信息", "姓名"], ["个人信息", "魔法少女名"]):
+        for keys in (
+            ["个人信息", "姓名"],
+            ["个人信息", "魔法少女名"],
+            ["个人信息", "反派干部名"],
+        ):
             name = self._get_nested(protagonist, keys, "").strip()
             if name and name not in names:
                 names.append(name)
