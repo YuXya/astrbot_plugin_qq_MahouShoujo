@@ -38,6 +38,8 @@ MONSTER_BOOK_DEFAULT = _load_book("monster_book.json")
 
 REINCARNATION_PROMPT = _load_prompt("reincarnation_prompt.txt")
 
+VILLAIN_OFFICER_REINCARNATION_PROMPT = _load_prompt("villain_officer_reincarnation_prompt.txt")
+
 BATTLE_DIARY_PROMPT = _load_prompt("battle_diary_prompt.txt")
 
 DAILY_DIARY_PROMPT = _load_prompt("daily_diary_prompt.txt")

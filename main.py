@@ -52,6 +52,24 @@ REINCARNATION_TEMPLATE = (
     "其他设定："
 )
 
+VILLAIN_OFFICER_REINCARNATION_FIELDS = [
+    "姓名", "性格特质", "初始欲望/执念", "部下/眷属种类",
+    "与主角关系", "代表色", "核心能力", "外貌描述", "其他设定",
+]
+
+VILLAIN_OFFICER_REINCARNATION_TEMPLATE = (
+    "/反派干部转生\n"
+    "姓名：\n"
+    "性格特质：\n"
+    "初始欲望/执念：\n"
+    "部下/眷属种类：\n"
+    "与主角关系：\n"
+    "代表色：\n"
+    "核心能力：\n"
+    "外貌描述：\n"
+    "其他设定："
+)
+
 
 class QQMahouShoujo(Star):
     config: AstrBotConfig
@@ -167,27 +185,35 @@ class QQMahouShoujo(Star):
                     "   性格特质：温柔内敛",
                     "   代表色：星空蓝",
                     "",
-                    "2. /魔法少女战斗",
+                    "2. /反派干部转生",
+                    "   创建你的反派干部角色档案，生成逻辑与魔法少女转生相同。",
+                    "   示例：",
+                    "   /反派干部转生",
+                    "   姓名：夜见绫",
+                    "   性格特质：冷静、支配欲强",
+                    "   核心能力：影子束缚",
+                    "",
+                    "3. /魔法少女战斗",
                     "   根据你的角色档案、当前状态和最近记录，生成一次战斗日记。",
                     "   可以直接自由战斗，也可以在命令后写本次行动。",
                     "   示例：/魔法少女战斗 去森林战斗爽",
                     "",
-                    "3. /魔法少女日常",
+                    "4. /魔法少女日常",
                     "   根据你的角色档案、当前状态和最近记录，生成一次日常日记。",
                     "   可以直接自由日常，也可以在命令后写本次行动。",
                     "   示例：/魔法少女日常 和队友一起去买甜点",
                     "",
-                    "4. /魔法少女黑化",
+                    "5. /魔法少女黑化",
                     "   根据你的角色档案、当前状态和最近记录，生成一次黑化日记。",
                     "   可以直接自由黑化，也可以在命令后写本次行动。",
                     "   示例：/魔法少女黑化 独自走进废弃车站",
                     "",
-                    "5. /反派干部战斗",
+                    "6. /反派干部战斗",
                     "   根据你的角色档案、当前状态和最近记录，生成一次反派干部战斗日记。",
                     "   可以直接自由战斗，也可以在命令后写本次行动。",
                     "   示例：/反派干部战斗 夜袭魔法少女据点",
                     "",
-                    "6. /魔法少女存档删除",
+                    "7. /魔法少女存档删除",
                     "   删除你在当前群的魔法少女存档，并清理其他玩家记忆中由你产生的客串记录。",
                     "   为避免误删，需要输入：/魔法少女存档删除 确认",
                     "",
@@ -249,13 +275,56 @@ class QQMahouShoujo(Star):
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
         """生成一张魔法少女转生人物卡。用法：/魔法少女转生"""
+        async for result in self._handle_reincarnation(
+            event,
+            command_name="魔法少女转生",
+            event_command="/魔法少女转生",
+            template=REINCARNATION_TEMPLATE,
+            fields=REINCARNATION_FIELDS,
+            prompt_name="reincarnation_prompt",
+            card_label="魔法少女转生",
+            faction_label="魔法少女",
+        ):
+            yield result
+
+    @filter.command("反派干部转生", alias={"villain_officer_reincarnate"})
+    async def villain_officer_reincarnate(
+        self,
+        event: AstrMessageEvent,
+    ) -> AsyncGenerator:
+        """生成一张反派干部转生人物卡。用法：/反派干部转生"""
+        async for result in self._handle_reincarnation(
+            event,
+            command_name="反派干部转生",
+            event_command="/反派干部转生",
+            template=VILLAIN_OFFICER_REINCARNATION_TEMPLATE,
+            fields=VILLAIN_OFFICER_REINCARNATION_FIELDS,
+            prompt_name="villain_officer_reincarnation_prompt",
+            card_label="反派干部转生",
+            faction_label="反派干部",
+        ):
+            yield result
+
+    async def _handle_reincarnation(
+        self,
+        event: AstrMessageEvent,
+        *,
+        command_name: str,
+        event_command: str,
+        template: str,
+        fields: list[str],
+        prompt_name: str,
+        card_label: str,
+        faction_label: str,
+    ) -> AsyncGenerator:
+        """处理转生建档命令；不同主题只替换命令名、模板和 Prompt。"""
 
         if not self._is_group_event_allowed(event):
             return
 
         group_id = self._get_group_id_from_event(event)
         if not group_id:
-            yield event.plain_result("请在群聊中使用 /魔法少女转生。")
+            yield event.plain_result(f"请在群聊中使用 {event_command}。")
             return
 
         user_id = self._get_sender_id_from_event(event)
@@ -267,10 +336,10 @@ class QQMahouShoujo(Star):
             yield event.plain_result("你的上一条魔法少女请求还在处理，已经进入队列，马上轮到你。")
 
         # 提取命令后的完整文本（支持多行格式）
-        raw_text = self._extract_reincarnation_text(event)
+        raw_text = self._extract_reincarnation_text(event, command_name)
 
         # 解析结构化字段
-        parsed_fields = self._parse_reincarnation_fields(raw_text)
+        parsed_fields = self._parse_reincarnation_fields(raw_text, fields)
         filled_count = len(parsed_fields)
 
         # 至少需要 3 个字段，否则返回模板
@@ -278,11 +347,11 @@ class QQMahouShoujo(Star):
             event.should_call_llm(False)
             if raw_text and filled_count > 0:
                 message = (
-                    f"填写信息不足（已填写 {filled_count}/9 项，至少需要 3 项），"
-                    f"请按以下格式重新发送：\n\n{REINCARNATION_TEMPLATE}"
+                    f"填写信息不足（已填写 {filled_count}/{len(fields)} 项，至少需要 3 项），"
+                    f"请按以下格式重新发送：\n\n{template}"
                 )
             else:
-                message = f"请按以下格式填写转生信息(最少填写三个字段)：\n\n{REINCARNATION_TEMPLATE}"
+                message = f"请按以下格式填写转生信息(最少填写三个字段)：\n\n{template}"
             yield event.plain_result(message)
             return
 
@@ -296,6 +365,10 @@ class QQMahouShoujo(Star):
                 group_id,
                 user_id,
                 preference_text,
+                event_command=event_command,
+                prompt_name=prompt_name,
+                card_label=card_label,
+                faction_label=faction_label,
             ):
                 yield result
 
@@ -305,6 +378,11 @@ class QQMahouShoujo(Star):
         group_id: str,
         user_id: str,
         preference_text: str = "",
+        *,
+        event_command: str = "/魔法少女转生",
+        prompt_name: str = "reincarnation_prompt",
+        card_label: str = "魔法少女转生",
+        faction_label: str = "魔法少女",
     ) -> AsyncGenerator:
         nickname = self._get_sender_name_from_event(event)
         avatar_url = self.avatar_service.build_avatar_url(user_id)
@@ -319,7 +397,7 @@ class QQMahouShoujo(Star):
             platform_id = self._get_platform_id_from_event(event)
             umo = f"{platform_id}:GroupMessage:{group_id}"
 
-        theme = "/魔法少女转生"
+        theme = event_command
         if preference_text:
             theme = f"{theme} {preference_text}"
 
@@ -330,10 +408,12 @@ class QQMahouShoujo(Star):
             nickname=nickname,
             umo=umo,
             avatar_url=avatar_url,
+            prompt_name=prompt_name,
+            event_command=event_command,
         )
 
         if result.error:
-            logger.warning(f"魔法少女转生人物卡流程结束但存在错误: {result.error}")
+            logger.warning(f"{card_label}人物卡流程结束但存在错误: {result.error}")
 
         if result.card:
             self.save_repository.save_reincarnation(
@@ -342,6 +422,7 @@ class QQMahouShoujo(Star):
                 card=result.card,
                 nickname=nickname,
                 avatar_url=avatar_url,
+                faction=faction_label,
             )
 
         yield await self.message_sender.send_image_or_text(
@@ -637,7 +718,7 @@ class QQMahouShoujo(Star):
         return None
 
     @staticmethod
-    def _extract_reincarnation_text(event: AstrMessageEvent) -> str:
+    def _extract_reincarnation_text(event: AstrMessageEvent, command_name: str = "魔法少女转生") -> str:
         """提取转生命令后的完整文本（支持空格或换行分隔的多行格式）"""
         try:
             text = event.get_message_str()
@@ -645,7 +726,7 @@ class QQMahouShoujo(Star):
             text = getattr(event, "message_str", "")
         text = str(text or "").strip()
 
-        prefixes = ["/魔法少女转生", "／魔法少女转生", "魔法少女转生"]
+        prefixes = [f"/{command_name}", f"／{command_name}", command_name]
         for prefix in prefixes:
             if text == prefix:
                 return ""
@@ -655,14 +736,18 @@ class QQMahouShoujo(Star):
         return ""
 
     @staticmethod
-    def _parse_reincarnation_fields(text: str) -> dict[str, str]:
+    def _parse_reincarnation_fields(
+        text: str,
+        fields: list[str] | None = None,
+    ) -> dict[str, str]:
         """解析玩家填写的转生表单字段，返回已填写的字段字典"""
         if not text:
             return {}
 
+        field_names = fields or REINCARNATION_FIELDS
         fields = {}
-        for field_name in REINCARNATION_FIELDS:
-            other_fields = [re.escape(f) for f in REINCARNATION_FIELDS if f != field_name]
+        for field_name in field_names:
+            other_fields = [re.escape(f) for f in field_names if f != field_name]
             lookahead = "|".join(other_fields) if other_fields else "$"
             pattern = rf'{re.escape(field_name)}[：:]\s*(.*?)(?=(?:{lookahead})[：:]|$)'
             match = re.search(pattern, text, re.DOTALL)

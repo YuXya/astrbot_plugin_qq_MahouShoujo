@@ -30,8 +30,10 @@ class ReincarnationApplicationService:
         nickname: str | None = None,
         umo: str | None = None,
         avatar_url: str | None = None,
+        prompt_name: str = "reincarnation_prompt",
+        event_command: str = "/魔法少女转生",
     ) -> ReincarnationExecutionResult:
-        theme = (theme or "/魔法少女转生").strip()
+        theme = (theme or event_command or "/魔法少女转生").strip()
 
         try:
             if self.config_manager.get_use_mock_data():
@@ -43,6 +45,8 @@ class ReincarnationApplicationService:
                     user_id=user_id,
                     nickname=nickname,
                     umo=umo,
+                    prompt_name=prompt_name,
+                    event_command=event_command,
                 )
                 card = analysis.card
                 raw_response = analysis.raw_response
@@ -71,9 +75,9 @@ class ReincarnationApplicationService:
                 raw_response=raw_response,
             )
         except Exception as exc:
-            logger.error(f"执行魔法少女转生卡片流程失败: {exc}", exc_info=True)
+            logger.error(f"执行{event_command}卡片流程失败: {exc}", exc_info=True)
             return ReincarnationExecutionResult(
                 success=False,
-                text=f"魔法少女转生卡生成失败：{exc}",
+                text=f"{event_command}卡生成失败：{exc}",
                 error=str(exc),
             )

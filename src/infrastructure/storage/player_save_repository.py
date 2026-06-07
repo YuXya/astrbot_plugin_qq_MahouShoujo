@@ -243,11 +243,15 @@ class PlayerSaveRepository:
         card: ReincarnationCard,
         nickname: str | None = None,
         avatar_url: str | None = None,
+        faction: str = "魔法少女",
     ) -> Path:
         user_dir = self.get_user_dir(group_id, user_id)
         user_dir.mkdir(parents=True, exist_ok=True)
 
         protagonist_tree = card.build_protagonist_tree()
+        protagonist_tree.setdefault("主角", {}).setdefault("阵营", {})["身份"] = (
+            str(faction or "魔法少女").strip() or "魔法少女"
+        )
 
         # 确保等级节点存在
         if "等级" not in protagonist_tree.get("主角", {}):
@@ -278,9 +282,9 @@ class PlayerSaveRepository:
             user_id,
             {
                 "type": "reincarnation",
-                "message": "完成魔法少女转生",
+                "message": f"完成{faction}转生",
                 "created_at": self._now_ms(),
-                "title": "魔法少女转生人物卡",
+                "title": f"{faction}转生人物卡",
                 "target_name": card.target_name,
             },
         )

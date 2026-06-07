@@ -14,6 +14,7 @@ from . import defaults
 class EditableResourceManager:
     PROMPT_FILES = {
         "reincarnation_prompt": "prompts/reincarnation_prompt.txt",
+        "villain_officer_reincarnation_prompt": "prompts/villain_officer_reincarnation_prompt.txt",
         "battle_diary_prompt": "prompts/battle_diary_prompt.txt",
         "daily_diary_prompt": "prompts/daily_diary_prompt.txt",
         "corruption_diary_prompt": "prompts/corruption_diary_prompt.txt",
@@ -254,6 +255,12 @@ class EditableResourceManager:
                 "category": "text_completion",
             },
             {
+                "id": self.PROMPT_FILES["villain_officer_reincarnation_prompt"],
+                "label": "反派干部转生卡 Prompt",
+                "type": "text",
+                "category": "text_completion",
+            },
+            {
                 "id": self.PROMPT_FILES["battle_diary_prompt"],
                 "label": "战斗日记 Prompt",
                 "type": "text",
@@ -306,6 +313,7 @@ class EditableResourceManager:
             "event_book/default.json": defaults.EVENT_BOOK_DEFAULT,
             "monster_book/default.json": defaults.MONSTER_BOOK_DEFAULT,
             self.PROMPT_FILES["reincarnation_prompt"]: defaults.REINCARNATION_PROMPT,
+            self.PROMPT_FILES["villain_officer_reincarnation_prompt"]: defaults.VILLAIN_OFFICER_REINCARNATION_PROMPT,
             self.PROMPT_FILES["battle_diary_prompt"]: defaults.BATTLE_DIARY_PROMPT,
             self.PROMPT_FILES["daily_diary_prompt"]: defaults.DAILY_DIARY_PROMPT,
             self.PROMPT_FILES["corruption_diary_prompt"]: defaults.CORRUPTION_DIARY_PROMPT,
@@ -337,7 +345,7 @@ class EditableResourceManager:
                 "性癖最高 Lv.5；base_path 是给 AI 输出 update.changes 的路径提示。"
             ),
             "event_book/default.json": (
-                "事件书文件。按 /魔法少女转生、/魔法少女战斗、/魔法少女日常、/魔法少女黑化、/反派干部战斗 分组。"
+                "事件书文件。按 /魔法少女转生、/反派干部转生、/魔法少女战斗、/魔法少女日常、/魔法少女黑化、/反派干部战斗 分组。"
                 "当前事件内关键词命中或 always 条目会注入详细介绍；其他事件只在关键词命中且简略介绍不为空时注入简略介绍。"
                 "visible_levels 为可见主角等级，数字 1-7 对应 F、E、D、C、B、A、S；未填写时默认全部可见。排序由网页上的上下位置决定。"
             ),
@@ -350,6 +358,10 @@ class EditableResourceManager:
                 "用于 /魔法少女转生 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
                 "可用变量：{{theme}}（触发命令+玩家偏好）、{{player_text}}（目标群友昵称或ID）、"
                 "{{supplement_text}}（世界书+状态书+事件书命中的补充设定，未命中时为空）。"
+            ),
+            self.PROMPT_FILES["villain_officer_reincarnation_prompt"]: (
+                "用于 /反派干部转生 的完整 Prompt。变量与魔法少女转生 Prompt 相同，"
+                "发给 AI 的 user message 就是这个模板渲染后的结果；要求返回兼容转生人物卡的纯 JSON。"
             ),
             self.PROMPT_FILES["battle_diary_prompt"]: (
                 "用于 /魔法少女战斗 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"

@@ -8,6 +8,12 @@
       "entries": []
     },
     {
+      "id": "villain_officer_reincarnation",
+      "command": "/反派干部转生",
+      "name": "反派干部转生",
+      "entries": []
+    },
+    {
       "id": "battle",
       "command": "/魔法少女战斗",
       "name": "魔法少女战斗",

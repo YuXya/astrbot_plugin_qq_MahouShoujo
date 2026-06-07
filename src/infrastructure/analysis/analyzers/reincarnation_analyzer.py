@@ -33,6 +33,8 @@ class ReincarnationAnalyzer(BaseAnalyzer[ReincarnationCard]):
         theme: str,
         user_id: str | None,
         nickname: str | None,
+        prompt_name: str = "reincarnation_prompt",
+        event_command: str = "/魔法少女转生",
     ) -> str:
         player_text = (
             f"目标群友昵称：{nickname}"
@@ -52,7 +54,7 @@ class ReincarnationAnalyzer(BaseAnalyzer[ReincarnationCard]):
         )
         event_book_result = self.event_book_engine.build_prompt_text(
             world_book_scan_parts,
-            current_event="/魔法少女转生",
+            current_event=event_command,
             player_level=1,
         )
         cross_hit_parts: list[str] = []
@@ -72,7 +74,7 @@ class ReincarnationAnalyzer(BaseAnalyzer[ReincarnationCard]):
             )
             event_book_result = self.event_book_engine.build_prompt_text(
                 enriched_scan_parts,
-                current_event="/魔法少女转生",
+                current_event=event_command,
                 player_level=1,
             )
 
@@ -83,7 +85,7 @@ class ReincarnationAnalyzer(BaseAnalyzer[ReincarnationCard]):
         ])
 
         return self.editable_manager.render_prompt(
-            "reincarnation_prompt",
+            prompt_name,
             {
                 "theme": theme,
                 "player_text": player_text,

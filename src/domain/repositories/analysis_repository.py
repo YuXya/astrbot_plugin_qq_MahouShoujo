@@ -13,5 +13,7 @@ class IReincarnationAnalysisProvider(ABC):
         user_id: str | None = None,
         nickname: str | None = None,
         umo: str | None = None,
+        prompt_name: str = "reincarnation_prompt",
+        event_command: str = "/魔法少女转生",
     ) -> ReincarnationAnalysisResult:
         pass

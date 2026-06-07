@@ -55,11 +55,13 @@ class BaseAnalyzer(ABC, Generic[TDataObject]):
         user_id: str | None = None,
         nickname: str | None = None,
         umo: str | None = None,
+        **prompt_kwargs,
     ) -> tuple[TDataObject | None, TokenUsage, str]:
         prompt = self.build_prompt(
             theme,
             user_id,
             nickname,
+            **prompt_kwargs,
         )
         system_prompt = self.editable_manager.get_prompt("default_system_prompt")
         if self.config_manager.get_debug_mode():
