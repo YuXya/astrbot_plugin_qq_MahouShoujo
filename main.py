@@ -66,6 +66,8 @@ VILLAIN_OFFICER_REINCARNATION_TEMPLATE = (
     "其他设定："
 )
 
+PLAYER_PROFILE_PANEL_URL = "https://www.youxiajiang.com/Games/AIBot/"
+
 
 class QQMahouShoujo(Star):
     config: AstrBotConfig
@@ -181,7 +183,7 @@ class QQMahouShoujo(Star):
                     "/反派干部战斗 行动目标：生成一次反派干部战斗日记。",
                     "/魔法少女存档删除 确认：删除当前群自己的存档。",
                     "",
-                    "角色档案面板：https://www.youxiajiang.com/Games/AIBot/",
+                    f"角色档案面板：{self._build_player_profile_panel_url()}",
                 ]
             )
         )
@@ -668,7 +670,7 @@ class QQMahouShoujo(Star):
                 yield event.plain_result(
                     "反派干部战斗前必须先创建至少一个可用魔物。"
                     "请登录角色档案面板，进入“魔物制作”创建魔物，或从公共魔物弹框拷贝：\n"
-                    f"{self._build_web_url()}"
+                    f"{self._build_player_profile_panel_url()}"
                 )
                 return
 
@@ -789,6 +791,9 @@ class QQMahouShoujo(Star):
             base_url = f"http://127.0.0.1:{port}"
         prefix = self.config_manager.get_web_public_path_prefix()
         return f"{base_url.rstrip('/')}{prefix}"
+
+    def _build_player_profile_panel_url(self) -> str:
+        return PLAYER_PROFILE_PANEL_URL
 
     def _get_group_id_from_event(self, event: AstrMessageEvent) -> str | None:
         try:
