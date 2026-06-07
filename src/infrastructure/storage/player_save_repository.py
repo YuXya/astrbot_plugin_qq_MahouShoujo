@@ -1059,23 +1059,11 @@ class PlayerSaveRepository:
         *,
         player_level: int,
     ) -> list[dict[str, Any]]:
-        candidates: list[dict[str, Any]] = []
-        candidates.extend(
-            self._read_monster_candidates_from_path(
-                self.get_user_dir(group_id, user_id) / "player_monster_book.json",
-                player_level=player_level,
-                source="player",
-            )
+        return self._read_monster_candidates_from_path(
+            self.get_user_dir(group_id, user_id) / "player_monster_book.json",
+            player_level=player_level,
+            source="player",
         )
-        if self.editable_manager is not None:
-            candidates.extend(
-                self._read_monster_candidates_from_path(
-                    self.editable_manager.monster_book_path,
-                    player_level=player_level,
-                    source="world",
-                )
-            )
-        return candidates
 
     def _read_monster_candidates_from_path(
         self,

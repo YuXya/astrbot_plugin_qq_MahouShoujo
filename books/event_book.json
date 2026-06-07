@@ -42,6 +42,12 @@
       "command": "/反派干部战斗",
       "name": "反派干部战斗",
       "entries": []
+    },
+    {
+      "id": "villain_officer_daily",
+      "command": "/反派干部日常",
+      "name": "反派干部日常",
+      "entries": []
     }
   ]
 }

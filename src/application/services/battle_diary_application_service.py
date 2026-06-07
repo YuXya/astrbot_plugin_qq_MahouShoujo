@@ -38,6 +38,8 @@ class BattleDiaryApplicationService:
         prompt_name: str = "battle_diary_prompt",
         default_action: str = "自由战斗",
         use_villain_battle_selection: bool = False,
+        require_villain_battle_prerequisites: bool = False,
+        allow_other_players: bool = True,
         identity_transition_faction: str | None = None,
     ) -> BattleDiaryExecutionResult:
         try:
@@ -57,6 +59,31 @@ class BattleDiaryApplicationService:
             cameo_memories = save_data.get("cameo_memories", [])
             selection_context: dict[str, object] | None = None
             if use_villain_battle_selection:
+                if require_villain_battle_prerequisites:
+                    protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+                    current_level = self.domain_service.get_current_level(protagonist)
+                    magical_girl_candidates = self.save_repository.build_city_magical_girl_candidates(
+                        group_id,
+                        user_id,
+                        recent_record_count=self.config_manager.get_teammate_recent_record_count(),
+                    )
+                    if not magical_girl_candidates:
+                        return BattleDiaryExecutionResult(
+                            success=False,
+                            text="该城市没有魔法少女，请先让群友转生成魔法少女",
+                            error="target_magical_girl_not_found",
+                        )
+                    monster_candidates = self.save_repository.build_villain_monster_candidates(
+                        group_id,
+                        user_id,
+                        player_level=current_level,
+                    )
+                    if not monster_candidates:
+                        return BattleDiaryExecutionResult(
+                            success=False,
+                            text="反派干部战斗前必须先创建至少一个可用魔物，请前往角色档案面板创建或拷贝公共魔物。",
+                            error="villain_monster_not_found",
+                        )
                 selection_context = await self._select_villain_battle_context(
                     group_id=group_id,
                     user_id=user_id,
@@ -75,7 +102,7 @@ class BattleDiaryApplicationService:
                         error="target_magical_girl_not_found",
                     )
                 nearby_players = [target]
-            else:
+            elif allow_other_players:
                 mentioned_players = self.save_repository.find_mentioned_npcs(
                     group_id,
                     user_id,
@@ -92,6 +119,8 @@ class BattleDiaryApplicationService:
                     umo=umo,
                 )
                 nearby_players = self._merge_nearby_players(mentioned_players, semantic_players)
+            else:
+                nearby_players = []
             analysis = await self.llm_analyzer.analyze_diary(
                 action_text=action_text,
                 player_data=player_data,

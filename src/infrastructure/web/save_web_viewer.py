@@ -1599,6 +1599,7 @@ class SaveWebViewer:
                 {{ id: "corruption", command: "/魔法少女黑化", name: "魔法少女黑化" }},
                 {{ id: "villain_officer_purification", command: "/反派干部洗白", name: "反派干部洗白" }},
                 {{ id: "villain_officer_battle", command: "/反派干部战斗", name: "反派干部战斗" }},
+                {{ id: "villain_officer_daily", command: "/反派干部日常", name: "反派干部日常" }},
               ];
               const ebLevelOptions = [
                 {{ value: 1, label: "F" }},
@@ -1971,6 +1972,11 @@ class SaveWebViewer:
                 "id": "villain_officer_battle",
                 "command": "/反派干部战斗",
                 "name": "反派干部战斗",
+            },
+            {
+                "id": "villain_officer_daily",
+                "command": "/反派干部日常",
+                "name": "反派干部日常",
             },
         ]
         raw_events = book.get("events", [])
@@ -2929,6 +2935,13 @@ class SaveWebViewer:
         )
         save_url = self._url("/player/monsters/save")
         book_json = self._json_script_data(book)
+        try:
+            public_book = self._normalize_monster_book(
+                json.loads(self.editable_manager.read_text("monster_book/default.json") or "{}")
+            )
+        except Exception:
+            public_book = {"version": 1, "entries": []}
+        public_book_json = self._json_script_data(public_book)
 
         return self._html_response(
             f"魔物制作 - {title_name}",
@@ -2939,9 +2952,23 @@ class SaveWebViewer:
                 <a class="player-back-link" href="{back_url}">返回个人档案</a>
                 <p class="player-kicker">Villain Workshop</p>
                 <h1>魔物制作</h1>
-                <p>{self._e(title_name)}的私人反派干部档案。这里创建的魔物只会保存到你的个人文件夹，不会直接应用进游戏；管理员审核录入后才会进入公共魔物书。</p>
+                <p>{self._e(title_name)}的私人反派干部档案。这里创建的魔物会保存到你的个人文件夹，并作为该反派干部亲自照护、可在行动中随行的魔物。</p>
+                <button id="show-public-monsters" type="button">查看公共魔物</button>
               </header>
 
+              <div id="public-monster-modal" class="monster-modal" hidden>
+                <div class="monster-modal-backdrop" data-action="close-public-monsters"></div>
+                <section class="monster-modal-panel" role="dialog" aria-modal="true" aria-labelledby="public-monster-modal-title">
+                  <div class="monster-modal-head">
+                    <div>
+                      <span>Public Monster Book</span>
+                      <h2 id="public-monster-modal-title">公共魔物</h2>
+                    </div>
+                    <button class="secondary compact-button" type="button" data-action="close-public-monsters">关闭</button>
+                  </div>
+                  <div id="public-monster-entries" class="player-monster-submissions"></div>
+                </section>
+              </div>
               <form id="player-monster-form" class="villain-workbench" method="post" action="{save_url}">
                 <input type="hidden" name="group_id" value="{self._e(group_id)}">
                 <input type="hidden" name="user_id" value="{self._e(user_id)}">
@@ -2961,11 +2988,15 @@ class SaveWebViewer:
               </form>
               <script>
                 const playerMonsterInitial = {book_json};
+                const publicMonsterBook = {public_book_json};
                 const playerMonsterForm = document.getElementById("player-monster-form");
                 const playerMonsterContent = document.getElementById("player-monster-content");
                 const playerMonsterTabs = document.getElementById("player-monster-tabs");
                 const playerMonsterEditor = document.getElementById("player-monster-editor");
                 const playerAddMonster = document.getElementById("player-add-monster");
+                const showPublicMonsters = document.getElementById("show-public-monsters");
+                const publicMonsterModal = document.getElementById("public-monster-modal");
+                const publicMonsterEntries = document.getElementById("public-monster-entries");
                 const playerMonsterLevels = [
                   {{ value: 1, label: "F" }},
                   {{ value: 2, label: "E" }},
@@ -3200,6 +3231,61 @@ class SaveWebViewer:
                   pmRenderTabs();
                   pmRenderEditor();
                 }}
+                function pmUniqueImportedId(rawId) {{
+                  const base = String(rawId || "public_monster").trim() || "public_monster";
+                  const existing = new Set(playerMonsterState.entries.map((entry) => String(entry.id || "").trim()).filter(Boolean));
+                  if (!existing.has(base)) return base;
+                  let suffix = 2;
+                  while (existing.has(`${{base}}_${{suffix}}`)) suffix += 1;
+                  return `${{base}}_${{suffix}}`;
+                }}
+                function pmRenderPublicMonsters() {{
+                  const entries = Array.isArray(publicMonsterBook.entries) ? publicMonsterBook.entries : [];
+                  if (!entries.length) {{
+                    publicMonsterEntries.innerHTML = '<p class="villain-empty">公共魔物书暂时没有魔物。</p>';
+                    return;
+                  }}
+                  publicMonsterEntries.innerHTML = entries.map((entry, index) => {{
+                    const normalized = pmNormalizeEntry(entry, index);
+                    return `
+                      <article class="player-monster-submission">
+                        <div class="player-monster-submission-head">
+                          <div>
+                            <span>公共魔物</span>
+                            <h3>${{pmEscapeHtml(normalized.name || normalized.id || `魔物 ${{index + 1}}`)}}</h3>
+                          </div>
+                          <button type="button" data-copy-public-monster="${{index}}">拷贝到我的魔物书</button>
+                        </div>
+                        <p><strong>等级：</strong>${{pmEscapeHtml(normalized.monster_levels.map(pmLevelLabel).join("/") || "未设置")}}</p>
+                        <p><strong>别名：</strong>${{pmEscapeHtml(normalized.keys.join("、") || "无")}}</p>
+                        <p>${{pmEscapeHtml(normalized.brief || normalized.content || "暂无简介")}}</p>
+                      </article>
+                    `;
+                  }}).join("");
+                  publicMonsterEntries.querySelectorAll("[data-copy-public-monster]").forEach((button) => {{
+                    button.addEventListener("click", () => {{
+                      pmSyncActiveFromDom();
+                      const index = Number.parseInt(button.dataset.copyPublicMonster, 10);
+                      const imported = pmNormalizeEntry(entries[index] || {{}}, playerMonsterState.entries.length);
+                      imported.id = pmUniqueImportedId(imported.id);
+                      playerMonsterState.entries.push(imported);
+                      playerMonsterActive = playerMonsterState.entries.length - 1;
+                      publicMonsterModal.hidden = true;
+                      pmRender();
+                      alert("已拷贝到你的魔物书编辑区，请点击“保存魔物档案”完成保存。");
+                    }});
+                  }});
+                }}
+                showPublicMonsters.addEventListener("click", () => {{
+                  pmSyncActiveFromDom();
+                  pmRenderPublicMonsters();
+                  publicMonsterModal.hidden = false;
+                }});
+                publicMonsterModal.querySelectorAll("[data-action='close-public-monsters']").forEach((button) => {{
+                  button.addEventListener("click", () => {{
+                    publicMonsterModal.hidden = true;
+                  }});
+                }});
                 playerAddMonster.addEventListener("click", () => {{
                   pmSyncActiveFromDom();
                   playerMonsterState.entries.push(pmDefaultEntry(playerMonsterState.entries.length));

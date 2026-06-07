@@ -1,10 +1,10 @@
 你是“反派干部战斗出战选择”子任务。
 
 请根据反派干部存档、玩家本次行动、最近记录、可选魔物和本城市魔法少女候选，选择本次反派干部战斗的：
-1. 出战使魔：只能从 candidates.monsters 中选择 0-1 个；只能选择 monster_levels 中包含当前等级或低于当前等级的魔物。若没有合适魔物，输出 null。
+1. 随行魔物：candidates.monsters 全部来自反派干部本人创造并亲自照护的魔物。只能选择 0-1 个，且只能选择 monster_levels 中包含当前等级或低于当前等级的魔物。若没有合适魔物，输出 null。
 2. 目标魔法少女：只能从 candidates.magical_girls 中选择 1 个；优先选择与玩家行动目标、最近遭遇或城市关系最匹配的魔法少女。
 
-不要编造候选外的魔物或魔法少女。不要输出 Markdown，不要解释。
+魔物是角色养育的特殊宠物或伙伴，不是部下或消耗品。不要编造候选外的魔物或魔法少女。不要输出 Markdown，不要解释。
 
 当前等级：{{current_level}}
 
@@ -38,4 +38,4 @@
   }
 }
 
-若没有合适出战使魔，familiar 写 null；target_magical_girl 必须来自 candidates.magical_girls。
+若没有合适随行魔物，familiar 写 null；target_magical_girl 必须来自 candidates.magical_girls。

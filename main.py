@@ -179,6 +179,7 @@ class QQMahouShoujo(Star):
                     "/反派干部转生：创建反派干部角色档案。",
                     "/魔法少女战斗：生成一次战斗日记，可追加行动。",
                     "/魔法少女日常：生成一次日常日记，可追加行动。",
+                    "/反派干部日常：生成一次带点坏心眼的反派日常日记，可追加行动。",
                     "/魔法少女黑化 黑化原因：生成一次黑化日记。",
                     "/反派干部洗白 洗白原因：生成一次洗白日记。",
                     "/反派干部战斗 行动目标：生成一次反派干部战斗日记。",
@@ -529,6 +530,46 @@ class QQMahouShoujo(Star):
                 ):
                     yield result
 
+    @filter.command("反派干部日常")
+    async def villain_officer_daily_diary(
+        self,
+        event: AstrMessageEvent,
+    ) -> AsyncGenerator:
+        """根据玩家存档生成一次完整的反派干部日常日记卡。用法：/反派干部日常"""
+        event.should_call_llm(True)
+
+        if not self._is_group_event_allowed(event):
+            return
+
+        group_id = self._get_group_id_from_event(event)
+        if not group_id:
+            yield event.plain_result("请在群聊中使用 /反派干部日常。")
+            return
+
+        user_id = self._get_sender_id_from_event(event)
+        if not user_id:
+            yield event.plain_result("没有拿到你的 QQ 号，暂时不能读取玩家存档。")
+            return
+
+        if await self.player_queue.is_locked(group_id, user_id):
+            yield event.plain_result("你的上一条魔法少女请求还在处理，已经进入队列，马上轮到你。")
+
+        async with self.player_queue.lock_for(group_id, user_id):
+            async with self.player_queue.group_lock_for(group_id):
+                async for result in self._run_battle_diary(
+                    event,
+                    group_id,
+                    user_id,
+                    command_name="反派干部日常",
+                    event_command="/反派干部日常",
+                    prompt_name="villain_officer_daily_prompt",
+                    default_action="自由反派日常",
+                    action_label="反派干部日常",
+                    card_label="反派干部日常日记卡",
+                    allow_other_players=False,
+                ):
+                    yield result
+
     @filter.command("反派干部洗白")
     async def villain_officer_purification_diary(
         self,
@@ -605,6 +646,35 @@ class QQMahouShoujo(Star):
             yield event.plain_result("没有拿到你的 QQ 号，暂时不能读取玩家存档。")
             return
 
+        save_data = self.save_repository.load_player_save(group_id, user_id)
+        if save_data:
+            magical_girls = self.save_repository.build_city_magical_girl_candidates(
+                group_id,
+                user_id,
+                recent_record_count=self.config_manager.get_teammate_recent_record_count(),
+            )
+            if not magical_girls:
+                event.should_call_llm(False)
+                yield event.plain_result("该城市没有魔法少女，请先让群友转生成魔法少女")
+                return
+
+            player_data = save_data.get("player_data", {})
+            protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+            current_level = self.diary_domain_service.get_current_level(protagonist)
+            monsters = self.save_repository.build_villain_monster_candidates(
+                group_id,
+                user_id,
+                player_level=current_level,
+            )
+            if not monsters:
+                event.should_call_llm(False)
+                yield event.plain_result(
+                    "反派干部战斗前必须先创建至少一个可用魔物。"
+                    "请登录角色档案面板，进入“魔物制作”创建魔物，或从公共魔物弹框拷贝：\n"
+                    f"{self._build_web_url()}"
+                )
+                return
+
         action_text = self._extract_command_tail(event, "反派干部战斗")
         if not action_text:
             event.should_call_llm(False)
@@ -635,6 +705,7 @@ class QQMahouShoujo(Star):
                     action_label="反派干部战斗",
                     card_label="反派干部战斗日记卡",
                     use_villain_battle_selection=True,
+                    require_villain_battle_prerequisites=True,
                 ):
                     yield result
 
@@ -651,6 +722,8 @@ class QQMahouShoujo(Star):
         action_label: str = "战斗",
         card_label: str = "战斗日记卡",
         use_villain_battle_selection: bool = False,
+        require_villain_battle_prerequisites: bool = False,
+        allow_other_players: bool = True,
         identity_transition_faction: str | None = None,
     ) -> AsyncGenerator:
         save_data = self.save_repository.load_player_save(group_id, user_id)
@@ -681,6 +754,8 @@ class QQMahouShoujo(Star):
             prompt_name=prompt_name,
             default_action=default_action,
             use_villain_battle_selection=use_villain_battle_selection,
+            require_villain_battle_prerequisites=require_villain_battle_prerequisites,
+            allow_other_players=allow_other_players,
             identity_transition_faction=identity_transition_faction,
         )
 
