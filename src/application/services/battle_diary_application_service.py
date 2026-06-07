@@ -77,6 +77,7 @@ class BattleDiaryApplicationService:
                         group_id,
                         user_id,
                         player_level=current_level,
+                        include_overleveled=True,
                     )
                     if not monster_candidates:
                         return BattleDiaryExecutionResult(
@@ -323,6 +324,7 @@ class BattleDiaryApplicationService:
             group_id,
             user_id,
             player_level=current_level,
+            include_overleveled=True,
         )
         target_candidates = self.save_repository.build_city_magical_girl_candidates(
             group_id,

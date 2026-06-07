@@ -4,7 +4,7 @@ import json
 
 from ....domain.models.data_models import BattleDiaryCard, TokenUsage
 from ....domain.services.battle_diary_domain_service import BattleDiaryDomainService
-from ....shared.levels import level_label
+from ....shared.levels import level_label, parse_level_label
 from ....utils.logger import logger
 from ...change_books import ChangeBookEngine
 from ...event_book import EventBookEngine
@@ -235,7 +235,11 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
     ) -> dict[str, object]:
         if not magical_girl_candidates:
             return {
-                "familiar": monster_candidates[0] if monster_candidates else None,
+                "familiar": self._resolve_default_monster(
+                    monster_candidates,
+                    current_level=1,
+                    action_text="",
+                ),
                 "target_magical_girl": None,
             }
 
@@ -278,7 +282,11 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         if not success or not isinstance(parsed, dict):
             logger.warning(f"反派干部战斗出战选择 JSON 解析失败，使用候选兜底: {error}")
             return {
-                "familiar": monster_candidates[0] if monster_candidates else None,
+                "familiar": self._resolve_default_monster(
+                    monster_candidates,
+                    current_level=current_level,
+                    action_text=action_text,
+                ),
                 "target_magical_girl": magical_girl_candidates[0],
             }
 
@@ -286,6 +294,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             "familiar": self._resolve_selected_monster(
                 parsed.get("familiar"),
                 monster_candidates,
+                current_level=current_level,
+                action_text=action_text,
             ),
             "target_magical_girl": self._resolve_selected_magical_girl(
                 parsed.get("target_magical_girl"),
@@ -426,10 +436,13 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             },
         )
 
-    @staticmethod
     def _resolve_selected_monster(
+        self,
         selected: object,
         candidates: list[dict],
+        *,
+        current_level: int,
+        action_text: str,
     ) -> dict | None:
         if not selected or not isinstance(selected, dict):
             return None
@@ -438,19 +451,66 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         for candidate in candidates:
             if not isinstance(candidate, dict):
                 continue
-            if selected_id and selected_id == str(candidate.get("id") or "").strip():
+            candidate_id = str(candidate.get("id") or "").strip()
+            candidate_name = str(candidate.get("name") or "").strip()
+            if (selected_id and selected_id == candidate_id) or (
+                selected_name and selected_name == candidate_name
+            ):
                 resolved = dict(candidate)
                 resolved["selection_reason"] = str(selected.get("reason") or "").strip()
                 selected_level = str(selected.get("level") or "").strip()
-                if selected_level:
-                    resolved["selected_level"] = selected_level
+                selectable_levels = [
+                    str(level or "").strip()
+                    for level in candidate.get("monster_levels", [])
+                    if str(level or "").strip()
+                ]
+                default_levels = [
+                    str(level or "").strip()
+                    for level in candidate.get("default_levels", [])
+                    if str(level or "").strip()
+                ]
+                action = str(action_text or "")
+                explicitly_requested = bool(
+                    (candidate_name and candidate_name in action)
+                    or (candidate_id and candidate_id in action)
+                )
+                if not selectable_levels:
+                    return None
+                if selected_level not in selectable_levels:
+                    selected_level = ""
+                if (
+                    selected_level
+                    and parse_level_label(selected_level) > current_level
+                    and not explicitly_requested
+                ):
+                    selected_level = ""
+                if not selected_level:
+                    if not default_levels and not explicitly_requested:
+                        return None
+                    selected_level = default_levels[-1] if default_levels else selectable_levels[0]
+                resolved["selected_level"] = selected_level
+                resolved["explicitly_requested"] = explicitly_requested
+                resolved["overleveled"] = parse_level_label(selected_level) > current_level
                 return resolved
-            if selected_name and selected_name == str(candidate.get("name") or "").strip():
-                resolved = dict(candidate)
-                resolved["selection_reason"] = str(selected.get("reason") or "").strip()
-                selected_level = str(selected.get("level") or "").strip()
-                if selected_level:
-                    resolved["selected_level"] = selected_level
+        return None
+
+    def _resolve_default_monster(
+        self,
+        candidates: list[dict],
+        *,
+        current_level: int,
+        action_text: str,
+    ) -> dict | None:
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            resolved = self._resolve_selected_monster(
+                {"id": candidate.get("id")},
+                candidates,
+                current_level=current_level,
+                action_text=action_text,
+            )
+            if resolved:
                 return resolved
         return None
 
@@ -630,23 +690,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "recent_record_count": recent_record_count,
                 "json": "[]",
             }
-        fields = [
-            "姓名",
-            "年龄",
-            "身份&职业",
-            "魔法少女名",
-            "武装",
-            "变身服",
-            "性格特质",
-            "代表色",
-            "核心能力",
-            "相貌特征",
-            "身材细节",
-            "性器官特征",
-            "等级",
-            "战斗次数",
-            "最近记录",
-        ]
         teammates: list[dict[str, object]] = []
         seen: set[str] = set()
         for item in nearby_players:
@@ -656,10 +699,14 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             if not name or name in seen:
                 continue
             seen.add(name)
-            public_item = {key: item.get(key, "") for key in fields}
-            public_item["姓名"] = item.get("姓名") or item.get("target_name", "")
-            public_item["魔法少女名"] = name
-            teammates.append(public_item)
+            teammates.append(
+                {
+                    "姓名": item.get("姓名") or item.get("target_name", ""),
+                    "魔法少女名": name,
+                    "主角": item.get("主角", {}),
+                    "最近记录": item.get("最近记录", []),
+                }
+            )
         if not teammates:
             return {
                 "count": 0,

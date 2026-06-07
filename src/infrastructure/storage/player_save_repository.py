@@ -1058,11 +1058,13 @@ class PlayerSaveRepository:
         user_id: str,
         *,
         player_level: int,
+        include_overleveled: bool = False,
     ) -> list[dict[str, Any]]:
         return self._read_monster_candidates_from_path(
             self.get_user_dir(group_id, user_id) / "player_monster_book.json",
             player_level=player_level,
             source="player",
+            include_overleveled=include_overleveled,
         )
 
     def _read_monster_candidates_from_path(
@@ -1071,6 +1073,7 @@ class PlayerSaveRepository:
         *,
         player_level: int,
         source: str,
+        include_overleveled: bool = False,
     ) -> list[dict[str, Any]]:
         raw = self._read_json(path)
         entries = raw.get("entries", []) if isinstance(raw, dict) else []
@@ -1090,6 +1093,7 @@ class PlayerSaveRepository:
                 fallback_id=str(fallback_id),
                 player_level=player_level,
                 source=source,
+                include_overleveled=include_overleveled,
             )
             if normalized:
                 candidates.append(normalized)
@@ -1102,6 +1106,7 @@ class PlayerSaveRepository:
         fallback_id: str,
         player_level: int,
         source: str,
+        include_overleveled: bool = False,
     ) -> dict[str, Any] | None:
         visible_levels = normalize_visible_levels(
             entry.get("visible_levels"),
@@ -1116,14 +1121,15 @@ class PlayerSaveRepository:
             min_level=entry.get("min_monster_level", 1),
             max_level=entry.get("max_monster_level", 7),
         )
-        usable_levels = [level for level in monster_levels if level <= player_level]
-        if not usable_levels:
+        default_levels = [level for level in monster_levels if level <= player_level]
+        selectable_levels = list(monster_levels) if include_overleveled else default_levels
+        if not selectable_levels:
             return None
 
         raw_settings = entry.get("level_settings")
         level_settings = raw_settings if isinstance(raw_settings, dict) else {}
         usable_level_settings: dict[str, dict[str, str]] = {}
-        for level in usable_levels:
+        for level in selectable_levels:
             raw_setting = level_settings.get(str(level), {})
             if not isinstance(raw_setting, dict):
                 raw_setting = {}
@@ -1143,7 +1149,8 @@ class PlayerSaveRepository:
             "name": name,
             "source": source,
             "visible_levels": [level_label(level) for level in visible_levels],
-            "monster_levels": [level_label(level) for level in usable_levels],
+            "monster_levels": [level_label(level) for level in selectable_levels],
+            "default_levels": [level_label(level) for level in default_levels],
             "brief": brief,
             "content": content,
             "level_settings": usable_level_settings,
@@ -1524,6 +1531,7 @@ class PlayerSaveRepository:
             "_user_id": user_dir.name,
             "_source": source,
             "target_name": target_name,
+            "主角": protagonist,
             "阵营": faction,
             "姓名": target_name,
             "年龄": self._get_nested(protagonist, ["个人信息", "年龄"], ""),

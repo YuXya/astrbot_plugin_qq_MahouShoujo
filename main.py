@@ -665,6 +665,7 @@ class QQMahouShoujo(Star):
                 group_id,
                 user_id,
                 player_level=current_level,
+                include_overleveled=True,
             )
             if not monsters:
                 event.should_call_llm(False)
