@@ -4901,19 +4901,19 @@ class SaveWebViewer:
     .relationship-card-section p {{ margin: 0; color: #4b2447; line-height: 1.65; overflow-wrap: anywhere; }}
     .relationship-tag-row {{ display: flex; flex-wrap: wrap; gap: 8px; padding-top: 14px; border-top: 1px solid rgba(211,91,165,.22); }}
     .relationship-tag-row span {{ min-height: 26px; display: inline-flex; align-items: center; padding: 3px 9px; border: 1px solid rgba(211,91,165,.26); border-radius: 999px; background: rgba(255,255,255,.72); color: #744160; font-size: 12px; font-weight: 900; }}
-    main:has(.villain-monster-shell) {{ width: 100%; max-width: none; min-height: 100vh; box-sizing: border-box; padding: 0; overflow: hidden; }}
+    main:has(.villain-monster-shell) {{ width: 100%; max-width: none; min-height: 100vh; box-sizing: border-box; padding: 0; overflow-x: hidden; overflow-y: visible; }}
     main:has(.villain-monster-shell) .topbar {{ position: absolute; top: 18px; right: 22px; z-index: 6; margin: 0; min-height: 0; }}
     main:has(.villain-monster-shell) .topbar button {{ border: 1px solid rgba(215, 168, 75, .34); background: rgba(18, 8, 8, .86); box-shadow: 0 12px 28px rgba(0, 0, 0, .42); backdrop-filter: blur(10px); }}
-    .villain-monster-shell {{ position: relative; min-height: 100vh; padding: 70px clamp(16px, 4vw, 54px) 42px; box-sizing: border-box; overflow: auto; background: radial-gradient(circle at 14% 16%, rgba(145, 18, 30, .48) 0 8%, transparent 22%), radial-gradient(circle at 84% 18%, rgba(215, 168, 75, .28) 0 9%, transparent 24%), linear-gradient(135deg, #090607 0%, #1a080b 48%, #351018 100%); color: #f7ead2; isolation: isolate; }}
+    .villain-monster-shell {{ --villain-content-width: 1180px; position: relative; width: 100%; min-height: 100vh; padding: 70px clamp(16px, 4vw, 54px) 42px; box-sizing: border-box; overflow: visible; background: radial-gradient(circle at 14% 16%, rgba(145, 18, 30, .48) 0 8%, transparent 22%), radial-gradient(circle at 84% 18%, rgba(215, 168, 75, .28) 0 9%, transparent 24%), linear-gradient(135deg, #090607 0%, #1a080b 48%, #351018 100%); color: #f7ead2; isolation: isolate; }}
     .villain-grid {{ position: absolute; inset: -20%; z-index: -2; background-image: linear-gradient(rgba(215,168,75,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(215,168,75,.055) 1px, transparent 1px); background-size: 38px 38px; transform: rotate(-6deg); }}
     .villain-monster-shell::after {{ content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(215,168,75,.08), transparent 18%, transparent 82%, rgba(145,18,30,.18)); pointer-events: none; }}
-    .villain-monster-head {{ position: relative; max-width: 1180px; margin: 0 auto 14px; padding: 26px 128px 24px; border: 1px solid rgba(215, 168, 75, .34); border-radius: 8px; background: rgba(18, 8, 8, .78); box-shadow: 0 22px 58px rgba(0,0,0,.42), inset 0 0 0 1px rgba(255,226,160,.08); backdrop-filter: blur(14px); text-align: center; }}
+    .villain-monster-head {{ position: relative; width: min(var(--villain-content-width), 100%); margin: 0 auto 14px; padding: 26px 128px 24px; box-sizing: border-box; border: 1px solid rgba(215, 168, 75, .34); border-radius: 8px; background: rgba(18, 8, 8, .78); box-shadow: 0 22px 58px rgba(0,0,0,.42), inset 0 0 0 1px rgba(255,226,160,.08); backdrop-filter: blur(14px); text-align: center; }}
     .villain-monster-head .player-back-link {{ border-color: rgba(215, 168, 75, .36); background: rgba(215,168,75,.1); color: #f2cf7a; }}
     .villain-monster-head .player-kicker {{ color: #d7a84b; }}
     .villain-monster-head h1 {{ margin: 0 0 10px; color: #f6d483; font-size: clamp(31px, 4.8vw, 58px); line-height: 1.05; text-shadow: 0 0 22px rgba(145, 18, 30, .72); overflow-wrap: anywhere; }}
     .villain-monster-head p:last-of-type {{ max-width: 56em; margin: 0 auto; color: #e6d1a9; line-height: 1.7; }}
     .villain-monster-head > button {{ margin: 16px auto 0; border: 1px solid rgba(215,168,75,.38); background: linear-gradient(135deg, rgba(127,16,28,.92), rgba(215,168,75,.82)); box-shadow: 0 12px 26px rgba(0,0,0,.3); }}
-    .villain-workbench {{ width: min(1240px, 100%); margin: 0 auto; display: grid; grid-template-columns: minmax(220px, 260px) minmax(0, 1fr); gap: 16px; align-items: start; }}
+    .villain-workbench {{ width: min(var(--villain-content-width), 100%); margin: 0 auto; display: grid; grid-template-columns: minmax(240px, 280px) minmax(0, 1fr); gap: 16px; align-items: start; }}
     .villain-menu, .villain-editor, .villain-savebar {{ border: 1px solid rgba(215, 168, 75, .24); border-radius: 8px; background: rgba(15, 7, 7, .82); box-shadow: 0 18px 44px rgba(0,0,0,.34), inset 0 0 0 1px rgba(255,226,160,.06); backdrop-filter: blur(12px); }}
     .villain-menu {{ padding: 14px; align-self: start; }}
     .villain-menu-head {{ display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }}
@@ -4931,8 +4931,8 @@ class SaveWebViewer:
     .villain-monster-shell input[type="text"], .villain-monster-shell textarea {{ width: 100%; }}
     .villain-monster-shell textarea::placeholder, .villain-monster-shell input::placeholder {{ color: rgba(247,234,210,.48); }}
     .villain-identity-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }}
-    .villain-identity-grid .compact-field {{ min-width: 0; display: grid; grid-template-columns: 70px minmax(0, 1fr); align-items: center; }}
-    .villain-level-row {{ min-width: 0; display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; align-items: center; margin-top: 12px; }}
+    .villain-identity-grid .compact-field {{ min-width: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; }}
+    .villain-level-row {{ min-width: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; align-items: center; margin-top: 12px; }}
     .villain-level-row > span {{ color: #e6d1a9; font-weight: 800; }}
     .villain-level-row .level-choice-row {{ width: 100%; min-height: 42px; }}
     .villain-help {{ margin: 10px 0 0; font-size: 13px; line-height: 1.6; }}

@@ -633,6 +633,13 @@
             <div class="info-value">{{ item.description }}</div>
           </div>
           {% endfor %}
+          {% for item in card.info if item.path == '/主角/能力设定/性格弱点' %}
+          <div class="info-row">
+            <div class="info-icon">☯</div>
+            <div class="info-label">{{ item.field }}</div>
+            <div class="info-value">{{ item.description }}</div>
+          </div>
+          {% endfor %}
         </div>
       </div>
 
