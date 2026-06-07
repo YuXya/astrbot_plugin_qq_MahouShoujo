@@ -38,6 +38,7 @@ class BattleDiaryApplicationService:
         prompt_name: str = "battle_diary_prompt",
         default_action: str = "自由战斗",
         use_villain_battle_selection: bool = False,
+        identity_transition_faction: str | None = None,
     ) -> BattleDiaryExecutionResult:
         try:
             save_data = self.save_repository.load_player_save(group_id, user_id)
@@ -124,6 +125,7 @@ class BattleDiaryApplicationService:
                 card.level_exp_after,
                 world_day_offset=world_day_offset,
                 mention_scan_texts=action_text,
+                identity_transition_faction=identity_transition_faction,
             )
             await self._maybe_summarize_relationships(
                 group_id=group_id,

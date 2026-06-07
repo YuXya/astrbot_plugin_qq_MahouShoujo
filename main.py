@@ -525,6 +525,7 @@ class QQMahouShoujo(Star):
                     default_action="自由黑化",
                     action_label="黑化",
                     card_label="黑化日记卡",
+                    identity_transition_faction="反派干部",
                 ):
                     yield result
 
@@ -578,6 +579,7 @@ class QQMahouShoujo(Star):
                     default_action="自由洗白",
                     action_label="反派干部洗白",
                     card_label="反派干部洗白日记卡",
+                    identity_transition_faction="魔法少女",
                 ):
                     yield result
 
@@ -648,6 +650,7 @@ class QQMahouShoujo(Star):
         action_label: str = "战斗",
         card_label: str = "战斗日记卡",
         use_villain_battle_selection: bool = False,
+        identity_transition_faction: str | None = None,
     ) -> AsyncGenerator:
         save_data = self.save_repository.load_player_save(group_id, user_id)
         if not save_data:
@@ -677,6 +680,7 @@ class QQMahouShoujo(Star):
             prompt_name=prompt_name,
             default_action=default_action,
             use_villain_battle_selection=use_villain_battle_selection,
+            identity_transition_faction=identity_transition_faction,
         )
 
         if result.error:

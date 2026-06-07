@@ -42,6 +42,7 @@ def _now_date_str() -> str:
 
 
 class PlayerSaveRepository:
+    PLAYER_FACTIONS = {"魔法少女", "反派干部"}
     SOURCE_FILE_NAMES = {
         "player_data.json",
         "player_data_update.json",
@@ -249,9 +250,10 @@ class PlayerSaveRepository:
         user_dir = self.get_user_dir(group_id, user_id)
         user_dir.mkdir(parents=True, exist_ok=True)
 
+        faction = self._normalize_player_faction(faction)
         protagonist_tree = card.build_protagonist_tree()
         protagonist_tree.setdefault("主角", {}).setdefault("阵营", {})["身份"] = (
-            str(faction or "魔法少女").strip() or "魔法少女"
+            faction
         )
 
         # 确保等级节点存在
@@ -273,9 +275,9 @@ class PlayerSaveRepository:
         player_data_path = user_dir / "player_data.json"
         self._atomic_write_json(player_data_path, player_data)
 
-        # 同时创建 player_data_update.json（当前实时状态的副本）
-        update_data = dict(player_data)
-        update_data["updated_at"] = _now_date_str()
+        # 转生会重置基础人物卡；实时状态只同步覆盖主角树，保留其他顶层词条。
+        update_data = self._read_json(user_dir / "player_data_update.json") or dict(player_data)
+        update_data["主角"] = player_data["主角"]
         self._atomic_write_json(user_dir / "player_data_update.json", update_data)
 
         self.append_log(
@@ -338,6 +340,7 @@ class PlayerSaveRepository:
         new_level_exp: int = 0,
         world_day_offset: int | None = None,
         mention_scan_texts: str | list[str] | None = None,
+        identity_transition_faction: str | None = None,
     ) -> None:
         user_dir = self.get_user_dir(group_id, user_id)
         user_dir.mkdir(parents=True, exist_ok=True)
@@ -351,6 +354,29 @@ class PlayerSaveRepository:
         player_data = self._load_current_player_data(user_dir)
         if not player_data:
             player_data = self._create_default_player_data(group_id, user_id)
+
+        if identity_transition_faction is not None:
+            protagonist = player_data.setdefault("主角", {})
+            if not isinstance(protagonist, dict):
+                protagonist = {}
+                player_data["主角"] = protagonist
+            faction_node = protagonist.setdefault("阵营", {})
+            if not isinstance(faction_node, dict):
+                faction_node = {}
+                protagonist["阵营"] = faction_node
+            faction_node["身份"] = self._normalize_player_faction(identity_transition_faction)
+            card.state_snapshot = dict(player_data)
+            self._save_current_player_data(user_dir, player_data)
+            self._append_battle_result_log(
+                group_id,
+                user_id,
+                card,
+                now=now,
+                world_day_offset=world_day_offset,
+                world_date=world_date,
+            )
+            self.advance_world_clock(group_id, expected_day_offset=world_day_offset)
+            return
 
         # 更新等级
         protagonist = player_data.setdefault("主角", {})
@@ -401,6 +427,26 @@ class PlayerSaveRepository:
             protagonist_name=card.target_name,
         )
 
+        self._append_battle_result_log(
+            group_id,
+            user_id,
+            card,
+            now=now,
+            world_day_offset=world_day_offset,
+            world_date=world_date,
+        )
+        self.advance_world_clock(group_id, expected_day_offset=world_day_offset)
+
+    def _append_battle_result_log(
+        self,
+        group_id: str,
+        user_id: str,
+        card: BattleDiaryCard,
+        *,
+        now: int,
+        world_day_offset: int,
+        world_date: str,
+    ) -> None:
         self.append_log(
             group_id,
             user_id,
@@ -423,7 +469,6 @@ class PlayerSaveRepository:
                 "update_changes": card.update_changes,
             },
         )
-        self.advance_world_clock(group_id, expected_day_offset=world_day_offset)
 
     # ── 日志压缩 ──────────────────────────────────
 
@@ -1344,6 +1389,11 @@ class PlayerSaveRepository:
         return True
 
     # ── 内部辅助 ──────────────────────────────────
+
+    @classmethod
+    def _normalize_player_faction(cls, faction: object) -> str:
+        text = str(faction or "").strip()
+        return text if text in cls.PLAYER_FACTIONS else "魔法少女"
 
     def _create_default_player_data(self, group_id: str, user_id: str) -> dict[str, Any]:
         return {
