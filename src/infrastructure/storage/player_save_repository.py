@@ -797,12 +797,14 @@ class PlayerSaveRepository:
                 )
                 level_node = protagonist.get("等级", {})
                 level = level_node.get("等级", 1) if isinstance(level_node, dict) else 1
+                faction = self._get_nested(protagonist, ["阵营", "身份"], "魔法少女")
                 saves.append(
                     {
                         "group_id": group_dir.name,
                         "user_id": user_dir.name,
                         "nickname": player_data.get("nickname", ""),
                         "target_name": target_name,
+                        "faction": faction,
                         "level": level,
                         "updated_at": player_data.get("updated_at", ""),
                     }
@@ -1301,7 +1303,9 @@ class PlayerSaveRepository:
 
         self._atomic_write_json(user_dir / "player_data_update.json", player_data)
 
-    def delete_player_save(self, group_id: str, user_id: str) -> bool:
+    def delete_player_save(
+        self, group_id: str, user_id: str, *, delete_monsters: bool = True
+    ) -> bool:
         user_dir = self.get_user_dir(group_id, user_id)
         root = self.root_dir.resolve()
         target = user_dir.resolve()
@@ -1311,8 +1315,21 @@ class PlayerSaveRepository:
             return False
 
         self.delete_cameo_memories_by_source(group_id, user_id)
-        shutil.rmtree(user_dir)
-        self._cleanup_empty_parent_dirs(user_dir)
+        if delete_monsters:
+            shutil.rmtree(user_dir)
+            self._cleanup_empty_parent_dirs(user_dir)
+            return True
+
+        for child in user_dir.iterdir():
+            if child.name == "player_monster_book.json":
+                continue
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+        if not any(user_dir.iterdir()):
+            user_dir.rmdir()
+            self._cleanup_empty_parent_dirs(user_dir)
         return True
 
     def delete_cameo_memories_by_source(self, group_id: str, source_user_id: str) -> int:

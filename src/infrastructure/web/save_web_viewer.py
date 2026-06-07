@@ -347,8 +347,8 @@ class SaveWebViewer:
         for item in saves:
             row = self._save_table_row(item)
             delete_form = (
-                f"<form class=\"inline-form\" method=\"post\" action=\"{self._url('/player/delete')}\" "
-                "onsubmit=\"return confirm('确定删除这个玩家存档？此操作不可恢复。');\">"
+                f"<form class=\"inline-form player-delete-form\" method=\"post\" action=\"{self._url('/player/delete')}\" "
+                f"data-player-label=\"{row['nickname']} / {row['user_id']}\">"
                 f"<input type=\"hidden\" name=\"group_id\" value=\"{row['group_id']}\">"
                 f"<input type=\"hidden\" name=\"user_id\" value=\"{row['user_id']}\">"
                 "<button class=\"danger compact-button\" type=\"submit\">删除</button>"
@@ -358,7 +358,7 @@ class SaveWebViewer:
                 "<tr>"
                 f"<td>{row['user_id']}</td>"
                 f"<td><a href=\"{row['href']}\">{row['nickname']}</a></td>"
-                f"<td>{row['class_name']}</td>"
+                f"<td>{row['player_identity']}</td>"
                 f"<td>{row['level']}</td>"
                 f"<td>{row['updated_at']}</td>"
                 f"<td>{delete_form}</td>"
@@ -384,11 +384,67 @@ class SaveWebViewer:
             <table>
               <thead>
                 <tr>
-                  <th>用户</th><th>角色</th><th>职阶</th><th>等级</th><th>更新时间</th><th>操作</th>
+                  <th>用户</th><th>角色</th><th>玩家身份</th><th>等级</th><th>更新时间</th><th>操作</th>
                 </tr>
               </thead>
               <tbody>{body}</tbody>
             </table>
+            <div id="player-delete-modal" class="delete-modal" hidden>
+              <div class="delete-modal-backdrop" data-action="close-delete-modal"></div>
+              <section class="delete-modal-panel" role="dialog" aria-modal="true" aria-labelledby="player-delete-modal-title">
+                <button class="delete-modal-close" type="button" data-action="close-delete-modal" aria-label="关闭">×</button>
+                <h2 id="player-delete-modal-title">删除玩家存档</h2>
+                <p class="muted">确定删除 <strong id="delete-player-label"></strong> 的玩家存档？此操作不可恢复。</p>
+                <label class="delete-monster-option">
+                  <input id="delete-player-monsters" type="checkbox">
+                  <span>是否同时删除魔物</span>
+                </label>
+                <div class="actions">
+                  <button class="secondary compact-button" type="button" data-action="close-delete-modal">取消</button>
+                  <button id="confirm-player-delete" class="danger compact-button" type="button">删除存档</button>
+                </div>
+              </section>
+            </div>
+            <script>
+              const deleteModal = document.getElementById("player-delete-modal");
+              const deleteLabel = document.getElementById("delete-player-label");
+              const deleteMonsterCheckbox = document.getElementById("delete-player-monsters");
+              const confirmPlayerDelete = document.getElementById("confirm-player-delete");
+              let pendingDeleteForm = null;
+
+              function closeDeleteModal() {{
+                pendingDeleteForm = null;
+                deleteMonsterCheckbox.checked = false;
+                deleteModal.hidden = true;
+              }}
+
+              document.querySelectorAll(".player-delete-form").forEach((form) => {{
+                form.addEventListener("submit", (event) => {{
+                  event.preventDefault();
+                  pendingDeleteForm = form;
+                  deleteLabel.textContent = form.dataset.playerLabel || "";
+                  deleteMonsterCheckbox.checked = false;
+                  deleteModal.hidden = false;
+                }});
+              }});
+
+              deleteModal.querySelectorAll("[data-action='close-delete-modal']").forEach((button) => {{
+                button.addEventListener("click", closeDeleteModal);
+              }});
+
+              confirmPlayerDelete.addEventListener("click", () => {{
+                if (!pendingDeleteForm) return;
+                let field = pendingDeleteForm.querySelector("input[name='delete_monsters']");
+                if (!field) {{
+                  field = document.createElement("input");
+                  field.type = "hidden";
+                  field.name = "delete_monsters";
+                  pendingDeleteForm.appendChild(field);
+                }}
+                field.value = deleteMonsterCheckbox.checked ? "1" : "0";
+                pendingDeleteForm.submit();
+              }});
+            </script>
             """,
         )
 
@@ -474,6 +530,7 @@ class SaveWebViewer:
             "user_id": self._e(user_id_raw),
             "nickname": self._e(item.get("nickname") or item.get("target_name") or "未命名"),
             "class_name": self._e(self._rank_display(item.get("class_name", ""))),
+            "player_identity": self._e(item.get("faction") or "魔法少女"),
             "level": self._e(self._rank_display(level_label(item.get("level", 1)))),
             "updated_at": self._format_time(item.get("updated_at")),
             "href": href,
@@ -3579,7 +3636,7 @@ class SaveWebViewer:
     def _player_site_extra_profile_cards(self, protagonist: dict[str, Any]) -> str:
         if not isinstance(protagonist, dict):
             return '<p class="player-site-empty">暂无补充档案。</p>'
-        skipped = {"个人信息", "相貌特征", "身材细节"}
+        skipped = {"个人信息", "相貌特征", "身材细节", "技能", "快感状态"}
         cards: list[str] = []
         for section_name, section_value in protagonist.items():
             label = str(section_name or "").strip()
@@ -4355,7 +4412,15 @@ class SaveWebViewer:
         if not group_id or not user_id:
             raise web.HTTPBadRequest(text="missing group_id or user_id")
 
-        self.repository.delete_player_save(group_id, user_id)
+        delete_monsters = str(data.get("delete_monsters", "")).strip() in {
+            "1",
+            "true",
+            "on",
+            "yes",
+        }
+        self.repository.delete_player_save(
+            group_id, user_id, delete_monsters=delete_monsters
+        )
         raise self._redirect("/")
 
     def _is_authorized(self, request: web.Request) -> bool:
@@ -5091,6 +5156,14 @@ class SaveWebViewer:
     .player-monster-submission-head h3 {{ margin: 3px 0 0; color: #172033; }}
     .player-monster-submission p {{ margin: 8px 0; color: #303846; }}
     .player-monster-submission pre {{ max-height: 260px; }}
+    .delete-modal[hidden] {{ display: none; }}
+    .delete-modal {{ position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; padding: 24px; }}
+    .delete-modal-backdrop {{ position: absolute; inset: 0; background: rgba(15, 23, 42, .54); backdrop-filter: blur(4px); }}
+    .delete-modal-panel {{ position: relative; width: min(420px, 100%); padding: 18px; border: 1px solid #d9e1eb; border-radius: 8px; background: #fff; box-shadow: 0 24px 70px rgba(15, 23, 42, .32); }}
+    .delete-modal-panel h2 {{ margin: 0 36px 8px 0; color: #172033; }}
+    .delete-modal-close {{ position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; min-height: 0; display: grid; place-items: center; padding: 0; border-radius: 50%; border-color: #d9e1eb; background: #f8fafc; color: #384252; font-size: 20px; line-height: 1; }}
+    .delete-monster-option {{ display: flex; align-items: center; gap: 8px; margin: 16px 0; padding: 10px 12px; border: 1px solid #dde2ea; border-radius: 8px; background: #f8fafc; color: #263241; font-weight: 800; }}
+    .delete-monster-option input {{ width: 16px; height: 16px; }}
     .hero-card {{ display: flex; gap: 20px; align-items: center; margin: 18px 0 18px; padding: 20px; border: 1px solid #d9e1eb; border-radius: 8px; background: #fff; box-shadow: 0 10px 24px rgba(31, 41, 55, 0.06); }}
     .avatar-large {{ width: 92px; height: 92px; flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; border-radius: 8px; border: 1px solid #d8e0eb; background: #f0f4f8; color: #59636e; font-size: 34px; font-weight: 900; }}
     .avatar-large img {{ width: 100%; height: 100%; object-fit: cover; display: block; }}
