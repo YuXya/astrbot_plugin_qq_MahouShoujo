@@ -28,6 +28,7 @@ class LLMBattleDiaryAnalyzer:
         logs: list[dict],
         cameo_memories: list[dict] | None = None,
         nearby_players: list[dict] | None = None,
+        selection_context: dict[str, object] | None = None,
         user_id: str | None = None,
         nickname: str | None = None,
         umo: str | None = None,
@@ -42,6 +43,7 @@ class LLMBattleDiaryAnalyzer:
             logs=logs,
             cameo_memories=cameo_memories,
             nearby_players=nearby_players,
+            selection_context=selection_context,
             user_id=user_id,
             nickname=nickname,
             umo=umo,
@@ -90,5 +92,26 @@ class LLMBattleDiaryAnalyzer:
             logs=logs,
             cameo_memories=cameo_memories,
             candidates=candidates or [],
+            umo=umo,
+        )
+
+    async def select_villain_battle_context(
+        self,
+        *,
+        action_text: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict] | None = None,
+        monster_candidates: list[dict] | None = None,
+        magical_girl_candidates: list[dict] | None = None,
+        umo: str | None = None,
+    ) -> dict[str, object]:
+        return await self.analyzer.select_villain_battle_context(
+            action_text=action_text,
+            player_data=player_data,
+            logs=logs,
+            cameo_memories=cameo_memories,
+            monster_candidates=monster_candidates or [],
+            magical_girl_candidates=magical_girl_candidates or [],
             umo=umo,
         )

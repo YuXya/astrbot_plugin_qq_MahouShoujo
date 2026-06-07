@@ -173,53 +173,18 @@ class QQMahouShoujo(Star):
         yield event.plain_result(
             "\n".join(
                 [
-                    "魔法少女新手指引",
+                    "魔法少女指令",
                     "",
-                    "玩家可使用指令：",
-                    "1. /魔法少女转生",
-                    "   创建你的魔法少女角色档案。",
-                    "   请按指定格式填写角色设定，至少填写3项属性。",
-                    "   示例：",
-                    "   /魔法少女转生",
-                    "   姓名：星野梦美",
-                    "   性格特质：温柔内敛",
-                    "   代表色：星空蓝",
+                    "/魔法少女转生：创建魔法少女角色档案。",
+                    "/反派干部转生：创建反派干部角色档案。",
+                    "/魔法少女战斗：生成一次战斗日记，可追加行动。",
+                    "/魔法少女日常：生成一次日常日记，可追加行动。",
+                    "/魔法少女黑化 黑化原因：生成一次黑化日记。",
+                    "/反派干部洗白 洗白原因：生成一次洗白日记。",
+                    "/反派干部战斗 行动目标：生成一次反派干部战斗日记。",
+                    "/魔法少女存档删除 确认：删除当前群自己的存档。",
                     "",
-                    "2. /反派干部转生",
-                    "   创建你的反派干部角色档案，生成逻辑与魔法少女转生相同。",
-                    "   示例：",
-                    "   /反派干部转生",
-                    "   姓名：夜见绫",
-                    "   性格特质：冷静、支配欲强",
-                    "   核心能力：影子束缚",
-                    "",
-                    "3. /魔法少女战斗",
-                    "   根据你的角色档案、当前状态和最近记录，生成一次战斗日记。",
-                    "   可以直接自由战斗，也可以在命令后写本次行动。",
-                    "   示例：/魔法少女战斗 去森林战斗爽",
-                    "",
-                    "4. /魔法少女日常",
-                    "   根据你的角色档案、当前状态和最近记录，生成一次日常日记。",
-                    "   可以直接自由日常，也可以在命令后写本次行动。",
-                    "   示例：/魔法少女日常 和队友一起去买甜点",
-                    "",
-                    "5. /魔法少女黑化",
-                    "   根据你的角色档案、当前状态和最近记录，生成一次黑化日记。",
-                    "   可以直接自由黑化，也可以在命令后写本次行动。",
-                    "   示例：/魔法少女黑化 独自走进废弃车站",
-                    "",
-                    "6. /反派干部战斗",
-                    "   根据你的角色档案、当前状态和最近记录，生成一次反派干部战斗日记。",
-                    "   可以直接自由战斗，也可以在命令后写本次行动。",
-                    "   示例：/反派干部战斗 夜袭魔法少女据点",
-                    "",
-                    "7. /魔法少女存档删除",
-                    "   删除你在当前群的魔法少女存档，并清理其他玩家记忆中由你产生的客串记录。",
-                    "   为避免误删，需要输入：/魔法少女存档删除 确认",
-                    "",
-                    "角色档案面板：",
-                    "https://www.youxiajiang.com/Games/AIBot/",
-                    "创建完角色后，可以在这里查看自己的角色档案、状态和战斗记录。",
+                    "角色档案面板：https://www.youxiajiang.com/Games/AIBot/",
                 ]
             )
         )
@@ -531,6 +496,20 @@ class QQMahouShoujo(Star):
             yield event.plain_result("没有拿到你的 QQ 号，暂时不能读取玩家存档。")
             return
 
+        action_text = self._extract_command_tail(event, "魔法少女黑化")
+        if not action_text:
+            event.should_call_llm(False)
+            yield event.plain_result(
+                "\n".join(
+                    [
+                        "请写此次黑化原因。",
+                        "格式：/魔法少女黑化 黑化原因",
+                        "示例：/魔法少女黑化 独自走进废弃车站时听见了污染低语",
+                    ]
+                )
+            )
+            return
+
         if await self.player_queue.is_locked(group_id, user_id):
             yield event.plain_result("你的上一条魔法少女请求还在处理，已经进入队列，马上轮到你。")
 
@@ -546,6 +525,59 @@ class QQMahouShoujo(Star):
                     default_action="自由黑化",
                     action_label="黑化",
                     card_label="黑化日记卡",
+                ):
+                    yield result
+
+    @filter.command("反派干部洗白")
+    async def villain_officer_purification_diary(
+        self,
+        event: AstrMessageEvent,
+    ) -> AsyncGenerator:
+        """根据玩家存档生成一次完整的反派干部洗白日记卡。用法：/反派干部洗白 洗白原因"""
+        event.should_call_llm(True)
+
+        if not self._is_group_event_allowed(event):
+            return
+
+        group_id = self._get_group_id_from_event(event)
+        if not group_id:
+            yield event.plain_result("请在群聊中使用 /反派干部洗白。")
+            return
+
+        user_id = self._get_sender_id_from_event(event)
+        if not user_id:
+            yield event.plain_result("没有拿到你的 QQ 号，暂时不能读取玩家存档。")
+            return
+
+        action_text = self._extract_command_tail(event, "反派干部洗白")
+        if not action_text:
+            event.should_call_llm(False)
+            yield event.plain_result(
+                "\n".join(
+                    [
+                        "请写此次洗白原因。",
+                        "格式：/反派干部洗白 洗白原因",
+                        "示例：/反派干部洗白 被目标魔法少女冒险救下后开始动摇",
+                    ]
+                )
+            )
+            return
+
+        if await self.player_queue.is_locked(group_id, user_id):
+            yield event.plain_result("你的上一条魔法少女请求还在处理，已经进入队列，马上轮到你。")
+
+        async with self.player_queue.lock_for(group_id, user_id):
+            async with self.player_queue.group_lock_for(group_id):
+                async for result in self._run_battle_diary(
+                    event,
+                    group_id,
+                    user_id,
+                    command_name="反派干部洗白",
+                    event_command="/反派干部洗白",
+                    prompt_name="villain_officer_purification_prompt",
+                    default_action="自由洗白",
+                    action_label="反派干部洗白",
+                    card_label="反派干部洗白日记卡",
                 ):
                     yield result
 
@@ -570,6 +602,20 @@ class QQMahouShoujo(Star):
             yield event.plain_result("没有拿到你的 QQ 号，暂时不能读取玩家存档。")
             return
 
+        action_text = self._extract_command_tail(event, "反派干部战斗")
+        if not action_text:
+            event.should_call_llm(False)
+            yield event.plain_result(
+                "\n".join(
+                    [
+                        "请写此次行动目标。",
+                        "格式：/反派干部战斗 行动目标",
+                        "示例：/反派干部战斗 夜袭魔法少女据点",
+                    ]
+                )
+            )
+            return
+
         if await self.player_queue.is_locked(group_id, user_id):
             yield event.plain_result("你的上一条魔法少女请求还在处理，已经进入队列，马上轮到你。")
 
@@ -585,6 +631,7 @@ class QQMahouShoujo(Star):
                     default_action="自由反派干部战斗",
                     action_label="反派干部战斗",
                     card_label="反派干部战斗日记卡",
+                    use_villain_battle_selection=True,
                 ):
                     yield result
 
@@ -600,6 +647,7 @@ class QQMahouShoujo(Star):
         default_action: str = "自由战斗",
         action_label: str = "战斗",
         card_label: str = "战斗日记卡",
+        use_villain_battle_selection: bool = False,
     ) -> AsyncGenerator:
         save_data = self.save_repository.load_player_save(group_id, user_id)
         if not save_data:
@@ -628,6 +676,7 @@ class QQMahouShoujo(Star):
             event_command=event_command,
             prompt_name=prompt_name,
             default_action=default_action,
+            use_villain_battle_selection=use_villain_battle_selection,
         )
 
         if result.error:

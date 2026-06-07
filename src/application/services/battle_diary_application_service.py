@@ -37,6 +37,7 @@ class BattleDiaryApplicationService:
         event_command: str = "/魔法少女战斗",
         prompt_name: str = "battle_diary_prompt",
         default_action: str = "自由战斗",
+        use_villain_battle_selection: bool = False,
     ) -> BattleDiaryExecutionResult:
         try:
             save_data = self.save_repository.load_player_save(group_id, user_id)
@@ -53,28 +54,49 @@ class BattleDiaryApplicationService:
             player_data = save_data.get("player_data", {})
             logs = save_data.get("logs", [])
             cameo_memories = save_data.get("cameo_memories", [])
-            mentioned_players = self.save_repository.find_mentioned_npcs(
-                group_id,
-                user_id,
-                [action_text, self._logs_text_for_teammate_scan(logs)],
-                recent_record_count=self.config_manager.get_teammate_recent_record_count(),
-            )
-            semantic_players = await self._infer_semantic_teammates(
-                group_id=group_id,
-                user_id=user_id,
-                player_data=player_data,
-                logs=logs,
-                cameo_memories=cameo_memories,
-                action_text=action_text,
-                umo=umo,
-            )
-            nearby_players = self._merge_nearby_players(mentioned_players, semantic_players)
+            selection_context: dict[str, object] | None = None
+            if use_villain_battle_selection:
+                selection_context = await self._select_villain_battle_context(
+                    group_id=group_id,
+                    user_id=user_id,
+                    player_data=player_data,
+                    logs=logs,
+                    cameo_memories=cameo_memories,
+                    action_text=action_text,
+                    umo=umo,
+                )
+                target = selection_context.get("target_magical_girl") if selection_context else None
+                if not isinstance(target, dict) or not target:
+                    return BattleDiaryExecutionResult(
+                        success=False,
+                        text="当前城市没有可作为目标的魔法少女存档，暂时不能发起 /反派干部战斗。",
+                        error="target_magical_girl_not_found",
+                    )
+                nearby_players = [target]
+            else:
+                mentioned_players = self.save_repository.find_mentioned_npcs(
+                    group_id,
+                    user_id,
+                    [action_text, self._logs_text_for_teammate_scan(logs)],
+                    recent_record_count=self.config_manager.get_teammate_recent_record_count(),
+                )
+                semantic_players = await self._infer_semantic_teammates(
+                    group_id=group_id,
+                    user_id=user_id,
+                    player_data=player_data,
+                    logs=logs,
+                    cameo_memories=cameo_memories,
+                    action_text=action_text,
+                    umo=umo,
+                )
+                nearby_players = self._merge_nearby_players(mentioned_players, semantic_players)
             analysis = await self.llm_analyzer.analyze_diary(
                 action_text=action_text,
                 player_data=player_data,
                 logs=logs,
                 cameo_memories=cameo_memories,
                 nearby_players=nearby_players,
+                selection_context=selection_context,
                 user_id=user_id,
                 nickname=nickname,
                 umo=umo,
@@ -250,6 +272,40 @@ class BattleDiaryApplicationService:
         except Exception as exc:
             logger.warning(f"队友语义识别失败，已回退直接点名扫描: group={group_id} {exc}")
             return []
+
+    async def _select_villain_battle_context(
+        self,
+        *,
+        group_id: str,
+        user_id: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict],
+        action_text: str,
+        umo: str | None,
+    ) -> dict[str, object]:
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+        current_level = self.domain_service.get_current_level(protagonist)
+        recent_record_count = self.config_manager.get_teammate_recent_record_count()
+        monster_candidates = self.save_repository.build_villain_monster_candidates(
+            group_id,
+            user_id,
+            player_level=current_level,
+        )
+        target_candidates = self.save_repository.build_city_magical_girl_candidates(
+            group_id,
+            user_id,
+            recent_record_count=recent_record_count,
+        )
+        return await self.llm_analyzer.select_villain_battle_context(
+            action_text=action_text,
+            player_data=player_data,
+            logs=logs,
+            cameo_memories=cameo_memories,
+            monster_candidates=monster_candidates,
+            magical_girl_candidates=target_candidates,
+            umo=umo,
+        )
 
     async def _append_cameo_memories(
         self,

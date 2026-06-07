@@ -62,6 +62,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         logs: list[dict],
         cameo_memories: list[dict] | None = None,
         nearby_players: list[dict] | None = None,
+        selection_context: dict[str, object] | None = None,
         user_id: str | None = None,
         nickname: str | None = None,
         umo: str | None = None,
@@ -76,6 +77,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             logs=logs,
             cameo_memories=cameo_memories,
             nearby_players=nearby_players,
+            selection_context=selection_context,
             user_id=user_id,
             nickname=nickname,
             current_world_date=current_world_date,
@@ -129,6 +131,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         user_id: str | None,
         nickname: str | None,
         current_world_date: str,
+        selection_context: dict[str, object] | None = None,
         event_command: str = "/魔法少女战斗",
         prompt_name: str = "battle_diary_prompt",
         default_action: str = "自由战斗",
@@ -210,8 +213,86 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "teammate_count": teammate_info["count"],
                 "recent_record_count": teammate_info["recent_record_count"],
                 "teammates_json": teammate_info["json"],
+                "sortie_familiar_json": self._json_dump(
+                    (selection_context or {}).get("familiar")
+                ),
+                "target_magical_girl_json": self._json_dump(
+                    (selection_context or {}).get("target_magical_girl")
+                ),
             },
         )
+
+    async def select_villain_battle_context(
+        self,
+        *,
+        action_text: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict] | None,
+        monster_candidates: list[dict],
+        magical_girl_candidates: list[dict],
+        umo: str | None = None,
+    ) -> dict[str, object]:
+        if not magical_girl_candidates:
+            return {
+                "familiar": monster_candidates[0] if monster_candidates else None,
+                "target_magical_girl": None,
+            }
+
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+        current_level = self.domain_service.get_current_level(protagonist)
+        prompt = self.editable_manager.render_prompt(
+            "villain_battle_selection_prompt",
+            {
+                "current_level": level_label(current_level),
+                "player_data_update_json": self._json_dump(player_data),
+                "action": action_text.strip(),
+                "logs_text": self._format_logs(logs),
+                "cameo_memories_text": self._format_cameo_memories(cameo_memories),
+                "candidates_json": self._json_dump(
+                    {
+                        "monsters": monster_candidates,
+                        "magical_girls": magical_girl_candidates,
+                    }
+                ),
+            },
+        )
+        system_prompt = self.editable_manager.get_prompt("default_system_prompt")
+        if self.config_manager.get_debug_mode():
+            self._save_debug_file("villain_battle_selection_prompt", prompt)
+
+        response = await call_provider_with_retry(
+            self.context,
+            self.config_manager,
+            prompt=prompt,
+            umo=umo,
+            system_prompt=system_prompt,
+            purpose="反派干部战斗出战选择",
+            provider_id_override=self.config_manager.get_subtask_llm_provider_id(),
+        )
+        result_text = extract_response_text(response)
+        if self.config_manager.get_debug_mode():
+            self._save_debug_file("villain_battle_selection_response", result_text)
+
+        success, parsed, error = parse_json_object_response(result_text)
+        if not success or not isinstance(parsed, dict):
+            logger.warning(f"反派干部战斗出战选择 JSON 解析失败，使用候选兜底: {error}")
+            return {
+                "familiar": monster_candidates[0] if monster_candidates else None,
+                "target_magical_girl": magical_girl_candidates[0],
+            }
+
+        return {
+            "familiar": self._resolve_selected_monster(
+                parsed.get("familiar"),
+                monster_candidates,
+            ),
+            "target_magical_girl": self._resolve_selected_magical_girl(
+                parsed.get("target_magical_girl"),
+                magical_girl_candidates,
+            )
+            or magical_girl_candidates[0],
+        }
 
     async def compress_battle_logs(
         self,
@@ -344,6 +425,56 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "candidates_json": self._json_dump(candidates),
             },
         )
+
+    @staticmethod
+    def _resolve_selected_monster(
+        selected: object,
+        candidates: list[dict],
+    ) -> dict | None:
+        if not selected or not isinstance(selected, dict):
+            return None
+        selected_id = str(selected.get("id") or "").strip()
+        selected_name = str(selected.get("name") or "").strip()
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            if selected_id and selected_id == str(candidate.get("id") or "").strip():
+                resolved = dict(candidate)
+                resolved["selection_reason"] = str(selected.get("reason") or "").strip()
+                selected_level = str(selected.get("level") or "").strip()
+                if selected_level:
+                    resolved["selected_level"] = selected_level
+                return resolved
+            if selected_name and selected_name == str(candidate.get("name") or "").strip():
+                resolved = dict(candidate)
+                resolved["selection_reason"] = str(selected.get("reason") or "").strip()
+                selected_level = str(selected.get("level") or "").strip()
+                if selected_level:
+                    resolved["selected_level"] = selected_level
+                return resolved
+        return None
+
+    @staticmethod
+    def _resolve_selected_magical_girl(
+        selected: object,
+        candidates: list[dict],
+    ) -> dict | None:
+        if not selected or not isinstance(selected, dict):
+            return None
+        selected_target = str(selected.get("target_name") or "").strip()
+        selected_magical = str(selected.get("magical_name") or "").strip()
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            if selected_target and selected_target == str(candidate.get("target_name") or "").strip():
+                resolved = dict(candidate)
+                resolved["selection_reason"] = str(selected.get("reason") or "").strip()
+                return resolved
+            if selected_magical and selected_magical == str(candidate.get("魔法少女名") or "").strip():
+                resolved = dict(candidate)
+                resolved["selection_reason"] = str(selected.get("reason") or "").strip()
+                return resolved
+        return None
 
     @staticmethod
     def _normalize_teammate_names(data: dict[str, object]) -> list[str]:

@@ -11,6 +11,7 @@ from typing import Any
 from astrbot.api.star import StarTools
 
 from ...domain.models.data_models import BattleDiaryCard, ReincarnationCard
+from ...shared.levels import level_label, normalize_visible_levels
 from ...utils.logger import logger
 from .state_progress import PROGRESS_KEYS
 
@@ -794,6 +795,7 @@ class PlayerSaveRepository:
                     "user_id": user_id,
                     "target_name": str(profile.get("target_name") or user_id),
                     "magical_name": str(profile.get("magical_name") or ""),
+                    "faction": str(profile.get("阵营") or "魔法少女"),
                     "level": profile.get("等级", 1),
                 }
             )
@@ -972,6 +974,147 @@ class PlayerSaveRepository:
                 npc["public_reputation"] = public_reputation
             candidates.append(npc)
         return candidates
+
+    def build_city_magical_girl_candidates(
+        self,
+        group_id: str,
+        user_id: str,
+        *,
+        recent_record_count: int = 1,
+    ) -> list[dict[str, Any]]:
+        users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
+        if not users_dir.exists():
+            return []
+
+        current_user = self._safe_id(user_id)
+        candidates: list[dict[str, Any]] = []
+        for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
+            if user_dir.name == current_user:
+                continue
+            npc = self._build_npc_package(
+                user_dir,
+                source="city_magical_girl_candidate",
+                recent_record_count=recent_record_count,
+            )
+            if not npc:
+                continue
+            if str(npc.get("阵营") or "").strip() != "魔法少女":
+                continue
+            public_reputation = self._read_public_reputation(user_dir)
+            if public_reputation:
+                npc["城市风评"] = public_reputation
+                npc["public_reputation"] = public_reputation
+            candidates.append(npc)
+        return candidates
+
+    def build_villain_monster_candidates(
+        self,
+        group_id: str,
+        user_id: str,
+        *,
+        player_level: int,
+    ) -> list[dict[str, Any]]:
+        candidates: list[dict[str, Any]] = []
+        candidates.extend(
+            self._read_monster_candidates_from_path(
+                self.get_user_dir(group_id, user_id) / "player_monster_book.json",
+                player_level=player_level,
+                source="player",
+            )
+        )
+        if self.editable_manager is not None:
+            candidates.extend(
+                self._read_monster_candidates_from_path(
+                    self.editable_manager.monster_book_path,
+                    player_level=player_level,
+                    source="world",
+                )
+            )
+        return candidates
+
+    def _read_monster_candidates_from_path(
+        self,
+        path: Path,
+        *,
+        player_level: int,
+        source: str,
+    ) -> list[dict[str, Any]]:
+        raw = self._read_json(path)
+        entries = raw.get("entries", []) if isinstance(raw, dict) else []
+        if isinstance(entries, dict):
+            iterable = entries.items()
+        elif isinstance(entries, list):
+            iterable = enumerate(entries)
+        else:
+            return []
+
+        candidates: list[dict[str, Any]] = []
+        for fallback_id, entry in iterable:
+            if not isinstance(entry, dict):
+                continue
+            normalized = self._monster_entry_for_selection(
+                entry,
+                fallback_id=str(fallback_id),
+                player_level=player_level,
+                source=source,
+            )
+            if normalized:
+                candidates.append(normalized)
+        return candidates
+
+    @staticmethod
+    def _monster_entry_for_selection(
+        entry: dict[str, Any],
+        *,
+        fallback_id: str,
+        player_level: int,
+        source: str,
+    ) -> dict[str, Any] | None:
+        visible_levels = normalize_visible_levels(
+            entry.get("visible_levels"),
+            min_level=entry.get("min_level", 1),
+            max_level=entry.get("max_level", 7),
+        )
+        if player_level not in visible_levels:
+            return None
+
+        monster_levels = normalize_visible_levels(
+            entry.get("monster_levels"),
+            min_level=entry.get("min_monster_level", 1),
+            max_level=entry.get("max_monster_level", 7),
+        )
+        usable_levels = [level for level in monster_levels if level <= player_level]
+        if not usable_levels:
+            return None
+
+        raw_settings = entry.get("level_settings")
+        level_settings = raw_settings if isinstance(raw_settings, dict) else {}
+        usable_level_settings: dict[str, dict[str, str]] = {}
+        for level in usable_levels:
+            raw_setting = level_settings.get(str(level), {})
+            if not isinstance(raw_setting, dict):
+                raw_setting = {}
+            usable_level_settings[level_label(level)] = {
+                "brief": str(raw_setting.get("brief") or "").strip(),
+                "content": str(raw_setting.get("content") or "").strip(),
+            }
+
+        name = str(entry.get("name") or entry.get("title") or "").strip()
+        content = str(entry.get("content") or entry.get("detail") or "").strip()
+        brief = str(entry.get("brief") or entry.get("summary") or "").strip()
+        if not name and not content and not brief:
+            return None
+
+        return {
+            "id": str(entry.get("id") or fallback_id).strip(),
+            "name": name,
+            "source": source,
+            "visible_levels": [level_label(level) for level in visible_levels],
+            "monster_levels": [level_label(level) for level in usable_levels],
+            "brief": brief,
+            "content": content,
+            "level_settings": usable_level_settings,
+        }
 
     def read_save_detail(self, group_id: str, user_id: str) -> dict[str, Any] | None:
         user_dir = self.get_user_dir(group_id, user_id)
@@ -1330,6 +1473,7 @@ class PlayerSaveRepository:
 
         target_name = self._get_nested(protagonist, ["个人信息", "姓名"], user_dir.name)
         magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], target_name)
+        faction = self._get_nested(protagonist, ["阵营", "身份"], "魔法少女")
         level_node = protagonist.get("等级", {})
         level = level_node.get("等级", 1) if isinstance(level_node, dict) else 1
         battle_count = self._ensure_battle_count(player_data)
@@ -1342,6 +1486,7 @@ class PlayerSaveRepository:
             "_user_id": user_dir.name,
             "_source": source,
             "target_name": target_name,
+            "阵营": faction,
             "姓名": target_name,
             "年龄": self._get_nested(protagonist, ["个人信息", "年龄"], ""),
             "身份&职业": self._get_nested(protagonist, ["个人信息", "身份&职业"], ""),
@@ -1588,6 +1733,7 @@ class PlayerSaveRepository:
             return None
         target_name = self._get_nested(protagonist, ["个人信息", "姓名"], user_dir.name)
         magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], target_name)
+        faction = self._get_nested(protagonist, ["阵营", "身份"], "魔法少女")
         level_node = protagonist.get("等级", {})
         level = level_node.get("等级", 1) if isinstance(level_node, dict) else 1
         return {
@@ -1595,6 +1741,7 @@ class PlayerSaveRepository:
             "user_id": user_dir.name,
             "target_name": target_name,
             "magical_name": magical_name,
+            "阵营": faction,
             "武装": self._get_nested(protagonist, ["个人信息", "武装"], ""),
             "变身服": self._get_nested(protagonist, ["个人信息", "变身服"], ""),
             "性格特质": self._get_nested(protagonist, ["个人信息", "性格特质"], ""),
@@ -1649,6 +1796,7 @@ class PlayerSaveRepository:
                     "user_id": profile.get("user_id", user_dir.name),
                     "target_name": profile.get("target_name", ""),
                     "magical_name": profile.get("magical_name", ""),
+                    "faction": profile.get("阵营", "魔法少女"),
                     "level": profile.get("等级", 1),
                     "public_reputation": public_reputation,
                 }
@@ -1683,6 +1831,7 @@ class PlayerSaveRepository:
             "user_id": str(profile.get("user_id") or ""),
             "target_name": str(profile.get("target_name") or ""),
             "magical_name": str(profile.get("magical_name") or ""),
+            "faction": str(profile.get("阵营") or "魔法少女"),
         }
 
     def _replace_protagonist_key(self, value: Any, target_name: str) -> Any:

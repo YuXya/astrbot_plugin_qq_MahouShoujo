@@ -18,7 +18,9 @@ class EditableResourceManager:
         "battle_diary_prompt": "prompts/battle_diary_prompt.txt",
         "daily_diary_prompt": "prompts/daily_diary_prompt.txt",
         "corruption_diary_prompt": "prompts/corruption_diary_prompt.txt",
+        "villain_officer_purification_prompt": "prompts/villain_officer_purification_prompt.txt",
         "villain_officer_battle_prompt": "prompts/villain_officer_battle_prompt.txt",
+        "villain_battle_selection_prompt": "prompts/villain_battle_selection_prompt.txt",
         "relationship_summary_prompt": "prompts/relationship_summary_prompt.txt",
         "teammate_completion_prompt": "prompts/teammate_completion_prompt.txt",
         "default_system_prompt": "prompts/default_system_prompt.txt",
@@ -279,8 +281,20 @@ class EditableResourceManager:
                 "category": "text_completion",
             },
             {
+                "id": self.PROMPT_FILES["villain_officer_purification_prompt"],
+                "label": "反派干部洗白日记 Prompt",
+                "type": "text",
+                "category": "text_completion",
+            },
+            {
                 "id": self.PROMPT_FILES["villain_officer_battle_prompt"],
                 "label": "反派干部战斗 Prompt",
+                "type": "text",
+                "category": "text_completion",
+            },
+            {
+                "id": self.PROMPT_FILES["villain_battle_selection_prompt"],
+                "label": "反派干部战斗出战选择 Prompt",
                 "type": "text",
                 "category": "text_completion",
             },
@@ -317,7 +331,9 @@ class EditableResourceManager:
             self.PROMPT_FILES["battle_diary_prompt"]: defaults.BATTLE_DIARY_PROMPT,
             self.PROMPT_FILES["daily_diary_prompt"]: defaults.DAILY_DIARY_PROMPT,
             self.PROMPT_FILES["corruption_diary_prompt"]: defaults.CORRUPTION_DIARY_PROMPT,
+            self.PROMPT_FILES["villain_officer_purification_prompt"]: defaults.VILLAIN_OFFICER_PURIFICATION_PROMPT,
             self.PROMPT_FILES["villain_officer_battle_prompt"]: defaults.VILLAIN_OFFICER_BATTLE_PROMPT,
+            self.PROMPT_FILES["villain_battle_selection_prompt"]: defaults.VILLAIN_BATTLE_SELECTION_PROMPT,
             self.PROMPT_FILES["relationship_summary_prompt"]: defaults.RELATIONSHIP_SUMMARY_PROMPT,
             self.PROMPT_FILES["teammate_completion_prompt"]: defaults.TEAMMATE_COMPLETION_PROMPT,
             self.PROMPT_FILES["default_system_prompt"]: defaults.DEFAULT_SYSTEM_PROMPT,
@@ -345,7 +361,7 @@ class EditableResourceManager:
                 "性癖最高 Lv.5；base_path 是给 AI 输出 update.changes 的路径提示。"
             ),
             "event_book/default.json": (
-                "事件书文件。按 /魔法少女转生、/反派干部转生、/魔法少女战斗、/魔法少女日常、/魔法少女黑化、/反派干部战斗 分组。"
+                "事件书文件。按 /魔法少女转生、/反派干部转生、/魔法少女战斗、/魔法少女日常、/魔法少女黑化、/反派干部洗白、/反派干部战斗 分组。"
                 "当前事件内关键词命中或 always 条目会注入详细介绍；其他事件只在关键词命中且简略介绍不为空时注入简略介绍。"
                 "visible_levels 为可见主角等级，数字 1-7 对应 F、E、D、C、B、A、S；未填写时默认全部可见。排序由网页上的上下位置决定。"
             ),
@@ -380,9 +396,18 @@ class EditableResourceManager:
                 "用于 /魔法少女黑化 的完整 Prompt。变量与战斗日记 Prompt 相同，"
                 "发给 AI 的 user message 就是这个模板渲染后的结果；要求仍返回兼容日记卡的纯 JSON。"
             ),
-            self.PROMPT_FILES["villain_officer_battle_prompt"]: (
-                "用于 /反派干部战斗 的完整 Prompt。变量与战斗日记 Prompt 相同，"
+            self.PROMPT_FILES["villain_officer_purification_prompt"]: (
+                "用于 /反派干部洗白 的完整 Prompt。变量与战斗日记 Prompt 相同，"
                 "发给 AI 的 user message 就是这个模板渲染后的结果；要求仍返回兼容日记卡的纯 JSON。"
+            ),
+            self.PROMPT_FILES["villain_officer_battle_prompt"]: (
+                "用于 /反派干部战斗 的完整 Prompt。除通用日记变量外，还可用 "
+                "{{sortie_familiar_json}} 和 {{target_magical_girl_json}}，"
+                "发给 AI 的 user message 就是这个模板渲染后的结果；要求仍返回兼容日记卡的纯 JSON。"
+            ),
+            self.PROMPT_FILES["villain_battle_selection_prompt"]: (
+                "用于 /反派干部战斗 正文生成前的后台出战选择。使用子任务 LLM Provider，"
+                "从可用魔物和本城市魔法少女中选择出战使魔与目标魔法少女。"
             ),
             self.PROMPT_FILES["relationship_summary_prompt"]: (
                 "用于多人 /魔法少女战斗 结束后的后台人物关系总结。发给 AI 的 user message 就是这个模板渲染后的结果。"

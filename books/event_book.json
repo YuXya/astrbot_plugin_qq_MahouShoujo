@@ -32,6 +32,12 @@
       "entries": []
     },
     {
+      "id": "villain_officer_purification",
+      "command": "/反派干部洗白",
+      "name": "反派干部洗白",
+      "entries": []
+    },
+    {
       "id": "villain_officer_battle",
       "command": "/反派干部战斗",
       "name": "反派干部战斗",

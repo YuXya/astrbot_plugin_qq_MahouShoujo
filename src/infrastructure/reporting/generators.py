@@ -35,10 +35,15 @@ class ReportGenerator(ICardGenerator):
         card: ReincarnationCard,
         html_render_func: Any,
     ) -> tuple[str | None, str | None]:
+        card_faction = self._reincarnation_card_faction(card)
         html_content = self.html_templates.render_template(
             "card.html",
             card=card,
             avatar_url=card.avatar_url,
+            card_faction=card_faction,
+            card_identity_label="反派干部" if card_faction == "反派干部" else "魔法少女",
+            card_identity_name=self._reincarnation_card_codename(card, card_faction),
+            is_villain=card_faction == "反派干部",
         )
         if not html_content:
             return None, None
@@ -157,6 +162,38 @@ class ReportGenerator(ICardGenerator):
             cursor = match.end()
         parts.append(html_lib.escape(raw_text[cursor:]))
         return "".join(parts)
+
+    @staticmethod
+    def _reincarnation_card_faction(card: ReincarnationCard) -> str:
+        for item in card.info:
+            if item.get("path") == "/主角/阵营/身份":
+                faction = str(item.get("description") or "").strip()
+                if faction:
+                    return faction
+        for item in card.info:
+            if item.get("path") == "/主角/个人信息/反派干部名":
+                return "反派干部"
+        return "魔法少女"
+
+    @staticmethod
+    def _reincarnation_card_codename(card: ReincarnationCard, faction: str) -> str:
+        target_path = (
+            "/主角/个人信息/反派干部名"
+            if faction == "反派干部"
+            else "/主角/个人信息/魔法少女名"
+        )
+        fallback_path = (
+            "/主角/个人信息/魔法少女名"
+            if faction == "反派干部"
+            else "/主角/个人信息/反派干部名"
+        )
+        for path in (target_path, fallback_path, "/主角/个人信息/姓名"):
+            for item in card.info:
+                if item.get("path") == path:
+                    name = str(item.get("description") or "").strip()
+                    if name:
+                        return name
+        return card.target_name
 
     def _persist_image(
         self,

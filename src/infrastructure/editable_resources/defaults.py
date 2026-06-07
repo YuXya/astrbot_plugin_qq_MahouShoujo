@@ -46,7 +46,11 @@ DAILY_DIARY_PROMPT = _load_prompt("daily_diary_prompt.txt")
 
 CORRUPTION_DIARY_PROMPT = _load_prompt("corruption_diary_prompt.txt")
 
+VILLAIN_OFFICER_PURIFICATION_PROMPT = _load_prompt("villain_officer_purification_prompt.txt")
+
 VILLAIN_OFFICER_BATTLE_PROMPT = _load_prompt("villain_officer_battle_prompt.txt")
+
+VILLAIN_BATTLE_SELECTION_PROMPT = _load_prompt("villain_battle_selection_prompt.txt")
 
 RELATIONSHIP_SUMMARY_PROMPT = _load_prompt("relationship_summary_prompt.txt")
 
