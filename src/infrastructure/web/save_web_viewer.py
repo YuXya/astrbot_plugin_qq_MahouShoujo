@@ -3011,6 +3011,7 @@ class SaveWebViewer:
                   entries: Array.isArray(playerMonsterInitial.entries) ? playerMonsterInitial.entries : [],
                 }};
                 let playerMonsterActive = 0;
+                let playerMonsterEditingLevel = null;
 
                 function pmEscapeHtml(value) {{
                   return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -3095,14 +3096,15 @@ class SaveWebViewer:
                 function pmSyncActiveFromDom() {{
                   const entry = playerMonsterState.entries[playerMonsterActive];
                   if (!entry || !playerMonsterEditor.firstElementChild) return;
-                  const levelSettings = {{}};
                   const monsterLevels = Array.from(playerMonsterEditor.querySelectorAll("[data-field='monster_level']:checked")).map((input) => Number.parseInt(input.value, 10));
-                  pmNormalizeLevels(monsterLevels).forEach((level) => {{
-                    levelSettings[String(level)] = {{
-                      brief: playerMonsterEditor.querySelector(`[data-field='level_brief_${{level}}']`)?.value || "",
-                      content: playerMonsterEditor.querySelector(`[data-field='level_content_${{level}}']`)?.value || "",
+                  const current = pmNormalizeEntry(entry, playerMonsterActive);
+                  const levelSettings = {{ ...current.level_settings }};
+                  if (playerMonsterEditor.querySelector("[data-mode='levels']")?.classList.contains("active") && playerMonsterEditingLevel) {{
+                    levelSettings[String(playerMonsterEditingLevel)] = {{
+                      brief: playerMonsterEditor.querySelector("[data-field='level_brief']")?.value || "",
+                      content: playerMonsterEditor.querySelector("[data-field='level_content']")?.value || "",
                     }};
-                  }});
+                  }}
                   playerMonsterState.entries[playerMonsterActive] = pmNormalizeEntry({{
                     id: playerMonsterEditor.querySelector("[data-field='id']")?.value || "",
                     name: playerMonsterEditor.querySelector("[data-field='name']")?.value || "",
@@ -3148,20 +3150,13 @@ class SaveWebViewer:
                   }}
                   const normalized = pmNormalizeEntry(entry, playerMonsterActive);
                   const modeGeneral = !normalized.use_level_settings;
-                  const levelBlocks = normalized.monster_levels.map((level) => {{
-                    const setting = normalized.level_settings[String(level)] || {{ brief: "", content: "" }};
-                    return `
-                      <section class="villain-level-panel">
-                        <h3>${{pmLevelLabel(level)}} 级魔物设定</h3>
-                        <label class="block-field">简单设定
-                          <textarea data-field="level_brief_${{level}}" class="entry-content-editor" spellcheck="false">${{pmEscapeHtml(setting.brief)}}</textarea>
-                        </label>
-                        <label class="block-field">详细设定
-                          <textarea data-field="level_content_${{level}}" class="entry-content-editor" spellcheck="false">${{pmEscapeHtml(setting.content)}}</textarea>
-                        </label>
-                      </section>
-                    `;
-                  }}).join("");
+                  if (!normalized.monster_levels.includes(playerMonsterEditingLevel)) {{
+                    playerMonsterEditingLevel = normalized.monster_levels[0] || null;
+                  }}
+                  const activeLevelSetting = normalized.level_settings[String(playerMonsterEditingLevel)] || {{ brief: "", content: "" }};
+                  const levelButtons = normalized.monster_levels.map((level) => `
+                    <button data-edit-level="${{level}}" class="${{level === playerMonsterEditingLevel ? "active" : ""}}" type="button">${{pmLevelLabel(level)}}</button>
+                  `).join("");
                   playerMonsterEditor.innerHTML = `
                     <article class="villain-card">
                       <div class="villain-editor-head">
@@ -3171,12 +3166,12 @@ class SaveWebViewer:
                         </div>
                         <button class="danger" data-action="delete" type="button">删除</button>
                       </div>
-                      <div class="world-entry-grid">
+                      <div class="villain-identity-grid">
                         <label class="compact-field"><span>ID</span><input data-field="id" type="text" value="${{pmEscapeAttr(normalized.id)}}"></label>
                         <label class="compact-field title-field"><span>魔物名</span><input data-field="name" type="text" value="${{pmEscapeAttr(normalized.name)}}"></label>
-                        <div class="compact-field level-field"><span>可见等级</span><div class="level-choice-row">${{pmLevelInputs("visible_level", normalized.visible_levels)}}</div></div>
-                        <div class="compact-field level-field"><span>魔物等级</span><div class="level-choice-row">${{pmLevelInputs("monster_level", normalized.monster_levels)}}</div></div>
                       </div>
+                      <div class="villain-level-row"><span>可见等级</span><div class="level-choice-row">${{pmLevelInputs("visible_level", normalized.visible_levels)}}</div></div>
+                      <div class="villain-level-row"><span>魔物等级</span><div class="level-choice-row">${{pmLevelInputs("monster_level", normalized.monster_levels)}}</div></div>
                       <p class="villain-help">可见等级决定管理员在公共魔物书里通常会让哪些玩家等级看到；魔物等级表示这个魔物本身可以对应哪些强度档位。</p>
                       <label class="block-field">魔物别名 / 关键词（支持中文逗号、英文逗号、顿号或换行分隔）
                         <textarea data-field="keys" class="keys-editor" spellcheck="false">${{pmEscapeHtml(normalized.keys.join("\\n"))}}</textarea>
@@ -3186,16 +3181,27 @@ class SaveWebViewer:
                         <button data-mode="levels" class="${{!modeGeneral ? "active" : ""}}" type="button">按等级细分</button>
                       </div>
                       <div class="villain-mode-note" data-note="general"${{modeGeneral ? "" : " hidden"}}>通用设定适合一个魔物在不同等级下差异不大时使用，只需要填写简单设定和详细设定。</div>
-                      <div class="villain-mode-note" data-note="levels"${{modeGeneral ? " hidden" : ""}}>按等级细分适合同名魔物会随等级出现不同形态、能力或剧情定位时使用；每个选中的魔物等级都能单独填写设定，留空时管理员可参考通用设定。</div>
-                      <section class="villain-general-panel">
+                      <div class="villain-mode-note" data-note="levels"${{modeGeneral ? " hidden" : ""}}>下方按钮来自“魔物等级”中勾选的等级。点击一个等级后，编辑区只显示该等级的一组简单设定和详细设定。</div>
+                      <section class="villain-general-panel"${{modeGeneral ? "" : " hidden"}}>
                         <label class="block-field">简单设定
-                          <textarea data-field="brief" class="entry-content-editor" spellcheck="false">${{pmEscapeHtml(normalized.brief)}}</textarea>
+                          <textarea data-field="brief" class="entry-content-editor villain-brief-editor" rows="3" spellcheck="false">${{pmEscapeHtml(normalized.brief)}}</textarea>
                         </label>
                         <label class="block-field">详细设定
-                          <textarea data-field="content" class="entry-content-editor" spellcheck="false">${{pmEscapeHtml(normalized.content)}}</textarea>
+                          <textarea data-field="content" class="entry-content-editor villain-content-editor" rows="8" spellcheck="false">${{pmEscapeHtml(normalized.content)}}</textarea>
                         </label>
                       </section>
-                      <section class="villain-level-settings"${{modeGeneral ? " hidden" : ""}}>${{levelBlocks}}</section>
+                      <section class="villain-level-settings"${{modeGeneral ? " hidden" : ""}}>
+                        <div class="villain-level-switcher" role="group" aria-label="选择要编辑的魔物等级">${{levelButtons}}</div>
+                        <section class="villain-level-panel">
+                          <h3>${{pmLevelLabel(playerMonsterEditingLevel)}} 级魔物设定</h3>
+                          <label class="block-field">简单设定
+                            <textarea data-field="level_brief" class="entry-content-editor villain-brief-editor" rows="3" spellcheck="false">${{pmEscapeHtml(activeLevelSetting.brief)}}</textarea>
+                          </label>
+                          <label class="block-field">详细设定
+                            <textarea data-field="level_content" class="entry-content-editor villain-content-editor" rows="8" spellcheck="false">${{pmEscapeHtml(activeLevelSetting.content)}}</textarea>
+                          </label>
+                        </section>
+                      </section>
                     </article>
                   `;
                   playerMonsterEditor.querySelector("[data-action='delete']").addEventListener("click", () => {{
@@ -3206,17 +3212,28 @@ class SaveWebViewer:
                   }});
                   playerMonsterEditor.querySelectorAll("[data-mode]").forEach((button) => {{
                     button.addEventListener("click", () => {{
+                      pmSyncActiveFromDom();
                       playerMonsterEditor.querySelectorAll("[data-mode]").forEach((item) => item.classList.remove("active"));
                       button.classList.add("active");
                       const useLevels = button.dataset.mode === "levels";
                       playerMonsterEditor.querySelector("[data-note='general']").hidden = useLevels;
                       playerMonsterEditor.querySelector("[data-note='levels']").hidden = !useLevels;
+                      playerMonsterEditor.querySelector(".villain-general-panel").hidden = useLevels;
                       playerMonsterEditor.querySelector(".villain-level-settings").hidden = !useLevels;
+                    }});
+                  }});
+                  playerMonsterEditor.querySelectorAll("[data-edit-level]").forEach((button) => {{
+                    button.addEventListener("click", () => {{
+                      pmSyncActiveFromDom();
+                      playerMonsterEditingLevel = Number.parseInt(button.dataset.editLevel, 10);
+                      pmRender();
                     }});
                   }});
                   playerMonsterEditor.querySelectorAll("[data-field='monster_level']").forEach((input) => {{
                     input.addEventListener("change", () => {{
                       pmSyncActiveFromDom();
+                      const selected = Array.from(playerMonsterEditor.querySelectorAll("[data-field='monster_level']:checked")).map((item) => Number.parseInt(item.value, 10));
+                      if (!selected.includes(playerMonsterEditingLevel)) playerMonsterEditingLevel = selected[0] || null;
                       pmRender();
                     }});
                   }});
@@ -4894,8 +4911,9 @@ class SaveWebViewer:
     .villain-monster-head .player-back-link {{ border-color: rgba(215, 168, 75, .36); background: rgba(215,168,75,.1); color: #f2cf7a; }}
     .villain-monster-head .player-kicker {{ color: #d7a84b; }}
     .villain-monster-head h1 {{ margin: 0 0 10px; color: #f6d483; font-size: clamp(31px, 4.8vw, 58px); line-height: 1.05; text-shadow: 0 0 22px rgba(145, 18, 30, .72); overflow-wrap: anywhere; }}
-    .villain-monster-head p:last-child {{ max-width: 56em; margin: 0 auto; color: #e6d1a9; line-height: 1.7; }}
-    .villain-workbench {{ max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: 14px; }}
+    .villain-monster-head p:last-of-type {{ max-width: 56em; margin: 0 auto; color: #e6d1a9; line-height: 1.7; }}
+    .villain-monster-head > button {{ margin: 16px auto 0; border: 1px solid rgba(215,168,75,.38); background: linear-gradient(135deg, rgba(127,16,28,.92), rgba(215,168,75,.82)); box-shadow: 0 12px 26px rgba(0,0,0,.3); }}
+    .villain-workbench {{ width: min(1240px, 100%); margin: 0 auto; display: grid; grid-template-columns: minmax(220px, 260px) minmax(0, 1fr); gap: 16px; align-items: start; }}
     .villain-menu, .villain-editor, .villain-savebar {{ border: 1px solid rgba(215, 168, 75, .24); border-radius: 8px; background: rgba(15, 7, 7, .82); box-shadow: 0 18px 44px rgba(0,0,0,.34), inset 0 0 0 1px rgba(255,226,160,.06); backdrop-filter: blur(12px); }}
     .villain-menu {{ padding: 14px; align-self: start; }}
     .villain-menu-head {{ display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }}
@@ -4904,22 +4922,35 @@ class SaveWebViewer:
     .villain-tabs {{ display: grid; gap: 8px; }}
     .villain-tabs button {{ width: 100%; margin: 0; padding: 10px 11px; border: 1px solid rgba(215,168,75,.18); background: rgba(255,226,160,.07); color: #f7ead2; text-align: left; overflow-wrap: anywhere; }}
     .villain-tabs button.active {{ border-color: rgba(215,168,75,.68); background: rgba(215,168,75,.16); color: #fff4d6; box-shadow: inset 3px 0 0 #d7a84b; }}
-    .villain-editor {{ min-height: 420px; padding: 14px; }}
-    .villain-card {{ padding: 4px; }}
+    .villain-editor {{ min-width: 0; min-height: 420px; padding: 20px; }}
+    .villain-card {{ min-width: 0; padding: 2px; }}
     .villain-editor-head {{ display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 14px; }}
     .villain-editor-head h2 {{ margin: 3px 0 0; color: #f6d483; font-size: 24px; overflow-wrap: anywhere; }}
     .villain-monster-shell .compact-field span, .villain-monster-shell label, .villain-help {{ color: #e6d1a9; }}
-    .villain-monster-shell input[type="text"], .villain-monster-shell textarea, .villain-monster-shell .level-choice-row {{ border-color: rgba(215,168,75,.24); background: rgba(255,226,160,.08); color: #fff4d6; }}
+    .villain-monster-shell input[type="text"], .villain-monster-shell textarea, .villain-monster-shell .level-choice-row {{ box-sizing: border-box; border-color: rgba(215,168,75,.24); background: rgba(255,226,160,.08); color: #fff4d6; }}
+    .villain-monster-shell input[type="text"], .villain-monster-shell textarea {{ width: 100%; }}
     .villain-monster-shell textarea::placeholder, .villain-monster-shell input::placeholder {{ color: rgba(247,234,210,.48); }}
+    .villain-identity-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }}
+    .villain-identity-grid .compact-field {{ min-width: 0; display: grid; grid-template-columns: 70px minmax(0, 1fr); align-items: center; }}
+    .villain-level-row {{ min-width: 0; display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; align-items: center; margin-top: 12px; }}
+    .villain-level-row > span {{ color: #e6d1a9; font-weight: 800; }}
+    .villain-level-row .level-choice-row {{ width: 100%; min-height: 42px; }}
     .villain-help {{ margin: 10px 0 0; font-size: 13px; line-height: 1.6; }}
     .villain-mode-row {{ display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 8px; }}
     .villain-mode-row button {{ margin: 0; border: 1px solid rgba(215,168,75,.2); background: rgba(255,226,160,.08); color: #f7ead2; }}
     .villain-mode-row button.active {{ border-color: rgba(215,168,75,.72); background: #7f101c; box-shadow: 0 10px 22px rgba(127,16,28,.28); }}
     .villain-mode-note {{ padding: 10px 12px; border: 1px solid rgba(215,168,75,.26); border-radius: 8px; background: rgba(215,168,75,.1); color: #f7ead2; font-size: 13px; line-height: 1.6; }}
     .villain-general-panel, .villain-level-settings {{ margin-top: 12px; }}
-    .villain-level-settings {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }}
-    .villain-level-panel {{ padding: 10px; border: 1px solid rgba(215,168,75,.22); border-radius: 8px; background: rgba(255,226,160,.06); }}
-    .villain-level-panel h3 {{ margin: 0 0 6px; color: #f6d483; font-size: 15px; }}
+    .villain-general-panel[hidden], .villain-level-settings[hidden] {{ display: none; }}
+    .villain-level-settings {{ display: grid; gap: 10px; }}
+    .villain-level-switcher {{ display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border: 1px solid rgba(215,168,75,.22); border-radius: 8px; background: rgba(255,226,160,.05); }}
+    .villain-level-switcher button {{ min-width: 48px; margin: 0; border: 1px solid rgba(215,168,75,.24); background: rgba(255,226,160,.08); color: #f7ead2; }}
+    .villain-level-switcher button.active {{ border-color: #f6d483; background: #7f101c; color: #fff4d6; box-shadow: 0 8px 18px rgba(127,16,28,.28); }}
+    .villain-level-panel {{ padding: 14px; border: 1px solid rgba(215,168,75,.22); border-radius: 8px; background: rgba(255,226,160,.06); }}
+    .villain-level-panel h3 {{ margin: 0 0 8px; color: #f6d483; font-size: 17px; }}
+    .villain-general-panel textarea, .villain-level-panel textarea {{ resize: vertical; }}
+    .villain-general-panel .villain-brief-editor, .villain-level-panel .villain-brief-editor {{ min-height: 74px; }}
+    .villain-general-panel .villain-content-editor, .villain-level-panel .villain-content-editor {{ min-height: 190px; }}
     .villain-savebar {{ grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 14px; }}
     .villain-savebar p, .villain-empty, .villain-empty-editor p {{ margin: 0; color: #e6d1a9; line-height: 1.6; }}
     .villain-empty-editor {{ min-height: 320px; display: grid; place-content: center; text-align: center; }}
@@ -5140,7 +5171,7 @@ class SaveWebViewer:
     @media (max-width: 720px) {{ .player-shell {{ padding: 76px 16px 34px; }} .player-hero {{ padding: 6px 74px 0 0; text-align: left; margin-bottom: 22px; }} .player-hero::before {{ width: 60px; height: 60px; font-size: 27px; }} .player-city-section {{ padding: 16px; }} .player-section-head {{ display: block; }} .player-city-card {{ grid-template-columns: 52px 1fr; padding: 15px; }} .city-card-orb {{ width: 46px; height: 46px; }} }}
     @media (max-width: 720px) {{ .player-detail-shell {{ --player-detail-width: 100%; padding: 62px 10px 24px; overflow: auto; }} .player-detail-shell .topbar {{ top: 10px; right: 10px; }} .player-detail-shell .topbar button {{ min-height: 30px; padding: 5px 8px; font-size: 12px; }} .player-detail-hero {{ margin-bottom: 12px; padding: 42px 54px 14px 12px; text-align: left; }} .player-detail-hero h1 {{ margin-bottom: 8px; font-size: clamp(24px, 9vw, 34px); }} .player-detail-hero p {{ font-size: 13px; line-height: 1.55; }} .player-detail-emblem {{ top: 12px; right: 12px; width: 42px; height: 42px; font-size: 21px; box-shadow: 0 10px 22px rgba(188, 80, 166, .2), inset 0 0 0 5px rgba(255,255,255,.48); }} .player-back-link {{ left: 10px; top: 10px; min-height: 28px; padding: 0 9px; font-size: 12px; }} .player-kicker, .player-section-head span, .city-card-label, .profile-card-head span {{ margin-bottom: 4px; font-size: 10px; }} .player-hero-tags {{ justify-content: flex-start; gap: 6px; margin-top: 10px; }} .player-hero-tags span {{ min-height: 22px; padding: 2px 7px; font-size: 11px; }} .player-detail-hero .player-top-grid {{ grid-template-columns: 1fr; gap: 7px; margin-top: 12px; }} .player-detail-hero .player-top-item, .player-top-item {{ min-height: 46px; padding: 8px 10px; }} .player-top-item span {{ font-size: 10px; }} .player-top-item strong {{ margin-top: 3px; font-size: 16px; }} .player-detail-flow, .player-profile-triad, .player-side-stack, .player-info-grid, .player-state-grid, .log-list {{ gap: 8px; }} .player-info-grid, .player-state-grid {{ grid-template-columns: 1fr; }} .player-profile-card, .player-site-section {{ padding: 10px; }} .player-profile-triad .player-profile-card {{ padding: 10px; }} .profile-card-head {{ margin-bottom: 8px; }} .profile-card-head h2, .player-profile-triad .profile-card-head h2 {{ font-size: 17px; }} .player-info-item, .player-state-item, .player-profile-triad .player-info-item {{ min-height: 40px; padding: 7px 8px; }} .player-info-item span, .player-state-item span, .player-profile-triad .player-info-item span {{ font-size: 10px; }} .player-info-item strong, .player-state-item strong, .player-profile-triad .player-info-item strong {{ margin-top: 2px; font-size: 12px; line-height: 1.35; }} .player-site-empty {{ padding: 12px; font-size: 12px; }} .player-memory-row .log-card-summary, .log-card-summary {{ padding: 9px 10px; }} .player-memory-row .log-card-body, .log-card-body {{ padding: 0 10px 10px; }} .log-card h3 {{ font-size: 14px; }} .log-meta, .log-result, .log-action {{ font-size: 12px; line-height: 1.55; }} .progress-list {{ gap: 10px; }} .progress-name {{ font-size: 14px; }} .progress-head {{ gap: 8px; margin-bottom: 5px; }} .progress-name::before {{ width: 12px; height: 12px; border-width: 2px; }} .progress-xp {{ font-size: 12px; }} .player-floating-actions {{ right: 10px; top: 50%; bottom: auto; transform: translateY(-50%); }} .player-floating-action {{ min-width: 48px; min-height: 34px; padding: 0 8px; font-size: 11px; border-radius: 7px; }} }}
     @media (max-width: 720px) {{ .relationship-shell {{ padding: 76px 14px 28px; overflow: auto; }} .relationship-head {{ padding: 58px 18px 20px; }} .relationship-head .player-kicker {{ display: none; }} .relationship-graph-panel {{ min-height: 430px; }} .relationship-graph {{ min-height: 430px; }} .relationship-card {{ padding: 16px; }} }}
-    @media (max-width: 720px) {{ .villain-monster-shell {{ padding: 76px 10px 24px; }} .villain-monster-head {{ padding: 58px 14px 18px; text-align: left; }} .villain-monster-head h1 {{ font-size: clamp(27px, 9vw, 38px); }} .villain-level-settings {{ grid-template-columns: 1fr; }} .villain-savebar {{ display: grid; }} }}
+    @media (max-width: 720px) {{ .villain-monster-shell {{ padding: 76px 10px 24px; }} .villain-monster-head {{ padding: 58px 14px 18px; text-align: left; }} .villain-monster-head h1 {{ font-size: clamp(27px, 9vw, 38px); }} .villain-identity-grid {{ grid-template-columns: 1fr; }} .villain-level-row {{ grid-template-columns: 1fr; gap: 6px; }} .villain-savebar {{ display: grid; }} }}
     @media (max-width: 560px) {{ .state-overview-grid {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .progress-list {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .profile-edit-grid {{ grid-template-columns: 1fr; }} }}
