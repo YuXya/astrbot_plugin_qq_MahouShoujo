@@ -397,7 +397,8 @@ class EditableResourceManager:
                 "发给 AI 的 user message 就是这个模板渲染后的结果；要求仍返回兼容日记卡的纯 JSON。"
             ),
             self.PROMPT_FILES["villain_officer_purification_prompt"]: (
-                "用于 /反派干部洗白 的完整 Prompt。变量与战斗日记 Prompt 相同，"
+                "用于 /反派干部洗白 的完整 Prompt。除通用日记变量外，还可用 "
+                "{{sortie_familiar_json}} 和 {{target_magical_girl_json}}，"
                 "发给 AI 的 user message 就是这个模板渲染后的结果；要求仍返回兼容日记卡的纯 JSON。"
             ),
             self.PROMPT_FILES["villain_officer_battle_prompt"]: (

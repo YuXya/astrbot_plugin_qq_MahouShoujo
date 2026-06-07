@@ -579,6 +579,7 @@ class QQMahouShoujo(Star):
                     default_action="自由洗白",
                     action_label="反派干部洗白",
                     card_label="反派干部洗白日记卡",
+                    use_villain_battle_selection=True,
                     identity_transition_faction="魔法少女",
                 ):
                     yield result

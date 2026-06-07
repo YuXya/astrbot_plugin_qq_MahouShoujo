@@ -68,9 +68,10 @@ class BattleDiaryApplicationService:
                 )
                 target = selection_context.get("target_magical_girl") if selection_context else None
                 if not isinstance(target, dict) or not target:
+                    command_label = str(event_command or "/反派干部战斗").strip() or "/反派干部战斗"
                     return BattleDiaryExecutionResult(
                         success=False,
-                        text="当前城市没有可作为目标的魔法少女存档，暂时不能发起 /反派干部战斗。",
+                        text=f"当前城市没有可作为目标的魔法少女存档，暂时不能发起 {command_label}。",
                         error="target_magical_girl_not_found",
                     )
                 nearby_players = [target]
