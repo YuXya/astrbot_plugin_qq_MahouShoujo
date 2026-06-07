@@ -217,7 +217,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                     (selection_context or {}).get("familiar")
                 ),
                 "target_magical_girl_json": self._json_dump(
-                    (selection_context or {}).get("target_magical_girl")
+                    self._prompt_protagonist_profile(
+                        (selection_context or {}).get("target_magical_girl")
+                    )
                 ),
             },
         )
@@ -256,7 +258,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "candidates_json": self._json_dump(
                     {
                         "monsters": monster_candidates,
-                        "magical_girls": magical_girl_candidates,
+                        "magical_girls": self._prompt_protagonist_profiles(
+                            magical_girl_candidates
+                        ),
                     }
                 ),
             },
@@ -432,7 +436,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "player_data_update_json": self._json_dump(player_data),
                 "logs_text": self._format_logs(logs),
                 "cameo_memories_text": self._format_cameo_memories(cameo_memories),
-                "candidates_json": self._json_dump(candidates),
+                "candidates_json": self._json_dump(
+                    self._prompt_protagonist_profiles(candidates)
+                ),
             },
         )
 
@@ -695,27 +701,22 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         for item in nearby_players:
             if not isinstance(item, dict):
                 continue
+            profile = self._prompt_protagonist_profile(item)
+            if not isinstance(profile, dict):
+                continue
+            personal_info = profile.get("个人信息", {})
+            if not isinstance(personal_info, dict):
+                personal_info = {}
             name = str(
-                item.get("角色名")
-                or item.get("魔法少女名")
-                or item.get("反派干部名")
-                or item.get("target_name")
+                personal_info.get("魔法少女名")
+                or personal_info.get("反派干部名")
+                or personal_info.get("姓名")
                 or ""
             ).strip()
             if not name or name in seen:
                 continue
             seen.add(name)
-            teammates.append(
-                {
-                    "角色名": name,
-                    "阵营": item.get("阵营", ""),
-                    "姓名": item.get("姓名") or item.get("target_name", ""),
-                    "魔法少女名": item.get("魔法少女名", ""),
-                    "反派干部名": item.get("反派干部名", ""),
-                    "主角": item.get("主角", {}),
-                    "最近记录": item.get("最近记录", []),
-                }
-            )
+            teammates.append(profile)
         if not teammates:
             return {
                 "count": 0,
@@ -767,27 +768,31 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             return ""
         return (
             "相关其他玩家：\n"
-            + cls._json_dump(cls._public_nearby_players(nearby_players))
-            + "\nsource 为\u201c同出生地区\u201d的玩家可作为自然客串 NPC；source 为\u201c本次行动点名\u201d的玩家"
-            "是玩家行动明确提到的目标、求助对象、拯救对象、寻找对象或远方联系人，即使不在同地区，"
-            "主角也可以根据对方位置尝试前往或围绕对方展开事件。不要替其他玩家决定永久性重大"
+            + cls._json_dump(cls._prompt_protagonist_profiles(nearby_players))
+            + "\n以上每个对象都是其他玩家存档里“主角”下的完整资料。主角可以根据玩家行动、"
+            "最近记录和交互记忆尝试前往或围绕对方展开事件。不要替其他玩家决定永久性重大"
             "状态变化、死亡、失踪、残疾或重大物品损失。"
         )
 
+    @staticmethod
+    def _prompt_protagonist_profile(item: object) -> dict[str, object] | None:
+        if not isinstance(item, dict):
+            return None
+        protagonist = item.get("主角", item)
+        if not isinstance(protagonist, dict):
+            return None
+        return dict(protagonist)
+
     @classmethod
-    def _public_nearby_players(cls, nearby_players: list[dict]) -> list[dict]:
-        players: list[dict] = []
-        for item in nearby_players:
+    def _prompt_protagonist_profiles(cls, items: list[dict] | None) -> list[dict[str, object]]:
+        profiles: list[dict[str, object]] = []
+        for item in items or []:
             if not isinstance(item, dict):
                 continue
-            public_item = {
-                key: value
-                for key, value in item.items()
-                if not str(key).startswith("_")
-            }
-            public_item["source"] = cls._npc_source_label(item)
-            players.append(public_item)
-        return players
+            profile = cls._prompt_protagonist_profile(item)
+            if profile:
+                profiles.append(profile)
+        return profiles
 
     @staticmethod
     def _npc_source_label(item: dict) -> str:

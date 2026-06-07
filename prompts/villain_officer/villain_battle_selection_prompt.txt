@@ -35,8 +35,8 @@
     "reason": "选择原因，简短说明"
   },
   "target_magical_girl": {
-    "target_name": "候选魔法少女 target_name",
-    "magical_name": "候选魔法少女 魔法少女名",
+    "target_name": "候选魔法少女 个人信息.姓名",
+    "magical_name": "候选魔法少女 个人信息.魔法少女名",
     "reason": "选择原因，简短说明"
   }
 }
