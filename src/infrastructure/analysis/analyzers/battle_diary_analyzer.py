@@ -337,6 +337,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             prompt=prompt,
             umo=umo,
             purpose="战斗记录压缩",
+            provider_id_override=self.config_manager.get_subtask_llm_provider_id(),
         )
         result_text = extract_response_text(response)
         if self.config_manager.get_debug_mode():
@@ -372,6 +373,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             prompt=prompt,
             umo=umo,
             purpose="其他人与主角的交互压缩",
+            provider_id_override=self.config_manager.get_subtask_llm_provider_id(),
         )
         result_text = extract_response_text(response)
         if self.config_manager.get_debug_mode():
