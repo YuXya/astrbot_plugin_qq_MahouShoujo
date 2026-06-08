@@ -115,3 +115,22 @@ class LLMBattleDiaryAnalyzer:
             magical_girl_candidates=magical_girl_candidates or [],
             umo=umo,
         )
+
+    async def select_magical_battle_context(
+        self,
+        *,
+        action_text: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict] | None = None,
+        villain_witch_candidates: list[dict] | None = None,
+        umo: str | None = None,
+    ) -> dict[str, object]:
+        return await self.analyzer.select_magical_battle_context(
+            action_text=action_text,
+            player_data=player_data,
+            logs=logs,
+            cameo_memories=cameo_memories,
+            villain_witch_candidates=villain_witch_candidates or [],
+            umo=umo,
+        )

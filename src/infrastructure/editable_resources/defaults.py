@@ -42,6 +42,8 @@ VILLAIN_WITCH_REINCARNATION_PROMPT = _load_prompt("villain_witch/villain_witch_r
 
 BATTLE_DIARY_PROMPT = _load_prompt("magical_girl/battle_diary_prompt.txt")
 
+MAGICAL_BATTLE_TARGET_SELECTION_PROMPT = _load_prompt("magical_girl/battle_target_selection_prompt.txt")
+
 DAILY_DIARY_PROMPT = _load_prompt("magical_girl/daily_diary_prompt.txt")
 
 CORRUPTION_DIARY_PROMPT = _load_prompt("magical_girl/corruption_diary_prompt.txt")

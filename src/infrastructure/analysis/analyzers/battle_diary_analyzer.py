@@ -216,6 +216,14 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "sortie_familiar_json": self._json_dump(
                     (selection_context or {}).get("familiar")
                 ),
+                "battle_target_type": str(
+                    (selection_context or {}).get("battle_type") or "monster"
+                ),
+                "target_villain_witch_json": self._json_dump(
+                    self._prompt_protagonist_profile(
+                        (selection_context or {}).get("target_villain_witch")
+                    )
+                ),
                 "target_magical_girl_json": self._json_dump(
                     self._prompt_protagonist_profile(
                         (selection_context or {}).get("target_magical_girl")
@@ -223,6 +231,69 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 ),
             },
         )
+
+    async def select_magical_battle_context(
+        self,
+        *,
+        action_text: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict] | None,
+        villain_witch_candidates: list[dict],
+        umo: str | None = None,
+    ) -> dict[str, object]:
+        if not villain_witch_candidates:
+            return {"battle_type": "monster", "target_villain_witch": None}
+
+        prompt = self.editable_manager.render_prompt(
+            "magical_battle_target_selection_prompt",
+            {
+                "player_data_update_json": self._json_dump(player_data),
+                "action": action_text.strip(),
+                "logs_text": self._format_logs(logs),
+                "cameo_memories_text": self._format_cameo_memories(cameo_memories),
+                "candidates_json": self._json_dump(
+                    {
+                        "villain_witches": self._prompt_protagonist_profiles(
+                            villain_witch_candidates
+                        ),
+                    }
+                ),
+            },
+        )
+        system_prompt = self.editable_manager.get_prompt("default_system_prompt")
+        if self.config_manager.get_debug_mode():
+            self._save_debug_file("magical_battle_target_selection_prompt", prompt)
+
+        response = await call_provider_with_retry(
+            self.context,
+            self.config_manager,
+            prompt=prompt,
+            umo=umo,
+            system_prompt=system_prompt,
+            purpose="魔法少女战斗目标判断",
+            provider_id_override=self.config_manager.get_subtask_llm_provider_id(),
+        )
+        result_text = extract_response_text(response)
+        if self.config_manager.get_debug_mode():
+            self._save_debug_file("magical_battle_target_selection_response", result_text)
+
+        success, parsed, error = parse_json_object_response(result_text)
+        if not success or not isinstance(parsed, dict):
+            logger.warning(f"魔法少女战斗目标判断 JSON 解析失败，按魔物战斗处理: {error}")
+            return {"battle_type": "monster", "target_villain_witch": None}
+
+        battle_type = str(parsed.get("battle_type") or "").strip()
+        if battle_type != "villain_witch":
+            return {"battle_type": "monster", "target_villain_witch": None}
+
+        target = self._resolve_selected_villain_witch(
+            parsed.get("target_villain_witch"),
+            villain_witch_candidates,
+        )
+        if not target:
+            return {"battle_type": "monster", "target_villain_witch": None}
+        return {"battle_type": "villain_witch", "target_villain_witch": target}
 
     async def select_villain_battle_context(
         self,
@@ -519,6 +590,33 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 action_text=action_text,
             )
             if resolved:
+                return resolved
+        return None
+
+    @staticmethod
+    def _resolve_selected_villain_witch(
+        selected: object,
+        candidates: list[dict],
+    ) -> dict | None:
+        if not selected or not isinstance(selected, dict):
+            return None
+        selected_target = str(selected.get("target_name") or "").strip()
+        selected_villain = str(
+            selected.get("villain_witch_name")
+            or selected.get("villain_name")
+            or selected.get("反派魔女名")
+            or ""
+        ).strip()
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            if selected_target and selected_target == str(candidate.get("target_name") or "").strip():
+                resolved = dict(candidate)
+                resolved["selection_reason"] = str(selected.get("reason") or "").strip()
+                return resolved
+            if selected_villain and selected_villain == str(candidate.get("反派魔女名") or "").strip():
+                resolved = dict(candidate)
+                resolved["selection_reason"] = str(selected.get("reason") or "").strip()
                 return resolved
         return None
 

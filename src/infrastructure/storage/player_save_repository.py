@@ -1054,6 +1054,38 @@ class PlayerSaveRepository:
             candidates.append(npc)
         return candidates
 
+    def build_city_villain_witch_candidates(
+        self,
+        group_id: str,
+        user_id: str,
+        *,
+        recent_record_count: int = 1,
+    ) -> list[dict[str, Any]]:
+        users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
+        if not users_dir.exists():
+            return []
+
+        current_user = self._safe_id(user_id)
+        candidates: list[dict[str, Any]] = []
+        for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
+            if user_dir.name == current_user:
+                continue
+            npc = self._build_npc_package(
+                user_dir,
+                source="city_villain_witch_candidate",
+                recent_record_count=recent_record_count,
+            )
+            if not npc:
+                continue
+            if str(npc.get("阵营") or "").strip() != "反派魔女":
+                continue
+            public_reputation = self._read_public_reputation(user_dir)
+            if public_reputation:
+                npc["城市风评"] = public_reputation
+                npc["public_reputation"] = public_reputation
+            candidates.append(npc)
+        return candidates
+
     def build_villain_monster_candidates(
         self,
         group_id: str,

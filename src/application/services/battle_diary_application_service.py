@@ -103,6 +103,38 @@ class BattleDiaryApplicationService:
                         error="target_magical_girl_not_found",
                     )
                 nearby_players = [target]
+            elif prompt_name == "battle_diary_prompt":
+                selection_context = await self._select_magical_battle_context(
+                    group_id=group_id,
+                    user_id=user_id,
+                    player_data=player_data,
+                    logs=logs,
+                    cameo_memories=cameo_memories,
+                    action_text=action_text,
+                    umo=umo,
+                )
+                if allow_other_players:
+                    mentioned_players = self.save_repository.find_mentioned_npcs(
+                        group_id,
+                        user_id,
+                        [action_text, self._logs_text_for_teammate_scan(logs)],
+                        recent_record_count=self.config_manager.get_teammate_recent_record_count(),
+                    )
+                    semantic_players = await self._infer_semantic_teammates(
+                        group_id=group_id,
+                        user_id=user_id,
+                        player_data=player_data,
+                        logs=logs,
+                        cameo_memories=cameo_memories,
+                        action_text=action_text,
+                        umo=umo,
+                    )
+                    nearby_players = self._merge_nearby_players(
+                        mentioned_players,
+                        semantic_players,
+                    )
+                else:
+                    nearby_players = []
             elif allow_other_players:
                 mentioned_players = self.save_repository.find_mentioned_npcs(
                     group_id,
@@ -338,6 +370,32 @@ class BattleDiaryApplicationService:
             cameo_memories=cameo_memories,
             monster_candidates=monster_candidates,
             magical_girl_candidates=target_candidates,
+            umo=umo,
+        )
+
+    async def _select_magical_battle_context(
+        self,
+        *,
+        group_id: str,
+        user_id: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict],
+        action_text: str,
+        umo: str | None,
+    ) -> dict[str, object]:
+        recent_record_count = self.config_manager.get_teammate_recent_record_count()
+        target_candidates = self.save_repository.build_city_villain_witch_candidates(
+            group_id,
+            user_id,
+            recent_record_count=recent_record_count,
+        )
+        return await self.llm_analyzer.select_magical_battle_context(
+            action_text=action_text,
+            player_data=player_data,
+            logs=logs,
+            cameo_memories=cameo_memories,
+            villain_witch_candidates=target_candidates,
             umo=umo,
         )
 

@@ -15,6 +15,7 @@ class EditableResourceManager:
     LEGACY_PROMPT_FILES = {
         "prompts/reincarnation_prompt.txt": "prompts/magical_girl/reincarnation_prompt.txt",
         "prompts/battle_diary_prompt.txt": "prompts/magical_girl/battle_diary_prompt.txt",
+        "prompts/battle_target_selection_prompt.txt": "prompts/magical_girl/battle_target_selection_prompt.txt",
         "prompts/daily_diary_prompt.txt": "prompts/magical_girl/daily_diary_prompt.txt",
         "prompts/corruption_diary_prompt.txt": "prompts/magical_girl/corruption_diary_prompt.txt",
         "prompts/villain_witch_reincarnation_prompt.txt": "prompts/villain_witch/villain_witch_reincarnation_prompt.txt",
@@ -27,6 +28,7 @@ class EditableResourceManager:
         "reincarnation_prompt": "prompts/magical_girl/reincarnation_prompt.txt",
         "villain_witch_reincarnation_prompt": "prompts/villain_witch/villain_witch_reincarnation_prompt.txt",
         "battle_diary_prompt": "prompts/magical_girl/battle_diary_prompt.txt",
+        "magical_battle_target_selection_prompt": "prompts/magical_girl/battle_target_selection_prompt.txt",
         "daily_diary_prompt": "prompts/magical_girl/daily_diary_prompt.txt",
         "corruption_diary_prompt": "prompts/magical_girl/corruption_diary_prompt.txt",
         "villain_witch_purification_prompt": "prompts/villain_witch/villain_witch_purification_prompt.txt",
@@ -300,6 +302,12 @@ class EditableResourceManager:
                 "category": "text_completion",
             },
             {
+                "id": self.PROMPT_FILES["magical_battle_target_selection_prompt"],
+                "label": "魔法少女战斗目标判断 Prompt",
+                "type": "text",
+                "category": "text_completion",
+            },
+            {
                 "id": self.PROMPT_FILES["daily_diary_prompt"],
                 "label": "日常日记 Prompt",
                 "type": "text",
@@ -366,6 +374,7 @@ class EditableResourceManager:
             self.PROMPT_FILES["reincarnation_prompt"]: defaults.REINCARNATION_PROMPT,
             self.PROMPT_FILES["villain_witch_reincarnation_prompt"]: defaults.VILLAIN_WITCH_REINCARNATION_PROMPT,
             self.PROMPT_FILES["battle_diary_prompt"]: defaults.BATTLE_DIARY_PROMPT,
+            self.PROMPT_FILES["magical_battle_target_selection_prompt"]: defaults.MAGICAL_BATTLE_TARGET_SELECTION_PROMPT,
             self.PROMPT_FILES["daily_diary_prompt"]: defaults.DAILY_DIARY_PROMPT,
             self.PROMPT_FILES["corruption_diary_prompt"]: defaults.CORRUPTION_DIARY_PROMPT,
             self.PROMPT_FILES["villain_witch_purification_prompt"]: defaults.VILLAIN_WITCH_PURIFICATION_PROMPT,
@@ -425,6 +434,10 @@ class EditableResourceManager:
                 "{{logs_text}}、{{cameo_memories_text}}、{{current_world_date}}、{{action}}、"
                 "{{supplement_text}}（世界书+状态书+事件书+技能书+性癖书命中的补充设定，未命中时为空）、"
                 "{{teammates_json}}（命中其他存档角色名时的队友公开字段 JSON；未命中时为空数组）。"
+            ),
+            self.PROMPT_FILES["magical_battle_target_selection_prompt"]: (
+                "用于 /魔法少女战斗 正文生成前的后台目标判断。使用子任务 LLM Provider，"
+                "先判断本次是和魔物战斗还是和反派魔女战斗；若是反派魔女战斗，则从本城市反派魔女中选择目标。"
             ),
             self.PROMPT_FILES["daily_diary_prompt"]: (
                 "用于 /魔法少女日常 的完整 Prompt。变量与战斗日记 Prompt 相同，"
