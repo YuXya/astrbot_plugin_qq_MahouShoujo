@@ -10,6 +10,8 @@
 - 玩家写“反派魔女”“敌方魔女”“找反派”“追踪黑化者”等但没有点名时，可以结合最近记录、交互记忆、城市风评和行动目标，从候选反派魔女中选择最合适的一名。
 - 如果 candidates.villain_witches 为空，battle_type 必须选 `monster`，target_villain_witch 写 null。
 - 不要编造候选外的反派魔女。
+- 当 battle_type 为 `villain_witch` 时，请只根据双方人物卡、行动目标、最近记录、能力克制和状态，给出本次“玩家魔法少女”获胜概率 `ai_win_rate`，范围 0-100。不要掷骰，骰子和最终胜率由程序计算。
+- 当 battle_type 为 `monster` 时，`ai_win_rate` 写 50。
 
 魔法少女存档：
 {{player_data_update_json}}
@@ -33,7 +35,8 @@
     "target_name": "候选反派魔女 个人信息.姓名",
     "villain_witch_name": "候选反派魔女 个人信息.反派魔女名",
     "reason": "选择原因，简短说明"
-  }
+  },
+  "ai_win_rate": 50
 }
 
 如果 battle_type 是 monster，target_villain_witch 必须写 null。只输出 JSON，不要 Markdown，不要解释。

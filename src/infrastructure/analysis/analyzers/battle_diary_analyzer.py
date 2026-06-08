@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 
 from ....domain.models.data_models import BattleDiaryCard, TokenUsage
 from ....domain.services.battle_diary_domain_service import BattleDiaryDomainService
@@ -229,6 +230,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                         (selection_context or {}).get("target_magical_girl")
                     )
                 ),
+                "battle_odds_json": self._json_dump(
+                    (selection_context or {}).get("battle_odds")
+                ),
             },
         )
 
@@ -243,7 +247,15 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         umo: str | None = None,
     ) -> dict[str, object]:
         if not villain_witch_candidates:
-            return {"battle_type": "monster", "target_villain_witch": None}
+            return {
+                "battle_type": "monster",
+                "target_villain_witch": None,
+                "battle_odds": self._build_battle_odds_context(
+                    player_data=player_data,
+                    opponent_data=None,
+                    battle_kind="magical_girl_vs_monster",
+                ),
+            }
 
         prompt = self.editable_manager.render_prompt(
             "magical_battle_target_selection_prompt",
@@ -281,19 +293,54 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         success, parsed, error = parse_json_object_response(result_text)
         if not success or not isinstance(parsed, dict):
             logger.warning(f"魔法少女战斗目标判断 JSON 解析失败，按魔物战斗处理: {error}")
-            return {"battle_type": "monster", "target_villain_witch": None}
+            return {
+                "battle_type": "monster",
+                "target_villain_witch": None,
+                "battle_odds": self._build_battle_odds_context(
+                    player_data=player_data,
+                    opponent_data=None,
+                    battle_kind="magical_girl_vs_monster",
+                ),
+            }
 
         battle_type = str(parsed.get("battle_type") or "").strip()
         if battle_type != "villain_witch":
-            return {"battle_type": "monster", "target_villain_witch": None}
+            return {
+                "battle_type": "monster",
+                "target_villain_witch": None,
+                "battle_odds": self._build_battle_odds_context(
+                    player_data=player_data,
+                    opponent_data=None,
+                    battle_kind="magical_girl_vs_monster",
+                    ai_win_rate=parsed.get("ai_win_rate"),
+                ),
+            }
 
         target = self._resolve_selected_villain_witch(
             parsed.get("target_villain_witch"),
             villain_witch_candidates,
         )
         if not target:
-            return {"battle_type": "monster", "target_villain_witch": None}
-        return {"battle_type": "villain_witch", "target_villain_witch": target}
+            return {
+                "battle_type": "monster",
+                "target_villain_witch": None,
+                "battle_odds": self._build_battle_odds_context(
+                    player_data=player_data,
+                    opponent_data=None,
+                    battle_kind="magical_girl_vs_monster",
+                    ai_win_rate=parsed.get("ai_win_rate"),
+                ),
+            }
+        return {
+            "battle_type": "villain_witch",
+            "target_villain_witch": target,
+            "battle_odds": self._build_battle_odds_context(
+                player_data=player_data,
+                opponent_data=target,
+                battle_kind="magical_girl_vs_villain_witch",
+                ai_win_rate=parsed.get("ai_win_rate"),
+            ),
+        }
 
     async def select_villain_battle_context(
         self,
@@ -306,18 +353,26 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         magical_girl_candidates: list[dict],
         umo: str | None = None,
     ) -> dict[str, object]:
-        if not magical_girl_candidates:
-            return {
-                "familiar": self._resolve_default_monster(
-                    monster_candidates,
-                    current_level=1,
-                    action_text="",
-                ),
-                "target_magical_girl": None,
-            }
-
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
         current_level = self.domain_service.get_current_level(protagonist)
+        if not magical_girl_candidates:
+            familiar = self._resolve_default_monster(
+                monster_candidates,
+                current_level=current_level,
+                action_text="",
+            )
+            return {
+                "familiar": familiar,
+                "target_magical_girl": None,
+                "battle_odds": self._build_battle_odds_context(
+                    player_data=player_data,
+                    opponent_data=None,
+                    battle_kind="villain_witch_vs_magical_girl",
+                    force_lose=bool(familiar and familiar.get("overleveled")),
+                    force_reason="随行魔物越级失控" if familiar and familiar.get("overleveled") else "",
+                ),
+            }
+
         prompt = self.editable_manager.render_prompt(
             "villain_battle_selection_prompt",
             {
@@ -356,28 +411,135 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         success, parsed, error = parse_json_object_response(result_text)
         if not success or not isinstance(parsed, dict):
             logger.warning(f"反派魔女战斗出战选择 JSON 解析失败，使用候选兜底: {error}")
-            return {
-                "familiar": self._resolve_default_monster(
-                    monster_candidates,
-                    current_level=current_level,
-                    action_text=action_text,
-                ),
-                "target_magical_girl": magical_girl_candidates[0],
-            }
-
-        return {
-            "familiar": self._resolve_selected_monster(
-                parsed.get("familiar"),
+            familiar = self._resolve_default_monster(
                 monster_candidates,
                 current_level=current_level,
                 action_text=action_text,
-            ),
-            "target_magical_girl": self._resolve_selected_magical_girl(
+            )
+            target = magical_girl_candidates[0]
+            return {
+                "familiar": familiar,
+                "target_magical_girl": target,
+                "battle_odds": self._build_battle_odds_context(
+                    player_data=player_data,
+                    opponent_data=target,
+                    battle_kind="villain_witch_vs_magical_girl",
+                    force_lose=bool(familiar and familiar.get("overleveled")),
+                    force_reason="随行魔物越级失控" if familiar and familiar.get("overleveled") else "",
+                ),
+            }
+
+        familiar = self._resolve_selected_monster(
+            parsed.get("familiar"),
+            monster_candidates,
+            current_level=current_level,
+            action_text=action_text,
+        )
+        target = (
+            self._resolve_selected_magical_girl(
                 parsed.get("target_magical_girl"),
                 magical_girl_candidates,
             )
-            or magical_girl_candidates[0],
+            or magical_girl_candidates[0]
+        )
+        return {
+            "familiar": familiar,
+            "target_magical_girl": target,
+            "battle_odds": self._build_battle_odds_context(
+                player_data=player_data,
+                opponent_data=target,
+                battle_kind="villain_witch_vs_magical_girl",
+                ai_win_rate=parsed.get("ai_win_rate"),
+                force_lose=bool(familiar and familiar.get("overleveled")),
+                force_reason="随行魔物越级失控" if familiar and familiar.get("overleveled") else "",
+            ),
         }
+
+    def _build_battle_odds_context(
+        self,
+        *,
+        player_data: dict,
+        opponent_data: dict | None,
+        battle_kind: str,
+        ai_win_rate: object = None,
+        force_lose: bool = False,
+        force_reason: str = "",
+    ) -> dict[str, object]:
+        """Build deterministic battle odds used by the diary prompt."""
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+        player_level = self.domain_service.get_current_level(protagonist)
+        opponent_level = self._profile_level(opponent_data) if opponent_data else player_level
+        d20 = random.randint(1, 20)
+        ai_rate = self._clamp_percent(ai_win_rate, default=50)
+
+        if force_lose:
+            final_rate = 0
+            code_rate = 0
+            dice_result = "forced_failure"
+            outcome = "player_lose"
+        elif d20 == 1:
+            final_rate = 0
+            code_rate = 0
+            dice_result = "critical_failure"
+            outcome = "player_lose"
+        elif d20 == 20:
+            final_rate = 100
+            code_rate = 100
+            dice_result = "critical_success"
+            outcome = "player_win"
+        elif battle_kind == "magical_girl_vs_monster":
+            # Monster fights use a flatter rule: AI side is neutral 50, code side is 25 + d20.
+            ai_rate = 50
+            code_rate = max(0, min(100, 25 + d20))
+            final_rate = round((code_rate + ai_rate) / 2)
+            dice_result = "failure" if d20 < 10 else "success"
+            outcome = "player_win" if final_rate >= 50 else "player_lose"
+        else:
+            power_rate = max(5, min(95, 50 + (player_level - opponent_level) * 12))
+            if d20 < 10:
+                dice_rate = 10 + (d20 - 2) * 5
+                dice_result = "failure"
+            else:
+                dice_rate = 55 + round((d20 - 10) * (40 / 9))
+                dice_result = "success"
+            code_rate = round((power_rate + dice_rate) / 2)
+            final_rate = round((code_rate + ai_rate) / 2)
+            outcome = "player_win" if final_rate >= 50 else "player_lose"
+
+        closeness = 50 - abs(final_rate - 50)
+        if final_rate in {0, 100}:
+            tempo = "一边倒，战斗干脆利落"
+        elif closeness >= 35:
+            tempo = "难解难分，双方反复交换优势"
+        elif closeness >= 20:
+            tempo = "有来有回，但胜负逐渐清晰"
+        else:
+            tempo = "优势明显，收束较快"
+
+        return {
+            "player_win_rate": final_rate,
+            "outcome": outcome,
+            "d20": d20,
+            "dice_result": dice_result,
+            "code_win_rate": code_rate,
+            "ai_win_rate": ai_rate,
+            "player_level": level_label(player_level),
+            "opponent_level": level_label(opponent_level),
+            "battle_kind": battle_kind,
+            "tempo": tempo,
+            "force_reason": force_reason,
+        }
+
+    def _profile_level(self, item: object) -> int:
+        profile = self._prompt_protagonist_profile(item)
+        return self.domain_service.get_current_level(profile or {})
+
+    @staticmethod
+    def _clamp_percent(value: object, *, default: int = 50) -> int:
+        try:
+            return max(0, min(100, int(float(value))))
+        except Exception:
+            return default
 
     async def compress_battle_logs(
         self,
