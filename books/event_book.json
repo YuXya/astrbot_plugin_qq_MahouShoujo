@@ -8,9 +8,9 @@
       "entries": []
     },
     {
-      "id": "villain_officer_reincarnation",
-      "command": "/反派干部转生",
-      "name": "反派干部转生",
+      "id": "villain_witch_reincarnation",
+      "command": "/反派魔女转生",
+      "name": "反派魔女转生",
       "entries": []
     },
     {
@@ -32,21 +32,21 @@
       "entries": []
     },
     {
-      "id": "villain_officer_purification",
-      "command": "/反派干部洗白",
-      "name": "反派干部洗白",
+      "id": "villain_witch_purification",
+      "command": "/反派魔女洗白",
+      "name": "反派魔女洗白",
       "entries": []
     },
     {
-      "id": "villain_officer_battle",
-      "command": "/反派干部战斗",
-      "name": "反派干部战斗",
+      "id": "villain_witch_battle",
+      "command": "/反派魔女战斗",
+      "name": "反派魔女战斗",
       "entries": []
     },
     {
-      "id": "villain_officer_daily",
-      "command": "/反派干部日常",
-      "name": "反派干部日常",
+      "id": "villain_witch_daily",
+      "command": "/反派魔女日常",
+      "name": "反派魔女日常",
       "entries": []
     }
   ]

@@ -82,7 +82,7 @@ class BattleDiaryApplicationService:
                     if not monster_candidates:
                         return BattleDiaryExecutionResult(
                             success=False,
-                            text="反派干部战斗前必须先创建至少一个可用魔物，请前往角色档案面板创建或拷贝公共魔物。",
+                            text="反派魔女战斗前必须先创建至少一个可用魔物，请前往角色档案面板创建或拷贝公共魔物。",
                             error="villain_monster_not_found",
                         )
                 selection_context = await self._select_villain_battle_context(
@@ -96,7 +96,7 @@ class BattleDiaryApplicationService:
                 )
                 target = selection_context.get("target_magical_girl") if selection_context else None
                 if not isinstance(target, dict) or not target:
-                    command_label = str(event_command or "/反派干部战斗").strip() or "/反派干部战斗"
+                    command_label = str(event_command or "/反派魔女战斗").strip() or "/反派魔女战斗"
                     return BattleDiaryExecutionResult(
                         success=False,
                         text=f"当前城市没有可作为目标的魔法少女存档，暂时不能发起 {command_label}。",
@@ -361,7 +361,7 @@ class BattleDiaryApplicationService:
             npc_user_id = str(npc.get("_user_id") or "").strip()
             npc_target_name = str(npc.get("target_name") or "").strip()
             npc_magical_name = str(npc.get("魔法少女名") or "").strip()
-            npc_villain_name = str(npc.get("反派干部名") or "").strip()
+            npc_villain_name = str(npc.get("反派魔女名") or "").strip()
             mention_names = [
                 name for name in (npc_target_name, npc_magical_name, npc_villain_name) if name
             ]
@@ -383,9 +383,9 @@ class BattleDiaryApplicationService:
                         "source_identity": source_profile.get("身份&职业", ""),
                         "source_magical_name": (
                             source_profile.get("魔法少女名", "")
-                            or source_profile.get("反派干部名", "")
+                            or source_profile.get("反派魔女名", "")
                         ),
-                        "source_villain_name": source_profile.get("反派干部名", ""),
+                        "source_villain_name": source_profile.get("反派魔女名", ""),
                         "npc_target_name": npc_magical_name or npc_villain_name or npc_target_name,
                         "encounter": card.encounter,
                         "result": card.result,
@@ -513,7 +513,7 @@ class BattleDiaryApplicationService:
             "年龄": str(info.get("年龄") or "").strip(),
             "身份&职业": str(info.get("身份&职业") or "").strip(),
             "魔法少女名": str(info.get("魔法少女名") or "").strip(),
-            "反派干部名": str(info.get("反派干部名") or "").strip(),
+            "反派魔女名": str(info.get("反派魔女名") or "").strip(),
         }
 
     @staticmethod

@@ -275,7 +275,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             prompt=prompt,
             umo=umo,
             system_prompt=system_prompt,
-            purpose="反派干部战斗出战选择",
+            purpose="反派魔女战斗出战选择",
             provider_id_override=self.config_manager.get_subtask_llm_provider_id(),
         )
         result_text = extract_response_text(response)
@@ -284,7 +284,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
 
         success, parsed, error = parse_json_object_response(result_text)
         if not success or not isinstance(parsed, dict):
-            logger.warning(f"反派干部战斗出战选择 JSON 解析失败，使用候选兜底: {error}")
+            logger.warning(f"反派魔女战斗出战选择 JSON 解析失败，使用候选兜底: {error}")
             return {
                 "familiar": self._resolve_default_monster(
                     monster_candidates,
@@ -709,7 +709,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 personal_info = {}
             name = str(
                 personal_info.get("魔法少女名")
-                or personal_info.get("反派干部名")
+                or personal_info.get("反派魔女名")
                 or personal_info.get("姓名")
                 or ""
             ).strip()

@@ -52,12 +52,12 @@ REINCARNATION_TEMPLATE = (
     "其他设定："
 )
 
-VILLAIN_OFFICER_REINCARNATION_FIELDS = [
+VILLAIN_WITCH_REINCARNATION_FIELDS = [
     "姓名", "性格特质", "代表色", "核心能力", "外貌描述", "其他设定",
 ]
 
-VILLAIN_OFFICER_REINCARNATION_TEMPLATE = (
-    "/反派干部转生\n"
+VILLAIN_WITCH_REINCARNATION_TEMPLATE = (
+    "/反派魔女转生\n"
     "姓名：\n"
     "性格特质：\n"
     "代表色：\n"
@@ -174,13 +174,13 @@ class QQMahouShoujo(Star):
                     "魔法少女指令",
                     "",
                     "/魔法少女转生：创建魔法少女角色档案。",
-                    "/反派干部转生：创建反派干部角色档案。",
+                    "/反派魔女转生：创建反派魔女角色档案。",
                     "/魔法少女战斗：生成一次战斗日记，可追加行动。",
                     "/魔法少女日常：生成一次日常日记，可追加行动。",
-                    "/反派干部日常：生成一次带点坏心眼的反派日常日记，可追加行动。",
+                    "/反派魔女日常：生成一次带点坏心眼的反派日常日记，可追加行动。",
                     "/魔法少女黑化 黑化原因：生成一次黑化日记。",
-                    "/反派干部洗白 洗白原因：生成一次洗白日记。",
-                    "/反派干部战斗 行动目标：生成一次反派干部战斗日记。",
+                    "/反派魔女洗白 洗白原因：生成一次洗白日记。",
+                    "/反派魔女战斗 行动目标：生成一次反派魔女战斗日记。",
                     "/魔法少女存档删除 确认：删除当前群自己的存档。",
                     "",
                     f"角色档案面板：{self._build_player_profile_panel_url()}",
@@ -251,21 +251,21 @@ class QQMahouShoujo(Star):
         ):
             yield result
 
-    @filter.command("反派干部转生", alias={"villain_officer_reincarnate"})
-    async def villain_officer_reincarnate(
+    @filter.command("反派魔女转生", alias={"villain_witch_reincarnate"})
+    async def villain_witch_reincarnate(
         self,
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
-        """生成一张反派干部转生人物卡。用法：/反派干部转生"""
+        """生成一张反派魔女转生人物卡。用法：/反派魔女转生"""
         async for result in self._handle_reincarnation(
             event,
-            command_name="反派干部转生",
-            event_command="/反派干部转生",
-            template=VILLAIN_OFFICER_REINCARNATION_TEMPLATE,
-            fields=VILLAIN_OFFICER_REINCARNATION_FIELDS,
-            prompt_name="villain_officer_reincarnation_prompt",
-            card_label="反派干部转生",
-            faction_label="反派干部",
+            command_name="反派魔女转生",
+            event_command="/反派魔女转生",
+            template=VILLAIN_WITCH_REINCARNATION_TEMPLATE,
+            fields=VILLAIN_WITCH_REINCARNATION_FIELDS,
+            prompt_name="villain_witch_reincarnation_prompt",
+            card_label="反派魔女转生",
+            faction_label="反派魔女",
         ):
             yield result
 
@@ -524,16 +524,16 @@ class QQMahouShoujo(Star):
                     default_action="自由黑化",
                     action_label="黑化",
                     card_label="黑化日记卡",
-                    identity_transition_faction="反派干部",
+                    identity_transition_faction="反派魔女",
                 ):
                     yield result
 
-    @filter.command("反派干部日常")
-    async def villain_officer_daily_diary(
+    @filter.command("反派魔女日常")
+    async def villain_witch_daily_diary(
         self,
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
-        """根据玩家存档生成一次完整的反派干部日常日记卡。用法：/反派干部日常"""
+        """根据玩家存档生成一次完整的反派魔女日常日记卡。用法：/反派魔女日常"""
         event.should_call_llm(True)
 
         if not self._is_group_event_allowed(event):
@@ -541,7 +541,7 @@ class QQMahouShoujo(Star):
 
         group_id = self._get_group_id_from_event(event)
         if not group_id:
-            yield event.plain_result("请在群聊中使用 /反派干部日常。")
+            yield event.plain_result("请在群聊中使用 /反派魔女日常。")
             return
 
         user_id = self._get_sender_id_from_event(event)
@@ -558,21 +558,21 @@ class QQMahouShoujo(Star):
                     event,
                     group_id,
                     user_id,
-                    command_name="反派干部日常",
-                    event_command="/反派干部日常",
-                    prompt_name="villain_officer_daily_prompt",
+                    command_name="反派魔女日常",
+                    event_command="/反派魔女日常",
+                    prompt_name="villain_witch_daily_prompt",
                     default_action="自由反派日常",
-                    action_label="反派干部日常",
-                    card_label="反派干部日常日记卡",
+                    action_label="反派魔女日常",
+                    card_label="反派魔女日常日记卡",
                 ):
                     yield result
 
-    @filter.command("反派干部洗白")
-    async def villain_officer_purification_diary(
+    @filter.command("反派魔女洗白")
+    async def villain_witch_purification_diary(
         self,
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
-        """根据玩家存档生成一次完整的反派干部洗白日记卡。用法：/反派干部洗白 洗白原因"""
+        """根据玩家存档生成一次完整的反派魔女洗白日记卡。用法：/反派魔女洗白 洗白原因"""
         event.should_call_llm(True)
 
         if not self._is_group_event_allowed(event):
@@ -580,7 +580,7 @@ class QQMahouShoujo(Star):
 
         group_id = self._get_group_id_from_event(event)
         if not group_id:
-            yield event.plain_result("请在群聊中使用 /反派干部洗白。")
+            yield event.plain_result("请在群聊中使用 /反派魔女洗白。")
             return
 
         user_id = self._get_sender_id_from_event(event)
@@ -588,15 +588,15 @@ class QQMahouShoujo(Star):
             yield event.plain_result("没有拿到你的 QQ 号，暂时不能读取玩家存档。")
             return
 
-        action_text = self._extract_command_tail(event, "反派干部洗白")
+        action_text = self._extract_command_tail(event, "反派魔女洗白")
         if not action_text:
             event.should_call_llm(False)
             yield event.plain_result(
                 "\n".join(
                     [
                         "请写此次洗白原因。",
-                        "格式：/反派干部洗白 洗白原因",
-                        "示例：/反派干部洗白 被目标魔法少女冒险救下后开始动摇",
+                        "格式：/反派魔女洗白 洗白原因",
+                        "示例：/反派魔女洗白 被目标魔法少女冒险救下后开始动摇",
                     ]
                 )
             )
@@ -611,23 +611,23 @@ class QQMahouShoujo(Star):
                     event,
                     group_id,
                     user_id,
-                    command_name="反派干部洗白",
-                    event_command="/反派干部洗白",
-                    prompt_name="villain_officer_purification_prompt",
+                    command_name="反派魔女洗白",
+                    event_command="/反派魔女洗白",
+                    prompt_name="villain_witch_purification_prompt",
                     default_action="自由洗白",
-                    action_label="反派干部洗白",
-                    card_label="反派干部洗白日记卡",
+                    action_label="反派魔女洗白",
+                    card_label="反派魔女洗白日记卡",
                     use_villain_battle_selection=True,
                     identity_transition_faction="魔法少女",
                 ):
                     yield result
 
-    @filter.command("反派干部战斗")
-    async def villain_officer_battle_diary(
+    @filter.command("反派魔女战斗")
+    async def villain_witch_battle_diary(
         self,
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
-        """根据玩家存档生成一次完整的反派干部战斗日记卡。用法：/反派干部战斗"""
+        """根据玩家存档生成一次完整的反派魔女战斗日记卡。用法：/反派魔女战斗"""
         event.should_call_llm(True)
 
         if not self._is_group_event_allowed(event):
@@ -635,7 +635,7 @@ class QQMahouShoujo(Star):
 
         group_id = self._get_group_id_from_event(event)
         if not group_id:
-            yield event.plain_result("请在群聊中使用 /反派干部战斗。")
+            yield event.plain_result("请在群聊中使用 /反派魔女战斗。")
             return
 
         user_id = self._get_sender_id_from_event(event)
@@ -667,21 +667,21 @@ class QQMahouShoujo(Star):
             if not monsters:
                 event.should_call_llm(False)
                 yield event.plain_result(
-                    "反派干部战斗前必须先创建至少一个可用魔物。"
+                    "反派魔女战斗前必须先创建至少一个可用魔物。"
                     "请登录角色档案面板，进入“魔物制作”创建魔物，或从公共魔物弹框拷贝：\n"
                     f"{self._build_player_profile_panel_url()}"
                 )
                 return
 
-        action_text = self._extract_command_tail(event, "反派干部战斗")
+        action_text = self._extract_command_tail(event, "反派魔女战斗")
         if not action_text:
             event.should_call_llm(False)
             yield event.plain_result(
                 "\n".join(
                     [
                         "请写此次行动目标。",
-                        "格式：/反派干部战斗 行动目标",
-                        "示例：/反派干部战斗 夜袭魔法少女据点",
+                        "格式：/反派魔女战斗 行动目标",
+                        "示例：/反派魔女战斗 夜袭魔法少女据点",
                     ]
                 )
             )
@@ -696,12 +696,12 @@ class QQMahouShoujo(Star):
                     event,
                     group_id,
                     user_id,
-                    command_name="反派干部战斗",
-                    event_command="/反派干部战斗",
-                    prompt_name="villain_officer_battle_prompt",
-                    default_action="自由反派干部战斗",
-                    action_label="反派干部战斗",
-                    card_label="反派干部战斗日记卡",
+                    command_name="反派魔女战斗",
+                    event_command="/反派魔女战斗",
+                    prompt_name="villain_witch_battle_prompt",
+                    default_action="自由反派魔女战斗",
+                    action_label="反派魔女战斗",
+                    card_label="反派魔女战斗日记卡",
                     use_villain_battle_selection=True,
                     require_villain_battle_prerequisites=True,
                 ):

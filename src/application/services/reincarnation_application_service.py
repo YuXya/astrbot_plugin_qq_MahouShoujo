@@ -87,7 +87,7 @@ class ReincarnationApplicationService:
     def _ensure_card_faction(card: Any, event_command: str) -> None:
         if not getattr(card, "info", None):
             return
-        faction = "反派干部" if "反派干部" in str(event_command or "") else "魔法少女"
+        faction = "反派魔女" if "反派魔女" in str(event_command or "") else "魔法少女"
         for item in card.info:
             if isinstance(item, dict) and item.get("path") == "/主角/阵营/身份":
                 item["description"] = str(item.get("description") or faction)

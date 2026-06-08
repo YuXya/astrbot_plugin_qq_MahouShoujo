@@ -560,7 +560,7 @@
   <main class="card {% if is_villain %}card-villain{% endif %}">
     <header class="header">
       <div>
-        <div class="eyebrow">{% if is_villain %}VILLAIN OFFICER IDENTITY{% else %}MAGICAL GIRL IDENTITY{% endif %}</div>
+        <div class="eyebrow">{% if is_villain %}VILLAIN WITCH IDENTITY{% else %}MAGICAL GIRL IDENTITY{% endif %}</div>
         <h1>
           {{ card_identity_label }}&nbsp;{{ card_identity_name }}
         </h1>
@@ -609,7 +609,7 @@
           <div class="section-title">个人信息</div>
         </div>
         <div class="rows">
-          {% for item in card.info if item.path.startswith('/主角/个人信息/') and item.path not in ['/主角/个人信息/魔法少女名', '/主角/个人信息/反派干部名', '/主角/个人信息/姓名', '/主角/个人信息/年龄'] %}
+          {% for item in card.info if item.path.startswith('/主角/个人信息/') and item.path not in ['/主角/个人信息/魔法少女名', '/主角/个人信息/反派魔女名', '/主角/个人信息/姓名', '/主角/个人信息/年龄'] %}
           <div class="info-row">
             <div class="info-icon">{{ {
               '姓名': '✒',

@@ -38,7 +38,7 @@ MONSTER_BOOK_DEFAULT = _load_book("monster_book.json")
 
 REINCARNATION_PROMPT = _load_prompt("magical_girl/reincarnation_prompt.txt")
 
-VILLAIN_OFFICER_REINCARNATION_PROMPT = _load_prompt("villain_officer/villain_officer_reincarnation_prompt.txt")
+VILLAIN_WITCH_REINCARNATION_PROMPT = _load_prompt("villain_witch/villain_witch_reincarnation_prompt.txt")
 
 BATTLE_DIARY_PROMPT = _load_prompt("magical_girl/battle_diary_prompt.txt")
 
@@ -46,13 +46,13 @@ DAILY_DIARY_PROMPT = _load_prompt("magical_girl/daily_diary_prompt.txt")
 
 CORRUPTION_DIARY_PROMPT = _load_prompt("magical_girl/corruption_diary_prompt.txt")
 
-VILLAIN_OFFICER_PURIFICATION_PROMPT = _load_prompt("villain_officer/villain_officer_purification_prompt.txt")
+VILLAIN_WITCH_PURIFICATION_PROMPT = _load_prompt("villain_witch/villain_witch_purification_prompt.txt")
 
-VILLAIN_OFFICER_BATTLE_PROMPT = _load_prompt("villain_officer/villain_officer_battle_prompt.txt")
+VILLAIN_WITCH_BATTLE_PROMPT = _load_prompt("villain_witch/villain_witch_battle_prompt.txt")
 
-VILLAIN_OFFICER_DAILY_PROMPT = _load_prompt("villain_officer/villain_officer_daily_prompt.txt")
+VILLAIN_WITCH_DAILY_PROMPT = _load_prompt("villain_witch/villain_witch_daily_prompt.txt")
 
-VILLAIN_BATTLE_SELECTION_PROMPT = _load_prompt("villain_officer/villain_battle_selection_prompt.txt")
+VILLAIN_BATTLE_SELECTION_PROMPT = _load_prompt("villain_witch/villain_battle_selection_prompt.txt")
 
 RELATIONSHIP_SUMMARY_PROMPT = _load_prompt("relationship_summary_prompt.txt")
 

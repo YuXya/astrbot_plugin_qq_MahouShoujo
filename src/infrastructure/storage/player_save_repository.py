@@ -42,7 +42,7 @@ def _now_date_str() -> str:
 
 
 class PlayerSaveRepository:
-    PLAYER_FACTIONS = {"魔法少女", "反派干部"}
+    PLAYER_FACTIONS = {"魔法少女", "反派魔女"}
     SOURCE_FILE_NAMES = {
         "player_data.json",
         "player_data_update.json",
@@ -1535,7 +1535,7 @@ class PlayerSaveRepository:
 
         target_name = self._get_nested(protagonist, ["个人信息", "姓名"], user_dir.name)
         magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], "")
-        villain_name = self._get_nested(protagonist, ["个人信息", "反派干部名"], "")
+        villain_name = self._get_nested(protagonist, ["个人信息", "反派魔女名"], "")
         faction = self._get_nested(protagonist, ["阵营", "身份"], "魔法少女")
         role_name = magical_name or villain_name or target_name
         level_node = protagonist.get("等级", {})
@@ -1557,7 +1557,7 @@ class PlayerSaveRepository:
             "年龄": self._get_nested(protagonist, ["个人信息", "年龄"], ""),
             "身份&职业": self._get_nested(protagonist, ["个人信息", "身份&职业"], ""),
             "魔法少女名": magical_name,
-            "反派干部名": villain_name,
+            "反派魔女名": villain_name,
             "武装": self._get_nested(protagonist, ["个人信息", "武装"], ""),
             "变身服": self._get_nested(protagonist, ["个人信息", "变身服"], ""),
             "性格特质": self._get_nested(protagonist, ["个人信息", "性格特质"], ""),
@@ -1957,7 +1957,7 @@ class PlayerSaveRepository:
         for keys in (
             ["个人信息", "姓名"],
             ["个人信息", "魔法少女名"],
-            ["个人信息", "反派干部名"],
+            ["个人信息", "反派魔女名"],
         ):
             name = self._get_nested(protagonist, keys, "").strip()
             if name and name not in names:

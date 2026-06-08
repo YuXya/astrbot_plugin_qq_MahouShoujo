@@ -1654,9 +1654,9 @@ class SaveWebViewer:
                 {{ id: "battle", command: "/魔法少女战斗", name: "魔法少女战斗" }},
                 {{ id: "daily", command: "/魔法少女日常", name: "魔法少女日常" }},
                 {{ id: "corruption", command: "/魔法少女黑化", name: "魔法少女黑化" }},
-                {{ id: "villain_officer_purification", command: "/反派干部洗白", name: "反派干部洗白" }},
-                {{ id: "villain_officer_battle", command: "/反派干部战斗", name: "反派干部战斗" }},
-                {{ id: "villain_officer_daily", command: "/反派干部日常", name: "反派干部日常" }},
+                {{ id: "villain_witch_purification", command: "/反派魔女洗白", name: "反派魔女洗白" }},
+                {{ id: "villain_witch_battle", command: "/反派魔女战斗", name: "反派魔女战斗" }},
+                {{ id: "villain_witch_daily", command: "/反派魔女日常", name: "反派魔女日常" }},
               ];
               const ebLevelOptions = [
                 {{ value: 1, label: "F" }},
@@ -2021,19 +2021,19 @@ class SaveWebViewer:
                 "name": "魔法少女黑化",
             },
             {
-                "id": "villain_officer_purification",
-                "command": "/反派干部洗白",
-                "name": "反派干部洗白",
+                "id": "villain_witch_purification",
+                "command": "/反派魔女洗白",
+                "name": "反派魔女洗白",
             },
             {
-                "id": "villain_officer_battle",
-                "command": "/反派干部战斗",
-                "name": "反派干部战斗",
+                "id": "villain_witch_battle",
+                "command": "/反派魔女战斗",
+                "name": "反派魔女战斗",
             },
             {
-                "id": "villain_officer_daily",
-                "command": "/反派干部日常",
-                "name": "反派干部日常",
+                "id": "villain_witch_daily",
+                "command": "/反派魔女日常",
+                "name": "反派魔女日常",
             },
         ]
         raw_events = book.get("events", [])
@@ -3009,7 +3009,7 @@ class SaveWebViewer:
                 <a class="player-back-link" href="{back_url}">返回个人档案</a>
                 <p class="player-kicker">Villain Workshop</p>
                 <h1>魔物制作</h1>
-                <p>{self._e(title_name)}的私人反派干部档案。这里创建的魔物会保存到你的个人文件夹，并作为该反派干部亲自照护、可在行动中随行的魔物。</p>
+                <p>{self._e(title_name)}的私人反派魔女档案。这里创建的魔物会保存到你的个人文件夹，并作为该反派魔女亲自照护、可在行动中随行的魔物。</p>
                 <button id="show-public-monsters" type="button">查看公共魔物</button>
               </header>
 
@@ -3443,7 +3443,7 @@ class SaveWebViewer:
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
         city_name = self.repository.get_city_name(group_id)
         faction = self._get_nested(protagonist, ["阵营", "身份"], "魔法少女") or "魔法少女"
-        is_villain = faction == "反派干部"
+        is_villain = faction == "反派魔女"
         magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], "")
         class_name = self._rank_display(self._get_nested(protagonist, ["个人信息", "身份&职业"], "未知职阶"))
         color = self._get_nested(protagonist, ["个人信息", "代表色"], "星光色")
@@ -3453,13 +3453,13 @@ class SaveWebViewer:
         familiar = self._get_nested(protagonist, ["个人信息", "使魔伙伴种类"], "")
         familiar_bond = self._get_nested(protagonist, ["个人信息", "使魔伙伴与主角关系"], "")
         display_name = magical_name or title_name
-        page_prefix = "反派干部" if is_villain else "魔法少女"
+        page_prefix = "反派魔女" if is_villain else "魔法少女"
         page_name = f"{page_prefix} {display_name}"
         shell_class = "faction-villain" if is_villain else "faction-magical"
-        profile_kicker = "Villain Officer Profile" if is_villain else "Mahou Shoujo Profile"
+        profile_kicker = "Villain Witch Profile" if is_villain else "Mahou Shoujo Profile"
         emblem = "◆" if is_villain else "✦"
         hero_copy = (
-            f"{city_name}记录中的反派干部档案。这里汇总了你的身份、外观、装备、成长进度与最近的行动痕迹。"
+            f"{city_name}记录中的反派魔女档案。这里汇总了你的身份、外观、装备、成长进度与最近的行动痕迹。"
             if is_villain
             else f"{city_name}记录中的魔法少女档案。这里汇总了你的身份、外观、装备、成长进度与最近的冒险痕迹。"
         )
