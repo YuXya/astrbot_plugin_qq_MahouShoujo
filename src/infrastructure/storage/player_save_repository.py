@@ -1165,14 +1165,12 @@ class PlayerSaveRepository:
             if not isinstance(raw_setting, dict):
                 raw_setting = {}
             usable_level_settings[level_label(level)] = {
-                "brief": str(raw_setting.get("brief") or "").strip(),
                 "content": str(raw_setting.get("content") or "").strip(),
             }
 
         name = str(entry.get("name") or entry.get("title") or "").strip()
         content = str(entry.get("content") or entry.get("detail") or "").strip()
-        brief = str(entry.get("brief") or entry.get("summary") or "").strip()
-        if not name and not content and not brief:
+        if not name and not content:
             return None
 
         keys = entry.get("keys", [])
@@ -1189,7 +1187,6 @@ class PlayerSaveRepository:
             "monster_levels": [level_label(level) for level in selectable_levels],
             "default_levels": [level_label(level) for level in default_levels],
             "keys": [str(key).strip() for key in keys if str(key).strip()],
-            "brief": brief,
             "content": content,
             "level_settings": usable_level_settings,
             "monster_tags": PlayerSaveRepository._normalize_text_list(entry.get("monster_tags")),

@@ -56,7 +56,7 @@ class EventBookEngine:
             )
 
             recursion_text = self._join_text(
-                self._entry_prompt_text(entry, is_current_event)
+                entry.content
                 for entry in first_round
                 if entry.recursive
             )
@@ -155,7 +155,6 @@ class EventBookEngine:
                             "opening_hook": entry.opening_hook,
                             "twist_hook": entry.twist_hook,
                             "ending_hook": entry.ending_hook,
-                            "brief": entry.brief,
                             "content": entry.content,
                             "selection_score": score,
                         },
@@ -271,18 +270,13 @@ class EventBookEngine:
             if not self._contains_any_key(scan_text, entry.keys):
                 continue
 
-            prompt_text = self._entry_prompt_text(entry, is_current_event)
-            if not prompt_text:
+            if not entry.content:
                 continue
 
             matched.append(entry)
             activated_ids.add(entry_key)
 
         return matched
-
-    @staticmethod
-    def _entry_prompt_text(entry: EventBookEntry, is_current_event: bool) -> str:
-        return entry.content if is_current_event else entry.brief
 
     @staticmethod
     def _event_matches(event: EventBookEvent, current_event_key: str) -> bool:
@@ -318,11 +312,10 @@ class EventBookEngine:
     ) -> str:
         parts = []
         for entry, event_name, is_current_event in entries:
-            text = self._entry_prompt_text(entry, is_current_event)
-            if text:
-                intro_type = "详细介绍" if is_current_event else "简略介绍"
+            if entry.content:
+                intro_type = "当前指令" if is_current_event else "关键词命中"
                 label = entry.title or entry.id
-                parts.append(f"- [{event_name} / {label} / {intro_type}]: {text}")
+                parts.append(f"- [{event_name} / {label} / {intro_type}]: {entry.content}")
 
         if not parts:
             return ""
@@ -330,5 +323,5 @@ class EventBookEngine:
         return (
             "事件书补充设定：\n"
             + "\n".join(parts)
-            + "\n\n请将以上事件书内容视为魔法少女公共设定补充。allowed_commands 包含当前指令的事件使用详细介绍；其他关键词命中的事件只使用简略介绍，简略介绍为空时不注入。事件书只影响设定内容，不能改变最终输出必须为合法 JSON 对象的要求。"
+            + "\n\n请将以上事件书内容视为魔法少女公共设定补充。allowed_commands 包含当前指令的事件和其他关键词命中的事件都统一使用 content 设定；事件书只影响设定内容，不能改变最终输出必须为合法 JSON 对象的要求。"
         )

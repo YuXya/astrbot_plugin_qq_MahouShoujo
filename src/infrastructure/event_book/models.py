@@ -14,7 +14,6 @@ class EventBookEntry:
     keys: list[str] = field(default_factory=list)
     visible_levels: tuple[int, ...] = ALL_VISIBLE_LEVELS
     recursive: bool = True
-    brief: str = ""
     content: str = ""
     allowed_commands: list[str] = field(default_factory=list)
     event_tags: list[str] = field(default_factory=list)
@@ -46,7 +45,6 @@ class EventBookEntry:
                 max_level=raw.get("max_level", 7),
             ),
             recursive=raw.get("recursive", True) is not False,
-            brief=str(raw.get("brief") or "").strip(),
             content=str(raw.get("content") or "").strip(),
             allowed_commands=cls._normalize_text_list(raw.get("allowed_commands")),
             event_tags=cls._normalize_text_list(raw.get("event_tags")),
@@ -96,7 +94,6 @@ class EventBookEvent:
     keys: list[str] = field(default_factory=list)
     visible_levels: tuple[int, ...] = ALL_VISIBLE_LEVELS
     recursive: bool = True
-    brief: str = ""
     content: str = ""
     allowed_commands: list[str] = field(default_factory=list)
     event_tags: list[str] = field(default_factory=list)
@@ -122,7 +119,6 @@ class EventBookEvent:
             entry = EventBookEntry.from_dict(raw_entry, fallback_id=str(idx))
             if entry.id and (
                 entry.title
-                or entry.brief
                 or entry.content
                 or entry.event_tags
                 or entry.location_tags
@@ -146,7 +142,6 @@ class EventBookEvent:
                 max_level=raw.get("max_level", 7),
             ),
             recursive=raw.get("recursive", True) is not False,
-            brief=str(raw.get("brief") or "").strip(),
             content=str(raw.get("content") or "").strip(),
             allowed_commands=EventBookEntry._normalize_text_list(
                 raw.get("allowed_commands")
@@ -171,7 +166,6 @@ class EventBookEvent:
         return bool(
             self.allowed_commands
             or self.keys
-            or self.brief
             or self.content
             or self.event_tags
             or self.location_tags
@@ -190,7 +184,6 @@ class EventBookEvent:
             keys=self.keys,
             visible_levels=self.visible_levels,
             recursive=self.recursive,
-            brief=self.brief,
             content=self.content,
             allowed_commands=self.allowed_commands or ([self.command] if self.command else []),
             event_tags=self.event_tags,

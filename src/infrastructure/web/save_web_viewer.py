@@ -1210,7 +1210,6 @@ class SaveWebViewer:
                   monster_levels: monsterLevelOptions.map((item) => item.value),
                   keys: [],
                   monster_tags: [],
-                  brief: "",
                   content: "",
                   opening_hooks: [],
                   preferred_locations: [],
@@ -1234,7 +1233,6 @@ class SaveWebViewer:
                     ? rawSettings[String(level)]
                     : {{}};
                   levelSettings[String(level)] = {{
-                    brief: String(raw.brief || ""),
                     content: String(raw.content || ""),
                   }};
                 }});
@@ -1246,7 +1244,6 @@ class SaveWebViewer:
                   monster_levels: monsterLevels,
                   keys: keys.map((key) => String(key).trim()).filter(Boolean),
                   monster_tags: monsterSplitList(entry.monster_tags),
-                  brief: String(entry.brief || entry.summary || ""),
                   content: String(entry.content || entry.detail || ""),
                   opening_hooks: monsterSplitList(entry.opening_hooks),
                   preferred_locations: monsterSplitList(entry.preferred_locations),
@@ -1306,10 +1303,8 @@ class SaveWebViewer:
                   const monsterLevels = Array.from(card.querySelectorAll("[data-field='monster_level']:checked")).map((input) => Number.parseInt(input.value, 10));
                   const levelSettings = {{}};
                   monsterNormalizeLevels(monsterLevels).forEach((level) => {{
-                    const briefInput = card.querySelector(`[data-field='level_brief_${{level}}']`);
                     const contentInput = card.querySelector(`[data-field='level_content_${{level}}']`);
                     levelSettings[String(level)] = {{
-                      brief: briefInput ? briefInput.value : "",
                       content: contentInput ? contentInput.value : "",
                     }};
                   }});
@@ -1321,7 +1316,6 @@ class SaveWebViewer:
                     monster_levels: monsterLevels,
                     keys: monsterSplitKeys(card.querySelector("[data-field='keys']").value),
                     monster_tags: monsterSplitList(card.querySelector("[data-field='monster_tags']").value),
-                    brief: card.querySelector("[data-field='brief']").value,
                     content: card.querySelector("[data-field='content']").value,
                     opening_hooks: monsterSplitList(card.querySelector("[data-field='opening_hooks']").value),
                     preferred_locations: monsterSplitList(card.querySelector("[data-field='preferred_locations']").value),
@@ -1379,14 +1373,11 @@ class SaveWebViewer:
                   card.dataset.entryKey = entryKey;
                   const levelFields = normalized.monster_levels.map((level) => {{
                     const label = monsterLevelOptions.find((item) => item.value === level)?.label || String(level);
-                    const setting = normalized.level_settings[String(level)] || {{ brief: "", content: "" }};
+                    const setting = normalized.level_settings[String(level)] || {{ content: "" }};
                     return `
                       <div class="monster-level-block">
                         <h3>${{label}} 级魔物设定</h3>
-                        <label class="block-field">简单设定（留空使用通用简单设定）
-                          <textarea data-field="level_brief_${{level}}" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(setting.brief || "")}}</textarea>
-                        </label>
-                        <label class="block-field">详细设定（留空使用通用详细设定）
+                        <label class="block-field">等级设定（留空使用通用设定）
                           <textarea data-field="level_content_${{level}}" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(setting.content || "")}}</textarea>
                         </label>
                       </div>
@@ -1414,13 +1405,10 @@ class SaveWebViewer:
                         <label class="block-field">魔物标签（用于和场景事件联动，每行一个）
                           <textarea data-field="monster_tags" class="keys-editor" spellcheck="false">${{monsterEscapeHtml(normalized.monster_tags.join("\\n"))}}</textarea>
                         </label>
-                        <label class="block-field">通用简单设定
-                          <textarea data-field="brief" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(normalized.brief)}}</textarea>
-                        </label>
-                        <label class="block-field">通用详细设定
+                        <label class="block-field">通用设定
                           <textarea data-field="content" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(normalized.content)}}</textarea>
                         </label>
-                        <label class="block-field">开场钩子 / 发现方式（每行一个）
+                        <label class="block-field">魔物显形 / 袭击方式（每行一个）
                           <textarea data-field="opening_hooks" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(normalized.opening_hooks.join("\\n"))}}</textarea>
                         </label>
                         <label class="block-field">适合地点（每行一个）
@@ -1429,7 +1417,7 @@ class SaveWebViewer:
                         <label class="block-field">战斗机制差异（每行一个）
                           <textarea data-field="battle_gimmicks" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(normalized.battle_gimmicks.join("\\n"))}}</textarea>
                         </label>
-                        <label class="block-field">结束残留 / 后续线索（每行一个）
+                        <label class="block-field">魔物残留 / 特征痕迹（每行一个）
                           <textarea data-field="ending_hooks" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(normalized.ending_hooks.join("\\n"))}}</textarea>
                         </label>
                         <div class="monster-level-settings">${{levelFields}}</div>
@@ -1524,7 +1512,15 @@ class SaveWebViewer:
                 warning=f"事件书 JSON 解析失败，请先修复原始 JSON：{exc}",
             )
 
+        try:
+            monster_book = self._normalize_monster_book(
+                json.loads(self.editable_manager.read_text("monster_book/default.json"))
+            )
+        except Exception:
+            monster_book = {"version": 1, "entries": []}
+
         book_json = self._json_script_data(book)
+        monster_book_json = self._json_script_data(monster_book)
         storage_key = "qq_mahoushoujo:event_book:open_events_flat"
         source_url = self._url(
             f"/editable/source?id={quote(file_id, safe='')}&category={self._e(back_category)}"
@@ -1576,6 +1572,7 @@ class SaveWebViewer:
             </form>
             <script>
               const initialEventBook = {book_json};
+              const eventMonsterBook = {monster_book_json};
               const eventEntriesEl = document.getElementById("event-book-events");
               const eventForm = document.getElementById("event-book-form");
               const eventContentInput = document.getElementById("event-book-content");
@@ -1606,6 +1603,26 @@ class SaveWebViewer:
                 "magical_girl",
                 "environment_crisis",
               ];
+              const eventMonsterOptions = (Array.isArray(eventMonsterBook.entries) ? eventMonsterBook.entries : [])
+                .filter((monster) => monster && monster.enabled !== false)
+                .map((monster, index) => ({{
+                  id: String(monster.id || `monster_${{index + 1}}`).trim(),
+                  name: String(monster.name || monster.title || monster.id || `魔物 ${{index + 1}}`).trim(),
+                  content: String(monster.content || ""),
+                  tags: eventSplitList(monster.monster_tags),
+                  keys: eventSplitList(monster.keys),
+                  locations: eventSplitList(monster.preferred_locations),
+                  levels: eventNormalizeLevels(monster.monster_levels),
+                }}))
+                .filter((monster) => monster.id && monster.tags.length);
+              const eventMonstersById = new Map(eventMonsterOptions.map((monster) => [monster.id, monster]));
+              const eventMonstersByTag = new Map();
+              eventMonsterOptions.forEach((monster) => {{
+                monster.tags.forEach((tag) => {{
+                  if (!eventMonstersByTag.has(tag)) eventMonstersByTag.set(tag, []);
+                  eventMonstersByTag.get(tag).push(monster);
+                }});
+              }});
               const eventState = {{
                 ...initialEventBook,
                 events: Array.isArray(initialEventBook.events) ? initialEventBook.events : [],
@@ -1631,7 +1648,6 @@ class SaveWebViewer:
                   opening_hook: "",
                   twist_hook: "",
                   ending_hook: "",
-                  brief: "",
                   content: "",
                 }};
               }}
@@ -1654,7 +1670,6 @@ class SaveWebViewer:
                   opening_hook: String(entry.opening_hook || ""),
                   twist_hook: String(entry.twist_hook || ""),
                   ending_hook: String(entry.ending_hook || ""),
-                  brief: String(entry.brief || ""),
                   content: String(entry.content || ""),
                 }};
               }}
@@ -1719,6 +1734,160 @@ class SaveWebViewer:
                 `).join("");
               }}
 
+              function eventUniqueList(items) {{
+                const result = [];
+                items.forEach((item) => {{
+                  const text = String(item || "").trim();
+                  if (text && !result.includes(text)) result.push(text);
+                }});
+                return result;
+              }}
+
+              function eventMonstersForTags(tags) {{
+                const selectedTags = new Set(eventSplitList(tags));
+                return eventMonsterOptions.filter((monster) =>
+                  monster.tags.some((tag) => selectedTags.has(tag))
+                );
+              }}
+
+              function eventUnknownMonsterTags(tags) {{
+                return eventSplitList(tags).filter((tag) => !eventMonstersByTag.has(tag));
+              }}
+
+              function eventCompatibleMonsterSummary(tags) {{
+                const normalizedTags = eventSplitList(tags);
+                if (!normalizedTags.length) return "兼容：不限魔物";
+                const monsters = eventMonstersForTags(normalizedTags);
+                if (monsters.length) {{
+                  const names = monsters.slice(0, 3).map((monster) => monster.name);
+                  const suffix = monsters.length > 3 ? ` 等 ${{monsters.length}} 个` : "";
+                  return `兼容：${{names.join(" / ")}}${{suffix}}`;
+                }}
+                return `兼容：自定义标签 ${{normalizedTags.length}} 个`;
+              }}
+
+              function eventMonsterTagsTextarea(card) {{
+                return card.querySelector("[data-field='compatible_monster_tags']");
+              }}
+
+              function eventSetMonsterTags(card, tags) {{
+                const textarea = eventMonsterTagsTextarea(card);
+                if (!textarea) return;
+                textarea.value = eventUniqueList(tags).join("\\n");
+                eventRefreshMonsterPicker(card);
+              }}
+
+              function eventAddCompatibleMonster(card, monsterId) {{
+                const monster = eventMonstersById.get(monsterId);
+                if (!monster) return;
+                const current = eventSplitList(eventMonsterTagsTextarea(card)?.value);
+                eventSetMonsterTags(card, current.concat(monster.tags));
+              }}
+
+              function eventRemoveCompatibleMonster(card, monsterId) {{
+                const monster = eventMonstersById.get(monsterId);
+                if (!monster) return;
+                const current = eventSplitList(eventMonsterTagsTextarea(card)?.value);
+                const remainingMonsters = eventMonstersForTags(current).filter((item) => item.id !== monster.id);
+                const preserveTags = new Set(eventUnknownMonsterTags(current));
+                remainingMonsters.forEach((item) => item.tags.forEach((tag) => preserveTags.add(tag)));
+                const removeTags = new Set(monster.tags);
+                eventSetMonsterTags(card, current.filter((tag) => !removeTags.has(tag) || preserveTags.has(tag)));
+              }}
+
+              function eventMonsterOptionHtml(monster, selectedIds) {{
+                const contentPreview = monster.content ? `${{monster.content.slice(0, 90)}}${{monster.content.length > 90 ? "..." : ""}}` : "暂无设定";
+                const searchText = [monster.name, monster.id, monster.content, ...monster.tags, ...monster.keys, ...monster.locations]
+                  .join(" ")
+                  .toLowerCase();
+                const isSelected = selectedIds.has(monster.id);
+                return `
+                  <button class="monster-picker-option" type="button" data-action="add-monster" data-monster-id="${{eventEscapeAttr(monster.id)}}" data-search="${{eventEscapeAttr(searchText)}}"${{isSelected ? " disabled" : ""}}>
+                    <span class="monster-picker-main">
+                      <strong>${{eventEscapeHtml(monster.name)}}</strong>
+                      <em>${{eventEscapeHtml(monster.id)}} · ${{eventLevelsLabel(monster.levels)}}</em>
+                    </span>
+                    <span class="monster-picker-preview">${{eventEscapeHtml(contentPreview)}}</span>
+                    <span class="monster-picker-meta">标签：${{eventEscapeHtml(monster.tags.join(" / "))}}</span>
+                    <span class="monster-picker-meta">地点：${{eventEscapeHtml(monster.locations.slice(0, 5).join(" / ") || "未填写")}}</span>
+                  </button>
+                `;
+              }}
+
+              function eventMonsterPickerHtml(tags) {{
+                const selectedMonsters = eventMonstersForTags(tags);
+                const selectedIds = new Set(selectedMonsters.map((monster) => monster.id));
+                const unknownTags = eventUnknownMonsterTags(tags);
+                const selectedHtml = selectedMonsters.length
+                  ? selectedMonsters.map((monster) => `
+                    <span class="monster-selected-chip">
+                      <span>${{eventEscapeHtml(monster.name)}} · ${{eventEscapeHtml(monster.tags.join(" / "))}}</span>
+                      <button type="button" data-action="remove-monster" data-monster-id="${{eventEscapeAttr(monster.id)}}" aria-label="移除 ${{eventEscapeAttr(monster.name)}}">×</button>
+                    </span>
+                  `).join("")
+                  : `<span class="muted">未指定魔物，留空表示不限魔物。</span>`;
+                const unknownHtml = unknownTags.length
+                  ? `<div class="monster-unmatched-tags"><strong>未匹配标签：</strong>${{unknownTags.map((tag) => `<code>${{eventEscapeHtml(tag)}}</code>`).join("")}}</div>`
+                  : "";
+                const optionsHtml = eventMonsterOptions.length
+                  ? eventMonsterOptions.map((monster) => eventMonsterOptionHtml(monster, selectedIds)).join("")
+                  : `<p class="muted">没有读到公共魔物书条目。</p>`;
+                return `
+                  <div class="monster-picker" data-role="monster-picker">
+                    <div class="monster-picker-head">
+                      <strong>兼容魔物</strong>
+                      <span class="muted">从公共魔物书选择，保存时仍写入标签数组。</span>
+                    </div>
+                    <div class="monster-selected-list" data-role="selected-monsters">${{selectedHtml}}</div>
+                    ${{unknownHtml}}
+                    <details class="monster-picker-add">
+                      <summary>+ 添加兼容魔物</summary>
+                      <input type="search" data-role="monster-search" placeholder="搜索魔物名、ID、标签、地点..." autocomplete="off">
+                      <div class="monster-picker-options" data-role="monster-options">${{optionsHtml}}</div>
+                    </details>
+                    <details class="monster-advanced-tags">
+                      <summary>高级标签明细</summary>
+                      <p class="muted">这里是最终保存到 compatible_monster_tags 的内容；未知历史标签会保留。</p>
+                      <textarea data-field="compatible_monster_tags" class="keys-editor" spellcheck="false">${{eventEscapeHtml(eventSplitList(tags).join("\\n"))}}</textarea>
+                    </details>
+                  </div>
+                `;
+              }}
+
+              function eventRefreshMonsterPicker(card) {{
+                const picker = card.querySelector("[data-role='monster-picker']");
+                if (!picker) return;
+                const textarea = eventMonsterTagsTextarea(card);
+                const wrapper = document.createElement("div");
+                wrapper.innerHTML = eventMonsterPickerHtml(textarea ? textarea.value : "");
+                picker.replaceWith(wrapper.firstElementChild);
+                eventBindMonsterPicker(card);
+                const summary = card.querySelector("[data-role='monster-summary']");
+                if (summary) summary.textContent = eventCompatibleMonsterSummary(textarea ? textarea.value : []);
+              }}
+
+              function eventBindMonsterPicker(card) {{
+                const picker = card.querySelector("[data-role='monster-picker']");
+                if (!picker) return;
+                picker.querySelectorAll("[data-action='add-monster']").forEach((button) => {{
+                  button.addEventListener("click", () => eventAddCompatibleMonster(card, button.dataset.monsterId || ""));
+                }});
+                picker.querySelectorAll("[data-action='remove-monster']").forEach((button) => {{
+                  button.addEventListener("click", () => eventRemoveCompatibleMonster(card, button.dataset.monsterId || ""));
+                }});
+                const searchInput = picker.querySelector("[data-role='monster-search']");
+                if (searchInput) {{
+                  searchInput.addEventListener("input", () => {{
+                    const query = searchInput.value.trim().toLowerCase();
+                    picker.querySelectorAll("[data-action='add-monster']").forEach((button) => {{
+                      button.hidden = query ? !String(button.dataset.search || "").includes(query) : false;
+                    }});
+                  }});
+                }}
+                const textarea = eventMonsterTagsTextarea(card);
+                if (textarea) textarea.addEventListener("input", () => eventRefreshMonsterPicker(card));
+              }}
+
               function eventSplitList(value) {{
                 const raw = Array.isArray(value) ? value.join("\\n") : String(value || "");
                 return raw.split(/[\\n,，、]/).map((item) => item.trim()).filter(Boolean);
@@ -1742,7 +1911,6 @@ class SaveWebViewer:
                   opening_hook: card.querySelector("[data-field='opening_hook']").value,
                   twist_hook: card.querySelector("[data-field='twist_hook']").value,
                   ending_hook: card.querySelector("[data-field='ending_hook']").value,
-                  brief: card.querySelector("[data-field='brief']").value,
                   content: card.querySelector("[data-field='content']").value,
                 }}, index));
               }}
@@ -1795,11 +1963,12 @@ class SaveWebViewer:
                   const summaryTitle = normalized.name || normalized.id || `事件 ${{index + 1}}`;
                   const commandLabel = normalized.allowed_commands.length ? normalized.allowed_commands.join(" / ") : "未选择指令";
                   const typeLabel = normalized.compatible_battle_types.length ? normalized.compatible_battle_types.join(" / ") : "不限战斗类型";
+                  const monsterLabel = eventCompatibleMonsterSummary(normalized.compatible_monster_tags);
                   card.innerHTML = `
                     <details${{isOpen ? " open" : ""}}>
                       <summary class="world-entry-head">
                         <span class="entry-title">${{eventEscapeHtml(summaryTitle)}}</span>
-                        <span class="muted" style="margin-left:4px">可见 ${{eventLevelsLabel(normalized.visible_levels)}} · ${{eventEscapeHtml(commandLabel)}} · ${{eventEscapeHtml(typeLabel)}}</span>
+                        <span class="muted" style="margin-left:4px">可见 ${{eventLevelsLabel(normalized.visible_levels)}} · ${{eventEscapeHtml(commandLabel)}} · ${{eventEscapeHtml(typeLabel)}} · <span data-role="monster-summary">${{eventEscapeHtml(monsterLabel)}}</span></span>
                         <label class="summary-check"><input data-field="enabled" type="checkbox"${{normalized.enabled ? " checked" : ""}}> 启用</label>
                         <button class="danger" type="button" data-action="delete">删除</button>
                       </summary>
@@ -1828,9 +1997,7 @@ class SaveWebViewer:
                         <label class="block-field">地点标签（学校、旧校舍、下水道、商店街、梦境、镜子、雨夜等）
                           <textarea data-field="location_tags" class="keys-editor" spellcheck="false">${{eventEscapeHtml(normalized.location_tags.join("\\n"))}}</textarea>
                         </label>
-                        <label class="block-field">兼容魔物标签（每行一个；留空表示不限制魔物）
-                          <textarea data-field="compatible_monster_tags" class="keys-editor" spellcheck="false">${{eventEscapeHtml(normalized.compatible_monster_tags.join("\\n"))}}</textarea>
-                        </label>
+                        ${{eventMonsterPickerHtml(normalized.compatible_monster_tags)}}
                         <label class="block-field">场景开场钩子
                           <textarea data-field="opening_hook" class="entry-content-editor" spellcheck="false" style="height:60px">${{eventEscapeHtml(normalized.opening_hook)}}</textarea>
                         </label>
@@ -1840,10 +2007,7 @@ class SaveWebViewer:
                         <label class="block-field">场景结尾钩子
                           <textarea data-field="ending_hook" class="entry-content-editor" spellcheck="false" style="height:60px">${{eventEscapeHtml(normalized.ending_hook)}}</textarea>
                         </label>
-                        <label class="block-field">简略介绍（其他指令关键词命中时注入；为空则不注入）
-                          <textarea data-field="brief" class="entry-content-editor" spellcheck="false" style="height:60px">${{eventEscapeHtml(normalized.brief)}}</textarea>
-                        </label>
-                        <label class="block-field">详细介绍（当前指令命中或 always 时注入）
+                        <label class="block-field">事件设定（当前指令或关键词命中时注入）
                           <textarea data-field="content" class="entry-content-editor" spellcheck="false">${{eventEscapeHtml(normalized.content)}}</textarea>
                         </label>
                       </div>
@@ -1856,6 +2020,7 @@ class SaveWebViewer:
                     eventHasLoadedOpenState = true;
                     eventPersistOpenState();
                   }});
+                  eventBindMonsterPicker(card);
                   card.querySelector("[data-action='delete']").addEventListener("click", (event) => {{
                     event.preventDefault();
                     event.stopPropagation();
@@ -1968,7 +2133,6 @@ class SaveWebViewer:
             ),
             "keys": [str(key).strip() for key in keys if str(key).strip()],
             "visible_levels": list(cls._normalize_visible_levels(raw_event)),
-            "brief": str(raw_event.get("brief") or ""),
             "content": str(raw_event.get("content") or ""),
             "allowed_commands": allowed_commands,
             "event_tags": cls._normalize_text_list(raw_event.get("event_tags")),
@@ -2022,7 +2186,6 @@ class SaveWebViewer:
                 if not isinstance(raw_setting, dict):
                     raw_setting = {}
                 level_settings[str(level)] = {
-                    "brief": str(raw_setting.get("brief") or ""),
                     "content": str(raw_setting.get("content") or ""),
                 }
 
@@ -2034,7 +2197,6 @@ class SaveWebViewer:
                     "visible_levels": list(cls._normalize_visible_levels(entry)),
                     "monster_levels": list(monster_levels),
                     "keys": [str(key).strip() for key in keys if str(key).strip()],
-                    "brief": str(entry.get("brief") or entry.get("summary") or ""),
                     "content": str(entry.get("content") or entry.get("detail") or ""),
                     "monster_tags": cls._normalize_text_list(entry.get("monster_tags")),
                     "opening_hooks": cls._normalize_text_list(entry.get("opening_hooks")),
@@ -2211,12 +2373,9 @@ class SaveWebViewer:
                 clean_values = [str(value).strip() for value in values if str(value).strip()]
                 if clean_values:
                     entry_lines.append(f"  {label}: " + "、".join(clean_values))
-            brief = str(event.get("brief") or "").strip()
             content = str(event.get("content") or "").strip()
-            if brief:
-                entry_lines.append(f"  简略: {brief}")
             if content:
-                entry_lines.append(f"  详细: {content}")
+                entry_lines.append(f"  设定: {content}")
             for field, label in (
                 ("opening_hook", "开场钩子"),
                 ("twist_hook", "变奏钩子"),
@@ -2261,18 +2420,15 @@ class SaveWebViewer:
             if keys:
                 lines.append("关键词: " + "、".join(str(key) for key in keys))
 
-            brief = str(entry.get("brief") or "").strip()
             content = str(entry.get("content") or "").strip()
-            if brief:
-                lines.append(f"通用简单设定: {brief}")
             if content:
-                lines.append(f"通用详细设定: {content}")
+                lines.append(f"通用设定: {content}")
             hook_labels = [
                 ("monster_tags", "魔物标签"),
-                ("opening_hooks", "开场钩子"),
+                ("opening_hooks", "魔物显形"),
                 ("preferred_locations", "适合地点"),
                 ("battle_gimmicks", "战斗机制"),
-                ("ending_hooks", "结束残留"),
+                ("ending_hooks", "魔物残留"),
             ]
             for field, label in hook_labels:
                 values = entry.get(field) if isinstance(entry.get(field), list) else []
@@ -2289,15 +2445,11 @@ class SaveWebViewer:
                 setting = level_settings.get(str(level), {})
                 if not isinstance(setting, dict):
                     continue
-                level_brief = str(setting.get("brief") or "").strip()
                 level_content = str(setting.get("content") or "").strip()
-                if not level_brief and not level_content:
+                if not level_content:
                     continue
                 lines.append(f"{level_label(level)} 级覆盖:")
-                if level_brief:
-                    lines.append(f"  简单设定: {level_brief}")
-                if level_content:
-                    lines.append(f"  详细设定: {level_content}")
+                lines.append(f"  设定: {level_content}")
 
             blocks.append("\n".join(lines))
 
@@ -4511,6 +4663,27 @@ class SaveWebViewer:
     .block-field {{ margin-top: 12px; }}
     textarea.keys-editor {{ min-height: 48px; font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }}
     textarea.entry-content-editor {{ min-height: 78px; }}
+    .monster-picker {{ margin-top: 12px; padding: 10px 12px; border: 1px solid #d9e1eb; border-radius: 8px; background: #f8fafc; }}
+    .monster-picker-head {{ display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 8px; }}
+    .monster-selected-list {{ display: flex; flex-wrap: wrap; gap: 8px; min-height: 30px; align-items: center; }}
+    .monster-selected-chip {{ display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border: 1px solid #c8d6e5; border-radius: 999px; background: #fff; color: #263241; font-size: 13px; font-weight: 800; }}
+    .monster-selected-chip button {{ width: 22px; height: 22px; min-height: 0; display: inline-grid; place-items: center; margin: 0; padding: 0; border-radius: 50%; border: 1px solid #d9e1eb; background: #eef4fa; color: #536172; line-height: 1; }}
+    .monster-selected-chip button:hover {{ background: #ffe7e3; color: #b42318; border-color: #f0b8b0; }}
+    .monster-unmatched-tags {{ display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; padding: 7px 9px; border: 1px dashed #d3b969; border-radius: 8px; background: #fff9df; color: #6f5410; font-size: 13px; }}
+    .monster-unmatched-tags code {{ padding: 2px 5px; border-radius: 5px; background: rgba(111,84,16,.1); }}
+    .monster-picker-add, .monster-advanced-tags {{ margin-top: 10px; }}
+    .monster-picker-add > summary, .monster-advanced-tags > summary {{ cursor: pointer; color: #1f5f99; font-weight: 900; }}
+    .monster-picker-add input[type="search"] {{ width: 100%; box-sizing: border-box; margin: 8px 0; padding: 8px 10px; border: 1px solid #c8d0dc; border-radius: 7px; font: inherit; background: #fff; }}
+    .monster-picker-options {{ max-height: 280px; display: grid; gap: 6px; overflow: auto; padding-right: 4px; }}
+    .monster-picker-option {{ width: 100%; display: grid; gap: 4px; margin: 0; padding: 9px 10px; text-align: left; border: 1px solid #d9e1eb; border-radius: 8px; background: #fff; color: #263241; }}
+    .monster-picker-option:hover:not(:disabled) {{ border-color: #8ab5e6; background: #f3f8ff; }}
+    .monster-picker-option:disabled {{ opacity: .54; cursor: not-allowed; }}
+    .monster-picker-main {{ display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }}
+    .monster-picker-main strong {{ color: #172033; }}
+    .monster-picker-main em {{ color: #68707d; font-style: normal; font-size: 12px; }}
+    .monster-picker-preview {{ color: #3a4350; font-size: 13px; line-height: 1.45; }}
+    .monster-picker-meta {{ color: #68707d; font-size: 12px; }}
+    .monster-advanced-tags textarea.keys-editor {{ width: 100%; box-sizing: border-box; margin-top: 6px; background: #fff; }}
     .status-level-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }}
     .monster-level-settings {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; margin-top: 12px; }}
     .monster-level-block {{ padding: 10px; border: 1px solid #dde2ea; border-radius: 8px; background: #f8fafc; }}
