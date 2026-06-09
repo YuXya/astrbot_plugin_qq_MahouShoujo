@@ -53,13 +53,17 @@ REINCARNATION_TEMPLATE = (
 )
 
 VILLAIN_WITCH_REINCARNATION_FIELDS = [
-    "姓名", "性格特质", "代表色", "核心能力", "外貌描述", "其他设定",
+    "姓名", "性格特质", "初始性癖", "使魔种类",
+    "与主角关系", "代表色", "核心能力", "外貌描述", "其他设定",
 ]
 
 VILLAIN_WITCH_REINCARNATION_TEMPLATE = (
     "/反派魔女转生\n"
     "姓名：\n"
     "性格特质：\n"
+    "初始性癖：\n"
+    "使魔种类：\n"
+    "与主角关系：\n"
     "代表色：\n"
     "核心能力：\n"
     "外貌描述：\n"
