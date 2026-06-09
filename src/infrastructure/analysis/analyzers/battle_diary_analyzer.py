@@ -214,8 +214,11 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "teammate_count": teammate_info["count"],
                 "recent_record_count": teammate_info["recent_record_count"],
                 "teammates_json": teammate_info["json"],
-                "sortie_familiar_json": self._json_dump(
-                    (selection_context or {}).get("familiar")
+                "selected_monster_json": self._json_dump(
+                    (selection_context or {}).get("selected_monster")
+                ),
+                "scene_event_json": self._json_dump(
+                    (selection_context or {}).get("scene_event")
                 ),
                 "battle_target_type": str(
                     (selection_context or {}).get("battle_type") or "monster"
@@ -244,18 +247,31 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         logs: list[dict],
         cameo_memories: list[dict] | None,
         villain_witch_candidates: list[dict],
+        monster_candidates: list[dict],
         umo: str | None = None,
     ) -> dict[str, object]:
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+        current_level = self.domain_service.get_current_level(protagonist)
+        text_parts = [
+            action_text,
+            self._format_logs(logs),
+            self._format_cameo_memories(cameo_memories),
+        ]
+        scene_event_candidates = self.event_book_engine.build_scene_event_candidates(
+            text_parts,
+            current_event="/魔法少女战斗",
+            player_level=current_level,
+            battle_types=["monster", "villain_witch", "environment_crisis"],
+            monster_candidates=monster_candidates,
+        )
         if not villain_witch_candidates:
-            return {
-                "battle_type": "monster",
-                "target_villain_witch": None,
-                "battle_odds": self._build_battle_odds_context(
-                    player_data=player_data,
-                    opponent_data=None,
-                    battle_kind="magical_girl_vs_monster",
-                ),
-            }
+            return self._magical_monster_context(
+                player_data=player_data,
+                monster_candidates=monster_candidates,
+                scene_event_candidates=scene_event_candidates,
+                current_level=current_level,
+                text_parts=text_parts,
+            )
 
         prompt = self.editable_manager.render_prompt(
             "magical_battle_target_selection_prompt",
@@ -269,6 +285,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                         "villain_witches": self._prompt_protagonist_profiles(
                             villain_witch_candidates
                         ),
+                        "monsters": monster_candidates,
+                        "scene_events": scene_event_candidates,
                     }
                 ),
             },
@@ -293,47 +311,54 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         success, parsed, error = parse_json_object_response(result_text)
         if not success or not isinstance(parsed, dict):
             logger.warning(f"魔法少女战斗目标判断 JSON 解析失败，按魔物战斗处理: {error}")
-            return {
-                "battle_type": "monster",
-                "target_villain_witch": None,
-                "battle_odds": self._build_battle_odds_context(
-                    player_data=player_data,
-                    opponent_data=None,
-                    battle_kind="magical_girl_vs_monster",
-                ),
-            }
+            return self._magical_monster_context(
+                player_data=player_data,
+                monster_candidates=monster_candidates,
+                scene_event_candidates=scene_event_candidates,
+                current_level=current_level,
+                text_parts=text_parts,
+            )
 
         battle_type = str(parsed.get("battle_type") or "").strip()
         if battle_type != "villain_witch":
-            return {
-                "battle_type": "monster",
-                "target_villain_witch": None,
-                "battle_odds": self._build_battle_odds_context(
-                    player_data=player_data,
-                    opponent_data=None,
-                    battle_kind="magical_girl_vs_monster",
-                    ai_win_rate=parsed.get("ai_win_rate"),
-                ),
-            }
+            return self._magical_monster_context(
+                player_data=player_data,
+                monster_candidates=monster_candidates,
+                scene_event_candidates=scene_event_candidates,
+                current_level=current_level,
+                text_parts=text_parts,
+                selected_monster=parsed.get("selected_monster"),
+                scene_event=parsed.get("scene_event"),
+                ai_win_rate=parsed.get("ai_win_rate"),
+            )
 
         target = self._resolve_selected_villain_witch(
             parsed.get("target_villain_witch"),
             villain_witch_candidates,
         )
         if not target:
-            return {
-                "battle_type": "monster",
-                "target_villain_witch": None,
-                "battle_odds": self._build_battle_odds_context(
-                    player_data=player_data,
-                    opponent_data=None,
-                    battle_kind="magical_girl_vs_monster",
-                    ai_win_rate=parsed.get("ai_win_rate"),
-                ),
-            }
+            return self._magical_monster_context(
+                player_data=player_data,
+                monster_candidates=monster_candidates,
+                scene_event_candidates=scene_event_candidates,
+                current_level=current_level,
+                text_parts=text_parts,
+                selected_monster=parsed.get("selected_monster"),
+                scene_event=parsed.get("scene_event"),
+                ai_win_rate=parsed.get("ai_win_rate"),
+            )
         return {
             "battle_type": "villain_witch",
             "target_villain_witch": target,
+            "selected_monster": None,
+            "scene_event": self._resolve_selected_scene_event(
+                parsed.get("scene_event"), scene_event_candidates
+            ) or self._select_scene_event(
+                scene_event_candidates,
+                battle_type="villain_witch",
+                selected_monster=None,
+                text_parts=text_parts,
+            ),
             "battle_odds": self._build_battle_odds_context(
                 player_data=player_data,
                 opponent_data=target,
@@ -355,23 +380,26 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
     ) -> dict[str, object]:
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
         current_level = self.domain_service.get_current_level(protagonist)
+        text_parts = [
+            action_text,
+            self._format_logs(logs),
+            self._format_cameo_memories(cameo_memories),
+        ]
+        scene_event_candidates = self.event_book_engine.build_scene_event_candidates(
+            text_parts,
+            current_event="/反派魔女战斗",
+            player_level=current_level,
+            battle_types=["magical_girl", "monster", "environment_crisis"],
+            monster_candidates=monster_candidates,
+        )
         if not magical_girl_candidates:
-            familiar = self._resolve_default_monster(
-                monster_candidates,
+            return self._villain_monster_context(
+                player_data=player_data,
+                monster_candidates=monster_candidates,
+                scene_event_candidates=scene_event_candidates,
                 current_level=current_level,
-                action_text="",
+                text_parts=text_parts,
             )
-            return {
-                "familiar": familiar,
-                "target_magical_girl": None,
-                "battle_odds": self._build_battle_odds_context(
-                    player_data=player_data,
-                    opponent_data=None,
-                    battle_kind="villain_witch_vs_magical_girl",
-                    force_lose=bool(familiar and familiar.get("overleveled")),
-                    force_reason="随行魔物越级失控" if familiar and familiar.get("overleveled") else "",
-                ),
-            }
 
         prompt = self.editable_manager.render_prompt(
             "villain_battle_selection_prompt",
@@ -383,10 +411,11 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "cameo_memories_text": self._format_cameo_memories(cameo_memories),
                 "candidates_json": self._json_dump(
                     {
-                        "monsters": monster_candidates,
                         "magical_girls": self._prompt_protagonist_profiles(
                             magical_girl_candidates
                         ),
+                        "monsters": monster_candidates,
+                        "scene_events": scene_event_candidates,
                     }
                 ),
             },
@@ -411,47 +440,160 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         success, parsed, error = parse_json_object_response(result_text)
         if not success or not isinstance(parsed, dict):
             logger.warning(f"反派魔女战斗出战选择 JSON 解析失败，使用候选兜底: {error}")
-            familiar = self._resolve_default_monster(
-                monster_candidates,
-                current_level=current_level,
-                action_text=action_text,
-            )
             target = magical_girl_candidates[0]
             return {
-                "familiar": familiar,
+                "battle_type": "magical_girl",
                 "target_magical_girl": target,
+                "selected_monster": None,
+                "scene_event": self._select_scene_event(
+                    scene_event_candidates,
+                    battle_type="magical_girl",
+                    selected_monster=None,
+                    text_parts=text_parts,
+                ),
                 "battle_odds": self._build_battle_odds_context(
                     player_data=player_data,
                     opponent_data=target,
                     battle_kind="villain_witch_vs_magical_girl",
-                    force_lose=bool(familiar and familiar.get("overleveled")),
-                    force_reason="随行魔物越级失控" if familiar and familiar.get("overleveled") else "",
                 ),
             }
 
-        familiar = self._resolve_selected_monster(
-            parsed.get("familiar"),
-            monster_candidates,
-            current_level=current_level,
-            action_text=action_text,
-        )
-        target = (
-            self._resolve_selected_magical_girl(
-                parsed.get("target_magical_girl"),
-                magical_girl_candidates,
+        battle_type = str(parsed.get("battle_type") or "magical_girl").strip()
+        if battle_type == "monster":
+            return self._villain_monster_context(
+                player_data=player_data,
+                monster_candidates=monster_candidates,
+                scene_event_candidates=scene_event_candidates,
+                current_level=current_level,
+                text_parts=text_parts,
+                selected_monster=parsed.get("selected_monster"),
+                scene_event=parsed.get("scene_event"),
+                ai_win_rate=parsed.get("ai_win_rate"),
             )
-            or magical_girl_candidates[0]
-        )
+
+        target = self._resolve_selected_magical_girl(
+            parsed.get("target_magical_girl"),
+            magical_girl_candidates,
+        ) or magical_girl_candidates[0]
         return {
-            "familiar": familiar,
+            "battle_type": "magical_girl",
             "target_magical_girl": target,
+            "selected_monster": None,
+            "scene_event": self._resolve_selected_scene_event(
+                parsed.get("scene_event"), scene_event_candidates
+            ) or self._select_scene_event(
+                scene_event_candidates,
+                battle_type="magical_girl",
+                selected_monster=None,
+                text_parts=text_parts,
+            ),
             "battle_odds": self._build_battle_odds_context(
                 player_data=player_data,
                 opponent_data=target,
                 battle_kind="villain_witch_vs_magical_girl",
                 ai_win_rate=parsed.get("ai_win_rate"),
-                force_lose=bool(familiar and familiar.get("overleveled")),
-                force_reason="随行魔物越级失控" if familiar and familiar.get("overleveled") else "",
+            ),
+        }
+
+    def _magical_monster_context(
+        self,
+        *,
+        player_data: dict,
+        monster_candidates: list[dict],
+        scene_event_candidates: list[dict],
+        current_level: int,
+        text_parts: list[str],
+        selected_monster: object = None,
+        scene_event: object = None,
+        ai_win_rate: object = None,
+    ) -> dict[str, object]:
+        resolved_scene = self._resolve_selected_scene_event(
+            scene_event, scene_event_candidates
+        ) or self._select_scene_event(
+            scene_event_candidates,
+            battle_type="monster",
+            selected_monster=None,
+            text_parts=text_parts,
+        )
+        resolved_monster = self._resolve_selected_monster(
+            selected_monster,
+            monster_candidates,
+            current_level=current_level,
+            action_text="\n".join(text_parts),
+        ) or self._select_public_monster(
+            monster_candidates,
+            current_level=current_level,
+            text_parts=text_parts,
+            scene_event=resolved_scene,
+        )
+        if not resolved_scene:
+            resolved_scene = self._select_scene_event(
+                scene_event_candidates,
+                battle_type="monster",
+                selected_monster=resolved_monster,
+                text_parts=text_parts,
+            )
+        return {
+            "battle_type": "monster",
+            "target_villain_witch": None,
+            "selected_monster": resolved_monster,
+            "scene_event": resolved_scene,
+            "battle_odds": self._build_battle_odds_context(
+                player_data=player_data,
+                opponent_data=None,
+                battle_kind="magical_girl_vs_monster",
+                ai_win_rate=ai_win_rate,
+            ),
+        }
+
+    def _villain_monster_context(
+        self,
+        *,
+        player_data: dict,
+        monster_candidates: list[dict],
+        scene_event_candidates: list[dict],
+        current_level: int,
+        text_parts: list[str],
+        selected_monster: object = None,
+        scene_event: object = None,
+        ai_win_rate: object = None,
+    ) -> dict[str, object]:
+        resolved_scene = self._resolve_selected_scene_event(
+            scene_event, scene_event_candidates
+        ) or self._select_scene_event(
+            scene_event_candidates,
+            battle_type="monster",
+            selected_monster=None,
+            text_parts=text_parts,
+        )
+        resolved_monster = self._resolve_selected_monster(
+            selected_monster,
+            monster_candidates,
+            current_level=current_level,
+            action_text="\n".join(text_parts),
+        ) or self._select_public_monster(
+            monster_candidates,
+            current_level=current_level,
+            text_parts=text_parts,
+            scene_event=resolved_scene,
+        )
+        if not resolved_scene:
+            resolved_scene = self._select_scene_event(
+                scene_event_candidates,
+                battle_type="monster",
+                selected_monster=resolved_monster,
+                text_parts=text_parts,
+            )
+        return {
+            "battle_type": "monster",
+            "target_magical_girl": None,
+            "selected_monster": resolved_monster,
+            "scene_event": resolved_scene,
+            "battle_odds": self._build_battle_odds_context(
+                player_data=player_data,
+                opponent_data=None,
+                battle_kind="villain_witch_vs_monster",
+                ai_win_rate=ai_win_rate,
             ),
         }
 
@@ -487,7 +629,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             code_rate = 100
             dice_result = "critical_success"
             outcome = "player_win"
-        elif battle_kind == "magical_girl_vs_monster":
+        elif battle_kind in {"magical_girl_vs_monster", "villain_witch_vs_monster"}:
             # Monster fights use a flatter rule: AI side is neutral 50, code side is 25 + d20.
             ai_rate = 50
             code_rate = max(0, min(100, 25 + d20))
@@ -677,6 +819,164 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             },
         )
 
+    def _select_public_monster(
+        self,
+        candidates: list[dict],
+        *,
+        current_level: int,
+        text_parts: list[str],
+        scene_event: dict | None = None,
+    ) -> dict | None:
+        if not candidates:
+            return None
+
+        scan_text = "\n".join(str(part or "") for part in text_parts)
+        scored: list[tuple[int, dict]] = []
+        for index, candidate in enumerate(candidates):
+            if not isinstance(candidate, dict):
+                continue
+            score = max(0, 100 - index)
+            names = [
+                str(candidate.get("id") or "").strip(),
+                str(candidate.get("name") or "").strip(),
+                *[str(key or "").strip() for key in candidate.get("keys", [])],
+            ]
+            explicit = False
+            for name in names:
+                if name and name in scan_text:
+                    score += 1000
+                    explicit = True
+            score += self._monster_scene_score(candidate, scene_event, scan_text)
+            resolved = self._resolve_selected_monster(
+                {"id": candidate.get("id"), "reason": "玩家行动或公共魔物书匹配"},
+                candidates,
+                current_level=current_level,
+                action_text=scan_text if explicit else "",
+            )
+            if resolved:
+                scored.append((score, resolved))
+
+        if not scored:
+            return None
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return scored[0][1]
+
+    @staticmethod
+    def _monster_scene_score(
+        monster: dict,
+        scene_event: dict | None,
+        scan_text: str,
+    ) -> int:
+        score = 0
+        monster_tags = BattleDiaryAnalyzer._text_set(monster.get("monster_tags"))
+        monster_locations = BattleDiaryAnalyzer._text_set(monster.get("preferred_locations"))
+        monster_keys = BattleDiaryAnalyzer._text_set(monster.get("keys"))
+        if scan_text:
+            folded = scan_text.casefold()
+            for value in monster_tags | monster_locations:
+                if value and (value in scan_text or value.casefold() in folded):
+                    score += 8
+        if scene_event:
+            compatible = BattleDiaryAnalyzer._text_set(
+                scene_event.get("compatible_monster_tags")
+            )
+            location_tags = BattleDiaryAnalyzer._text_set(scene_event.get("location_tags"))
+            event_tags = BattleDiaryAnalyzer._text_set(scene_event.get("event_tags"))
+            score += len((monster_tags | monster_keys) & compatible) * 20
+            score += len(monster_locations & location_tags) * 12
+            score += len(monster_tags & event_tags) * 8
+        return score
+
+    @staticmethod
+    def _text_set(value: object) -> set[str]:
+        if isinstance(value, str):
+            raw_items = [value]
+        elif isinstance(value, list):
+            raw_items = value
+        else:
+            raw_items = []
+        return {
+            str(item or "").strip()
+            for item in raw_items
+            if str(item or "").strip()
+        }
+
+    def _select_scene_event(
+        self,
+        candidates: list[dict],
+        *,
+        battle_type: str,
+        selected_monster: dict | None,
+        text_parts: list[str],
+    ) -> dict | None:
+        if not candidates:
+            return None
+        scan_text = "\n".join(str(part or "") for part in text_parts)
+        scored: list[tuple[int, dict]] = []
+        for index, candidate in enumerate(candidates):
+            if not isinstance(candidate, dict):
+                continue
+            compatible_types = self._text_set(candidate.get("compatible_battle_types"))
+            if compatible_types and battle_type not in compatible_types:
+                continue
+            score = int(candidate.get("selection_score") or 0) + max(0, 20 - index)
+            score += self._scene_monster_score(candidate, selected_monster)
+            score += self._scene_text_score(candidate, scan_text)
+            scored.append((score, candidate))
+        if not scored:
+            return None
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return dict(scored[0][1])
+
+    def _resolve_selected_scene_event(
+        self,
+        selected: object,
+        candidates: list[dict],
+    ) -> dict | None:
+        if not selected or not isinstance(selected, dict):
+            return None
+        selected_id = str(selected.get("id") or "").strip()
+        selected_title = str(selected.get("title") or "").strip()
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            candidate_id = str(candidate.get("id") or "").strip()
+            candidate_title = str(candidate.get("title") or "").strip()
+            if (selected_id and selected_id == candidate_id) or (
+                selected_title and selected_title == candidate_title
+            ):
+                resolved = dict(candidate)
+                resolved["selection_reason"] = str(selected.get("reason") or "").strip()
+                return resolved
+        return None
+
+    def _scene_monster_score(
+        self,
+        scene_event: dict,
+        selected_monster: dict | None,
+    ) -> int:
+        if not selected_monster:
+            return 0
+        compatible = self._text_set(scene_event.get("compatible_monster_tags"))
+        monster_tags = self._text_set(selected_monster.get("monster_tags"))
+        monster_locations = self._text_set(selected_monster.get("preferred_locations"))
+        location_tags = self._text_set(scene_event.get("location_tags"))
+        return (
+            len(monster_tags & compatible) * 20
+            + len(monster_locations & location_tags) * 12
+        )
+
+    def _scene_text_score(self, scene_event: dict, scan_text: str) -> int:
+        if not scan_text:
+            return 0
+        folded = scan_text.casefold()
+        score = 0
+        for field in ("event_tags", "location_tags"):
+            for value in self._text_set(scene_event.get(field)):
+                if value and (value in scan_text or value.casefold() in folded):
+                    score += 8
+        return score
+
     def _resolve_selected_monster(
         self,
         selected: object,
@@ -711,9 +1011,15 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                     if str(level or "").strip()
                 ]
                 action = str(action_text or "")
+                keys = [
+                    str(key or "").strip()
+                    for key in candidate.get("keys", [])
+                    if str(key or "").strip()
+                ]
                 explicitly_requested = bool(
                     (candidate_name and candidate_name in action)
                     or (candidate_id and candidate_id in action)
+                    or any(key in action for key in keys)
                 )
                 if not selectable_levels:
                     return None

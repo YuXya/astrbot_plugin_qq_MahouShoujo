@@ -124,6 +124,7 @@ class LLMBattleDiaryAnalyzer:
         logs: list[dict],
         cameo_memories: list[dict] | None = None,
         villain_witch_candidates: list[dict] | None = None,
+        monster_candidates: list[dict] | None = None,
         umo: str | None = None,
     ) -> dict[str, object]:
         return await self.analyzer.select_magical_battle_context(
@@ -132,5 +133,6 @@ class LLMBattleDiaryAnalyzer:
             logs=logs,
             cameo_memories=cameo_memories,
             villain_witch_candidates=villain_witch_candidates or [],
+            monster_candidates=monster_candidates or [],
             umo=umo,
         )

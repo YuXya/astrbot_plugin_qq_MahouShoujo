@@ -408,13 +408,14 @@ class EditableResourceManager:
                 "性癖最高 Lv.5；base_path 是给 AI 输出 update.changes 的路径提示。"
             ),
             "event_book/default.json": (
-                "事件书文件。按 /魔法少女转生、/反派魔女转生、/魔法少女战斗、/魔法少女日常、/魔法少女黑化、/反派魔女洗白、/反派魔女战斗、/反派魔女日常 分组。"
-                "当前事件内关键词命中或 always 条目会注入详细介绍；其他事件只在关键词命中且简略介绍不为空时注入简略介绍。"
-                "visible_levels 为可见主角等级，数字 1-7 对应 F、E、D、C、B、A、S；未填写时默认全部可见。排序由网页上的上下位置决定。"
+                "事件书文件。events 中每个对象就是一个事件，allowed_commands 数组声明哪些指令可以触发该事件，"
+                "同一个事件可以同时用于魔法少女日常、反派魔女日常、魔法少女战斗、反派魔女战斗等多个指令。"
+                "事件可填写关键词、事件标签、地点标签、兼容魔物标签、兼容战斗类型和开场/变奏/结尾钩子，供上下文选择使用。"
+                "visible_levels 为可见主角等级，数字 1-7 对应 F、E、D、C、B、A、S；未填写时默认全部可见。"
             ),
             "monster_book/default.json": (
-                "魔物书文件。这里只负责填写和保存魔物设定，不会自动注入任何 Prompt。"
-                "每个魔物包含 ID、魔物名、可见等级、魔物等级、关键词、通用简单设定、通用详细设定；"
+                "魔物书文件。公共魔物书是普通魔物敌人图鉴，普通魔物战会从这里选择本次敌人或异常源。"
+                "每个魔物包含 ID、魔物名、可见等级、魔物等级、关键词、魔物标签、通用简单设定、通用详细设定和开场/地点/机制/结尾钩子；"
                 "每个已选择的魔物等级都可以单独填写简单设定和详细设定，留空时读取方应回退到通用设定。"
             ),
             self.PROMPT_FILES["reincarnation_prompt"]: (
@@ -437,7 +438,7 @@ class EditableResourceManager:
             ),
             self.PROMPT_FILES["magical_battle_target_selection_prompt"]: (
                 "用于 /魔法少女战斗 正文生成前的后台目标判断。使用子任务 LLM Provider，"
-                "先判断本次是和魔物战斗还是和反派魔女战斗；若是反派魔女战斗，则从本城市反派魔女中选择目标。"
+                "选择 battle_type、scene_event、公共魔物或目标反派魔女，并给出 AI 侧胜率判断。"
             ),
             self.PROMPT_FILES["daily_diary_prompt"]: (
                 "用于 /魔法少女日常 的完整 Prompt。变量与战斗日记 Prompt 相同，"
@@ -449,12 +450,12 @@ class EditableResourceManager:
             ),
             self.PROMPT_FILES["villain_witch_purification_prompt"]: (
                 "用于 /反派魔女洗白 的完整 Prompt。除通用日记变量外，还可用 "
-                "{{sortie_familiar_json}} 和 {{target_magical_girl_json}}，"
+                "{{selected_monster_json}} 和 {{target_magical_girl_json}}，"
                 "发给 AI 的 user message 就是这个模板渲染后的结果；要求仍返回兼容日记卡的纯 JSON。"
             ),
             self.PROMPT_FILES["villain_witch_battle_prompt"]: (
                 "用于 /反派魔女战斗 的完整 Prompt。除通用日记变量外，还可用 "
-                "{{sortie_familiar_json}} 和 {{target_magical_girl_json}}，"
+                "{{selected_monster_json}} 和 {{target_magical_girl_json}}，"
                 "发给 AI 的 user message 就是这个模板渲染后的结果；要求仍返回兼容日记卡的纯 JSON。"
             ),
             self.PROMPT_FILES["villain_witch_daily_prompt"]: (
@@ -463,7 +464,7 @@ class EditableResourceManager:
             ),
             self.PROMPT_FILES["villain_battle_selection_prompt"]: (
                 "用于 /反派魔女战斗 正文生成前的后台出战选择。使用子任务 LLM Provider，"
-                "从角色自己创造的魔物和本城市魔法少女中选择随行魔物与目标魔法少女。"
+                "选择 battle_type、scene_event、公共魔物或目标魔法少女，并给出 AI 侧胜率判断。"
             ),
             self.PROMPT_FILES["relationship_summary_prompt"]: (
                 "用于多人 /魔法少女战斗 结束后的后台人物关系总结。发给 AI 的 user message 就是这个模板渲染后的结果。"

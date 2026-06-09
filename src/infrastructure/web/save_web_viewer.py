@@ -72,8 +72,6 @@ class SaveWebViewer:
         self._add_route(app, "POST", "/city/name/save", self._city_name_save)
         self._add_route(app, "GET", "/player", self._player_detail)
         self._add_route(app, "GET", "/player/relationships", self._player_relationships)
-        self._add_route(app, "GET", "/player/monsters", self._player_monsters)
-        self._add_route(app, "POST", "/player/monsters/save", self._player_monsters_save)
         self._add_route(app, "POST", "/player/profile/save", self._player_profile_save)
         self._add_route(app, "POST", "/player/delete", self._player_delete)
         self._add_route(app, "POST", "/player/log/delete", self._player_log_delete)
@@ -97,7 +95,6 @@ class SaveWebViewer:
         self._add_route(app, "GET", "/editable/export", self._editable_export)
         self._add_route(app, "GET", "/editable/export/key-info", self._editable_export_key_info)
         self._add_route(app, "POST", "/editable/import", self._editable_import)
-        self._add_route(app, "POST", "/editable/monster/import-player", self._editable_monster_import_player)
         self._add_route(app, "GET", "/health", self._health)
 
         self._runner = web.AppRunner(app)
@@ -395,10 +392,6 @@ class SaveWebViewer:
                 <button class="delete-modal-close" type="button" data-action="close-delete-modal" aria-label="关闭">×</button>
                 <h2 id="player-delete-modal-title">删除玩家存档</h2>
                 <p class="muted">确定删除 <strong id="delete-player-label"></strong> 的玩家存档？此操作不可恢复。</p>
-                <label class="delete-monster-option">
-                  <input id="delete-player-monsters" type="checkbox">
-                  <span>是否同时删除魔物</span>
-                </label>
                 <div class="actions">
                   <button class="secondary compact-button" type="button" data-action="close-delete-modal">取消</button>
                   <button id="confirm-player-delete" class="danger compact-button" type="button">删除存档</button>
@@ -408,13 +401,11 @@ class SaveWebViewer:
             <script>
               const deleteModal = document.getElementById("player-delete-modal");
               const deleteLabel = document.getElementById("delete-player-label");
-              const deleteMonsterCheckbox = document.getElementById("delete-player-monsters");
               const confirmPlayerDelete = document.getElementById("confirm-player-delete");
               let pendingDeleteForm = null;
 
               function closeDeleteModal() {{
                 pendingDeleteForm = null;
-                deleteMonsterCheckbox.checked = false;
                 deleteModal.hidden = true;
               }}
 
@@ -423,7 +414,6 @@ class SaveWebViewer:
                   event.preventDefault();
                   pendingDeleteForm = form;
                   deleteLabel.textContent = form.dataset.playerLabel || "";
-                  deleteMonsterCheckbox.checked = false;
                   deleteModal.hidden = false;
                 }});
               }});
@@ -434,14 +424,6 @@ class SaveWebViewer:
 
               confirmPlayerDelete.addEventListener("click", () => {{
                 if (!pendingDeleteForm) return;
-                let field = pendingDeleteForm.querySelector("input[name='delete_monsters']");
-                if (!field) {{
-                  field = document.createElement("input");
-                  field.type = "hidden";
-                  field.name = "delete_monsters";
-                  pendingDeleteForm.appendChild(field);
-                }}
-                field.value = deleteMonsterCheckbox.checked ? "1" : "0";
                 pendingDeleteForm.submit();
               }});
             </script>
@@ -1151,7 +1133,6 @@ class SaveWebViewer:
             )
 
         book_json = self._json_script_data(book)
-        player_monster_json = self._json_script_data(self._player_monster_submissions())
         storage_key = "qq_mahoushoujo:monster_book:open_entries"
         source_url = self._url(
             f"/editable/source?id={quote(file_id, safe='')}&category={self._e(back_category)}"
@@ -1163,30 +1144,16 @@ class SaveWebViewer:
             <h1>{self._e(title)}</h1>
             <p><a href="{self._url(f'/editable?category={self._e(back_category)}')}">返回{self._e(self._editable_category_title(back_category))}</a></p>
             <p class="muted">{self._e(file_id)}</p>
-            <p class="muted">魔物书只负责编辑和保存 JSON，不会自动参与当前项目的 Prompt 或战斗逻辑。等级覆盖设定留空时，读取方应使用通用设定。</p>
+            <p class="muted">公共魔物书是普通魔物敌人图鉴；普通魔物战会从这里选择本次敌人或异常源。等级覆盖设定留空时，读取方应使用通用设定。</p>
             <div class="source-actions">
               <a class="button-link secondary-link" href="{source_url}">编辑源码</a>
               <a class="button-link secondary-link" href="{export_url}">导出 JSON</a>
-              <button id="show-player-monsters" class="secondary compact-button" type="button">查看玩家创建的魔物</button>
               <form class="inline-import-form" method="post" action="{self._url('/editable/import')}" enctype="multipart/form-data">
                 <input type="hidden" name="id" value="{self._e(file_id)}">
                 <input type="hidden" name="category" value="{self._e(back_category)}">
                 <input name="import_file" type="file" accept=".json,application/json">
                 <button class="secondary compact-button" type="submit">导入 JSON</button>
               </form>
-            </div>
-            <div id="player-monster-modal" class="monster-modal" hidden>
-              <div class="monster-modal-backdrop" data-action="close-player-monsters"></div>
-              <section class="monster-modal-panel" role="dialog" aria-modal="true" aria-labelledby="player-monster-modal-title">
-                <div class="monster-modal-head">
-                  <div>
-                    <span>Player Workshop</span>
-                    <h2 id="player-monster-modal-title">玩家创建的魔物</h2>
-                  </div>
-                  <button class="secondary compact-button" type="button" data-action="close-player-monsters">关闭</button>
-                </div>
-                <div id="player-monster-submissions" class="player-monster-submissions"></div>
-              </section>
             </div>
             <form id="monster-book-form" method="post" action="{self._url('/editable/save')}">
               <input type="hidden" name="id" value="{self._e(file_id)}">
@@ -1197,7 +1164,7 @@ class SaveWebViewer:
               <div class="world-book-toolbar">
                 <div>
                   <h2>魔物列表</h2>
-                  <p class="muted">创建魔物，选择可见等级和魔物等级；每个魔物等级可填写单独的简单设定和详细设定。</p>
+                  <p class="muted">编辑公共魔物，选择可见等级、魔物等级、标签和开场/地点/机制/结尾钩子；每个魔物等级可填写单独设定。</p>
                 </div>
                 <button id="add-monster" type="button">+ 添加魔物</button>
               </div>
@@ -1213,14 +1180,10 @@ class SaveWebViewer:
             </form>
             <script>
               const initialMonsterBook = {book_json};
-              const playerMonsterSubmissions = {player_monster_json};
               const monsterEntriesEl = document.getElementById("monster-book-entries");
               const monsterForm = document.getElementById("monster-book-form");
               const monsterContentInput = document.getElementById("monster-book-content");
               const addMonsterButton = document.getElementById("add-monster");
-              const showPlayerMonstersButton = document.getElementById("show-player-monsters");
-              const playerMonsterModal = document.getElementById("player-monster-modal");
-              const playerMonsterSubmissionsEl = document.getElementById("player-monster-submissions");
               const monsterStorageKey = "{self._e(storage_key)}";
               const monsterLevelOptions = [
                 {{ value: 1, label: "F" }},
@@ -1246,8 +1209,13 @@ class SaveWebViewer:
                   visible_levels: monsterLevelOptions.map((item) => item.value),
                   monster_levels: monsterLevelOptions.map((item) => item.value),
                   keys: [],
+                  monster_tags: [],
                   brief: "",
                   content: "",
+                  opening_hooks: [],
+                  preferred_locations: [],
+                  battle_gimmicks: [],
+                  ending_hooks: [],
                   level_settings: {{}},
                 }};
               }}
@@ -1277,8 +1245,13 @@ class SaveWebViewer:
                   visible_levels: monsterNormalizeLevels(entry.visible_levels, entry.min_level, entry.max_level),
                   monster_levels: monsterLevels,
                   keys: keys.map((key) => String(key).trim()).filter(Boolean),
+                  monster_tags: monsterSplitList(entry.monster_tags),
                   brief: String(entry.brief || entry.summary || ""),
                   content: String(entry.content || entry.detail || ""),
+                  opening_hooks: monsterSplitList(entry.opening_hooks),
+                  preferred_locations: monsterSplitList(entry.preferred_locations),
+                  battle_gimmicks: monsterSplitList(entry.battle_gimmicks),
+                  ending_hooks: monsterSplitList(entry.ending_hooks),
                   level_settings: levelSettings,
                 }};
               }}
@@ -1323,6 +1296,11 @@ class SaveWebViewer:
                 return String(value || "").split(/[\\n,，、]/).map((key) => key.trim()).filter(Boolean);
               }}
 
+              function monsterSplitList(value) {{
+                const raw = Array.isArray(value) ? value.join("\\n") : String(value || "");
+                return raw.split(/[\\n,，、]/).map((item) => item.trim()).filter(Boolean);
+              }}
+
               function monsterSyncFromDom() {{
                 monsterState.entries = Array.from(monsterEntriesEl.querySelectorAll(".monster-entry")).map((card, index) => {{
                   const monsterLevels = Array.from(card.querySelectorAll("[data-field='monster_level']:checked")).map((input) => Number.parseInt(input.value, 10));
@@ -1342,8 +1320,13 @@ class SaveWebViewer:
                     visible_levels: Array.from(card.querySelectorAll("[data-field='visible_level']:checked")).map((input) => Number.parseInt(input.value, 10)),
                     monster_levels: monsterLevels,
                     keys: monsterSplitKeys(card.querySelector("[data-field='keys']").value),
+                    monster_tags: monsterSplitList(card.querySelector("[data-field='monster_tags']").value),
                     brief: card.querySelector("[data-field='brief']").value,
                     content: card.querySelector("[data-field='content']").value,
+                    opening_hooks: monsterSplitList(card.querySelector("[data-field='opening_hooks']").value),
+                    preferred_locations: monsterSplitList(card.querySelector("[data-field='preferred_locations']").value),
+                    battle_gimmicks: monsterSplitList(card.querySelector("[data-field='battle_gimmicks']").value),
+                    ending_hooks: monsterSplitList(card.querySelector("[data-field='ending_hooks']").value),
                     level_settings: levelSettings,
                   }}, index);
                 }});
@@ -1428,11 +1411,26 @@ class SaveWebViewer:
                         <label class="block-field">关键词（支持中文逗号、英文逗号、顿号或换行分隔）
                           <textarea data-field="keys" class="keys-editor" spellcheck="false">${{monsterEscapeHtml(normalized.keys.join("\\n"))}}</textarea>
                         </label>
+                        <label class="block-field">魔物标签（用于和场景事件联动，每行一个）
+                          <textarea data-field="monster_tags" class="keys-editor" spellcheck="false">${{monsterEscapeHtml(normalized.monster_tags.join("\\n"))}}</textarea>
+                        </label>
                         <label class="block-field">通用简单设定
                           <textarea data-field="brief" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(normalized.brief)}}</textarea>
                         </label>
                         <label class="block-field">通用详细设定
                           <textarea data-field="content" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(normalized.content)}}</textarea>
+                        </label>
+                        <label class="block-field">开场钩子 / 发现方式（每行一个）
+                          <textarea data-field="opening_hooks" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(normalized.opening_hooks.join("\\n"))}}</textarea>
+                        </label>
+                        <label class="block-field">适合地点（每行一个）
+                          <textarea data-field="preferred_locations" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(normalized.preferred_locations.join("\\n"))}}</textarea>
+                        </label>
+                        <label class="block-field">战斗机制差异（每行一个）
+                          <textarea data-field="battle_gimmicks" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(normalized.battle_gimmicks.join("\\n"))}}</textarea>
+                        </label>
+                        <label class="block-field">结束残留 / 后续线索（每行一个）
+                          <textarea data-field="ending_hooks" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(normalized.ending_hooks.join("\\n"))}}</textarea>
                         </label>
                         <div class="monster-level-settings">${{levelFields}}</div>
                       </div>
@@ -1483,78 +1481,6 @@ class SaveWebViewer:
                 return monsterEscapeHtml(value).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
               }}
 
-              function monsterRenderPlayerSubmissions() {{
-                if (!playerMonsterSubmissionsEl) return;
-                const submissions = Array.isArray(playerMonsterSubmissions) ? playerMonsterSubmissions : [];
-                if (!submissions.length) {{
-                  playerMonsterSubmissionsEl.innerHTML = '<div class="empty-state">暂时没有玩家创建的魔物。</div>';
-                  return;
-                }}
-                playerMonsterSubmissionsEl.innerHTML = submissions.map((item, index) => {{
-                  const entry = monsterNormalizeEntry(item.entry || {{}}, index);
-                  const title = entry.name || entry.id || `玩家魔物 ${{index + 1}}`;
-                  const keys = entry.keys.length ? entry.keys.join("、") : "未填写";
-                  const source = `${{item.city_name || item.group_id || "未知城市"}} / ${{item.player_name || item.user_id || "未知玩家"}}`;
-                  return `
-                    <article class="player-monster-submission">
-                      <div class="player-monster-submission-head">
-                        <div>
-                          <span>${{monsterEscapeHtml(source)}}</span>
-                          <h3>${{monsterEscapeHtml(title)}}</h3>
-                        </div>
-                        <button type="button" data-import-player-monster="${{index}}">录入魔物书</button>
-                      </div>
-                      <div class="log-meta">
-                        <span>ID: ${{monsterEscapeHtml(entry.id || "未填写")}}</span>
-                        <span>可见 ${{monsterLevelsLabel(entry.visible_levels)}}</span>
-                        <span>魔物 ${{monsterLevelsLabel(entry.monster_levels)}}</span>
-                      </div>
-                      <p><strong>别名：</strong>${{monsterEscapeHtml(keys)}}</p>
-                      <details>
-                        <summary>查看设定</summary>
-                        <pre>${{monsterEscapeHtml(JSON.stringify(entry, null, 2))}}</pre>
-                      </details>
-                    </article>
-                  `;
-                }}).join("");
-                playerMonsterSubmissionsEl.querySelectorAll("[data-import-player-monster]").forEach((button) => {{
-                  button.addEventListener("click", () => {{
-                    const index = Number.parseInt(button.dataset.importPlayerMonster, 10);
-                    const source = submissions[index];
-                    if (!source || !source.entry) return;
-                    monsterCaptureOpenState();
-                    monsterSyncFromDom();
-                    const imported = monsterNormalizeEntry(source.entry, monsterState.entries.length);
-                    const existingIds = new Set(monsterState.entries.map((entry) => String(entry.id || "").trim()).filter(Boolean));
-                    if (existingIds.has(imported.id)) {{
-                      imported.id = `${{imported.id}}_player_${{Date.now().toString(36)}}`;
-                    }}
-                    monsterState.entries.push(imported);
-                    monsterOpenKeys.add(monsterEntryKey(imported, monsterState.entries.length - 1));
-                    monsterHasLoadedOpenState = true;
-                    monsterPersistOpenState();
-                    monsterRenderEntries();
-                    alert("已加入当前魔物书编辑区，请点击页面底部“保存”写入 default.json。");
-                  }});
-                }});
-              }}
-
-              function monsterOpenPlayerModal() {{
-                monsterRenderPlayerSubmissions();
-                playerMonsterModal.hidden = false;
-              }}
-
-              function monsterClosePlayerModal() {{
-                playerMonsterModal.hidden = true;
-              }}
-
-              if (showPlayerMonstersButton && playerMonsterModal) {{
-                showPlayerMonstersButton.addEventListener("click", monsterOpenPlayerModal);
-                playerMonsterModal.querySelectorAll("[data-action='close-player-monsters']").forEach((button) => {{
-                  button.addEventListener("click", monsterClosePlayerModal);
-                }});
-              }}
-
               addMonsterButton.addEventListener("click", () => {{
                 monsterCaptureOpenState();
                 monsterSyncFromDom();
@@ -1597,507 +1523,92 @@ class SaveWebViewer:
                 content,
                 warning=f"事件书 JSON 解析失败，请先修复原始 JSON：{exc}",
             )
-
-        book_json = self._json_script_data(book)
-        storage_key = "qq_mahoushoujo:event_book:open_state"
-        source_url = self._url(
-            f"/editable/source?id={quote(file_id, safe='')}&category={self._e(back_category)}"
-        )
-        export_url = self._url(f"/editable/export?id={quote(file_id, safe='')}")
-        key_info_export_url = self._url(
-            f"/editable/export/key-info?id={quote(file_id, safe='')}"
-        )
-        return self._html_response(
+        return self._plain_editable_file_response(
             title,
-            f"""
-            <h1>{self._e(title)}</h1>
-            <p><a href="{self._url(f'/editable?category={self._e(back_category)}')}">返回{self._e(self._editable_category_title(back_category))}</a></p>
-            <p class="muted">{self._e(file_id)}</p>
-            <p class="muted">事件书按当前命令分组。当前事件内关键词命中或 always 条目会注入详细介绍；其他事件只在关键词命中且简略介绍不为空时注入简略介绍。可见等级用 F、E、D、C、B、A、S 多选控制，默认全部可见。</p>
-            <div class="source-actions">
-              <a class="button-link secondary-link" href="{source_url}">编辑源码</a>
-              <a class="button-link secondary-link" href="{export_url}">导出 JSON</a>
-              <a class="button-link secondary-link" href="{key_info_export_url}">导出关键信息 TXT</a>
-              <form class="inline-import-form" method="post" action="{self._url('/editable/import')}" enctype="multipart/form-data">
-                <input type="hidden" name="id" value="{self._e(file_id)}">
-                <input type="hidden" name="category" value="{self._e(back_category)}">
-                <input name="import_file" type="file" accept=".json,application/json">
-                <button class="secondary compact-button" type="submit">导入 JSON</button>
-              </form>
-            </div>
-            <form id="event-book-form" method="post" action="{self._url('/editable/save')}">
-              <input type="hidden" name="id" value="{self._e(file_id)}">
-              <input type="hidden" name="category" value="{self._e(back_category)}">
-              <input id="event-book-content" type="hidden" name="content" value="">
-              <label for="note">资源说明 / 注释</label>
-              <textarea id="note" class="note-editor" name="note" spellcheck="false">{self._e(note)}</textarea>
-
-              <div class="world-book-toolbar">
-                <div>
-                  <h2>事件列表</h2>
-                </div>
-              </div>
-              <div id="event-book-events"></div>
-              <div class="actions">
-                <button type="submit">保存</button>
-              </div>
-            </form>
-            <form method="post" action="{self._url('/editable/reset')}" onsubmit="return confirm('确定恢复为当前代码内置默认内容？旧文件会先自动备份。');">
-              <input type="hidden" name="id" value="{self._e(file_id)}">
-              <input type="hidden" name="category" value="{self._e(back_category)}">
-              <button class="secondary" type="submit">恢复当前默认内容</button>
-            </form>
-            <script>
-              const initialEventBook = {book_json};
-              const eventsEl = document.getElementById("event-book-events");
-              const ebForm = document.getElementById("event-book-form");
-              const ebContentInput = document.getElementById("event-book-content");
-              const ebStorageKey = "{self._e(storage_key)}";
-              const requiredEvents = [
-                {{ id: "reincarnation", command: "/魔法少女转生", name: "魔法少女转生" }},
-                {{ id: "battle", command: "/魔法少女战斗", name: "魔法少女战斗" }},
-                {{ id: "daily", command: "/魔法少女日常", name: "魔法少女日常" }},
-                {{ id: "corruption", command: "/魔法少女黑化", name: "魔法少女黑化" }},
-                {{ id: "villain_witch_purification", command: "/反派魔女洗白", name: "反派魔女洗白" }},
-                {{ id: "villain_witch_battle", command: "/反派魔女战斗", name: "反派魔女战斗" }},
-                {{ id: "villain_witch_daily", command: "/反派魔女日常", name: "反派魔女日常" }},
-              ];
-              const ebLevelOptions = [
-                {{ value: 1, label: "F" }},
-                {{ value: 2, label: "E" }},
-                {{ value: 3, label: "D" }},
-                {{ value: 4, label: "C" }},
-                {{ value: 5, label: "B" }},
-                {{ value: 6, label: "A" }},
-                {{ value: 7, label: "S" }},
-              ];
-
-              const ebState = {{
-                ...initialEventBook,
-                events: ebNormalizeEvents(initialEventBook.events),
-              }};
-
-              let ebOpenState = {{ events: new Set(), entries: new Set() }};
-              let ebHasCapturedOpenState = false;
-
-              function ebEntryDefaults(index) {{
-                return {{
-                  id: `entry_${{index + 1}}`,
-                  title: "",
-                  enabled: true,
-                  recursive: true,
-                  strategy: "keyword",
-                  keys: [],
-                  visible_levels: ebLevelOptions.map((item) => item.value),
-                  brief: "",
-                  content: "",
-                }};
-              }}
-
-              function ebNormalizeEvents(events) {{
-                const source = Array.isArray(events) ? events : [];
-                return requiredEvents.map((required) => {{
-                  const found = source.find((event) => event && (event.id === required.id || event.command === required.command));
-                  return ebNormalizeEvent({{ ...required, ...(found || {{}}), id: required.id, command: required.command, name: required.name }});
-                }});
-              }}
-
-              function ebNormalizeEvent(event) {{
-                return {{
-                  id: String(event.id || "").trim(),
-                  command: String(event.command || "").trim(),
-                  name: String(event.name || ""),
-                  entries: Array.isArray(event.entries) ? event.entries.map((e, ei) => ebNormalizeEntry(e, ei)) : [],
-                }};
-              }}
-
-              function ebNormalizeEntry(entry, index) {{
-                const keys = Array.isArray(entry.keys)
-                  ? entry.keys
-                  : (typeof entry.keys === "string" ? [entry.keys] : []);
-                return {{
-                  id: String(entry.id || `entry_${{index + 1}}`).trim(),
-                  title: String(entry.title || ""),
-                  enabled: entry.enabled !== false,
-                  recursive: entry.recursive !== false,
-                  strategy: entry.strategy === "always" ? "always" : "keyword",
-                  keys: keys.map((key) => String(key).trim()).filter(Boolean),
-                  visible_levels: ebNormalizeVisibleLevels(entry.visible_levels, entry.min_level, entry.max_level),
-                  brief: String(entry.brief || ""),
-                  content: String(entry.content || ""),
-                }};
-              }}
-
-              function ebSplitKeys(value) {{
-                return String(value || "")
-                  .split(/[\\n,，]/)
-                  .map((key) => key.trim())
-                  .filter(Boolean);
-              }}
-
-              function ebNormalizeVisibleLevels(raw, minLevel, maxLevel) {{
-                let selected = [];
-                if (Array.isArray(raw)) {{
-                  selected = raw.map((level) => Number.parseInt(level, 10));
-                }} else if (typeof raw === "string" && raw.trim()) {{
-                  selected = raw.split(/[,，\\s]+/).map((level) => {{
-                    const trimmed = String(level).trim().toUpperCase();
-                    const byLabel = ebLevelOptions.find((item) => item.label === trimmed);
-                    return byLabel ? byLabel.value : Number.parseInt(trimmed, 10);
-                  }});
-                }} else {{
-                  const minValue = Number.parseInt(minLevel, 10);
-                  const maxValue = Number.parseInt(maxLevel, 10);
-                  const low = Number.isFinite(minValue) ? Math.max(1, Math.min(7, minValue)) : 1;
-                  const high = Number.isFinite(maxValue) ? Math.max(low, Math.min(7, maxValue)) : 7;
-                  selected = ebLevelOptions.map((item) => item.value).filter((level) => level >= low && level <= high);
-                }}
-                const clean = ebLevelOptions
-                  .map((item) => item.value)
-                  .filter((level) => selected.includes(level));
-                return clean.length ? clean : ebLevelOptions.map((item) => item.value);
-              }}
-
-              function ebVisibleLevelsLabel(levels) {{
-                const normalized = ebNormalizeVisibleLevels(levels);
-                if (normalized.length === ebLevelOptions.length) return "F-S";
-                return normalized
-                  .map((level) => ebLevelOptions.find((item) => item.value === level)?.label || String(level))
-                  .join("/");
-              }}
-
-              function ebVisibleLevelInputs(levels) {{
-                const selected = new Set(ebNormalizeVisibleLevels(levels));
-                return ebLevelOptions.map((item) => `
-                  <label class="summary-check level-choice">
-                    <input data-field="visible_level" type="checkbox" value="${{item.value}}"${{selected.has(item.value) ? " checked" : ""}}> ${{item.label}}
-                  </label>
-                `).join("");
-              }}
-
-              function ebEscapeHtml(value) {{
-                return String(value)
-                  .replace(/&/g, "&amp;")
-                  .replace(/</g, "&lt;")
-                  .replace(/>/g, "&gt;");
-              }}
-
-              function ebEscapeAttr(value) {{
-                return ebEscapeHtml(value)
-                  .replace(/"/g, "&quot;")
-                  .replace(/'/g, "&#39;");
-              }}
-
-              function ebEntryKey(entry, eventIdx, entryIdx) {{
-                return `${{eventIdx}}_${{String(entry.id || entry.title || `entry_${{entryIdx + 1}}`).trim()}}`;
-              }}
-
-              function ebCaptureOpenState() {{
-                ebHasCapturedOpenState = true;
-                ebOpenState.events = new Set();
-                ebOpenState.entries = new Set();
-                eventsEl.querySelectorAll(".event-block").forEach((block) => {{
-                  const eventKey = block.dataset.eventKey;
-                  const eventDetails = block.querySelector(":scope > details");
-                  if (eventKey && eventDetails && eventDetails.open) ebOpenState.events.add(eventKey);
-                  block.querySelectorAll(".eb-entry").forEach((card) => {{
-                    const entryKey = card.dataset.entryKey;
-                    const entryDetails = card.querySelector("details");
-                    if (entryKey && entryDetails && entryDetails.open) ebOpenState.entries.add(entryKey);
-                  }});
-                }});
-                ebPersistOpenState();
-              }}
-
-              function ebLoadOpenState() {{
-                try {{
-                  const raw = localStorage.getItem(ebStorageKey);
-                  if (!raw) return;
-                  const data = JSON.parse(raw);
-                  if (!data) return;
-                  if (Array.isArray(data.openEvents)) ebOpenState.events = new Set(data.openEvents.map(String));
-                  if (Array.isArray(data.openEntries)) ebOpenState.entries = new Set(data.openEntries.map(String));
-                  ebHasCapturedOpenState = true;
-                }} catch (error) {{
-                  console.warn("failed to load event book open state", error);
-                }}
-              }}
-
-              function ebPersistOpenState() {{
-                try {{
-                  localStorage.setItem(ebStorageKey, JSON.stringify({{
-                    openEvents: Array.from(ebOpenState.events),
-                    openEntries: Array.from(ebOpenState.entries),
-                  }}));
-                }} catch (error) {{
-                  console.warn("failed to save event book open state", error);
-                }}
-              }}
-
-              function ebSyncFromDom() {{
-                ebState.events = Array.from(eventsEl.querySelectorAll(".event-block")).map((block, eventIdx) => {{
-                  const current = ebNormalizeEvent(ebState.events[eventIdx] || requiredEvents[eventIdx]);
-                  current.entries = Array.from(block.querySelectorAll(".eb-entry")).map((card, entryIdx) => ebNormalizeEntry({{
-                    id: card.querySelector("[data-field='id']").value,
-                    title: card.querySelector("[data-field='title']").value,
-                    enabled: card.querySelector("[data-field='enabled']").checked,
-                    recursive: card.querySelector("[data-field='recursive']").checked,
-                    strategy: card.querySelector("[data-field='strategy']").value,
-                    keys: ebSplitKeys(card.querySelector("[data-field='keys']").value),
-                    visible_levels: Array.from(card.querySelectorAll("[data-field='visible_level']:checked")).map((input) => Number.parseInt(input.value, 10)),
-                    brief: card.querySelector("[data-field='brief']").value,
-                    content: card.querySelector("[data-field='content']").value,
-                  }}, entryIdx));
-                  return current;
-                }});
-              }}
-
-              function ebRenderEvents() {{
-                eventsEl.innerHTML = "";
-                ebState.events.forEach((eventItem, eventIdx) => {{
-                  const norm = ebNormalizeEvent(eventItem);
-                  const eventKey = norm.command || norm.id;
-                  const eventIsOpen = ebHasCapturedOpenState && ebOpenState.events.has(eventKey);
-                  const eventEl = document.createElement("section");
-                  eventEl.className = "event-block";
-                  eventEl.dataset.eventKey = eventKey;
-                  const entryCount = norm.entries.length;
-
-                  let entriesHtml = "";
-                  norm.entries.forEach((entry, entryIdx) => {{
-                    const eNorm = ebNormalizeEntry(entry, entryIdx);
-                    const entryKey = ebEntryKey(eNorm, eventIdx, entryIdx);
-                    const entryIsOpen = ebHasCapturedOpenState && ebOpenState.entries.has(entryKey);
-                    const entrySummary = eNorm.title || eNorm.id || `条目 ${{entryIdx + 1}}`;
-                    entriesHtml += `
-                      <div class="eb-entry rb-entry" data-entry-key="${{ebEscapeAttr(entryKey)}}" data-entry-index="${{entryIdx}}">
-                        <details${{entryIsOpen ? " open" : ""}}>
-                          <summary class="world-entry-head">
-                            <span class="entry-title">${{ebEscapeHtml(entrySummary)}}</span>
-                            <label class="summary-check"><input data-field="enabled" type="checkbox"${{eNorm.enabled ? " checked" : ""}}> 启用</label>
-                            <label class="summary-check"><input data-field="recursive" type="checkbox"${{eNorm.recursive ? " checked" : ""}}> 允许递归</label>
-                            <span class="muted" style="margin-left:4px">${{ebVisibleLevelsLabel(eNorm.visible_levels)}}</span>
-                            <button class="danger" type="button" data-action="delete-entry">删除</button>
-                          </summary>
-                          <div class="world-entry-body">
-                            <div class="world-entry-grid">
-                              <label class="compact-field"><span>ID</span><input data-field="id" type="text" value="${{ebEscapeAttr(eNorm.id)}}"></label>
-                              <label class="compact-field title-field"><span>标题</span><input data-field="title" type="text" value="${{ebEscapeAttr(eNorm.title)}}"></label>
-                              <div class="compact-field level-field"><span>可见等级</span><div class="level-choice-row">${{ebVisibleLevelInputs(eNorm.visible_levels)}}</div></div>
-                              <label class="compact-field"><span>触发方式</span>
-                                <select data-field="strategy">
-                                  <option value="keyword"${{eNorm.strategy === "keyword" ? " selected" : ""}}>关键词命中</option>
-                                  <option value="always"${{eNorm.strategy === "always" ? " selected" : ""}}>总是注入（仅当前事件）</option>
-                                </select>
-                              </label>
-                            </div>
-                            <label class="block-field">关键词（支持中文逗号、英文逗号或换行分隔；always 只在本事件生效，其他事件不会因 always 命中）
-                              <textarea data-field="keys" class="keys-editor" spellcheck="false">${{ebEscapeHtml(eNorm.keys.join("\\n"))}}</textarea>
-                            </label>
-                            <label class="block-field">简略介绍（其他事件关键词命中时注入；为空则视为未命中）
-                              <textarea data-field="brief" class="entry-content-editor" spellcheck="false" style="height:60px">${{ebEscapeHtml(eNorm.brief)}}</textarea>
-                            </label>
-                            <label class="block-field">详细介绍（当前事件关键词命中或当前事件 always 时注入）
-                              <textarea data-field="content" class="entry-content-editor" spellcheck="false">${{ebEscapeHtml(eNorm.content)}}</textarea>
-                            </label>
-                          </div>
-                        </details>
-                      </div>
-                    `;
-                  }});
-
-                  eventEl.innerHTML = `
-                    <details${{eventIsOpen ? " open" : ""}}>
-                      <summary class="world-entry-head region-head">
-                        <span class="entry-title">${{ebEscapeHtml(norm.command)}} · ${{ebEscapeHtml(norm.name)}}</span>
-                        <span class="muted" style="margin-left:4px">(${{entryCount}} 个条目)</span>
-                      </summary>
-                      <div class="region-body">
-                        <div class="world-entry-grid">
-                          <label class="compact-field"><span>事件 ID</span><input type="text" value="${{ebEscapeAttr(norm.id)}}" disabled></label>
-                          <label class="compact-field"><span>命令</span><input type="text" value="${{ebEscapeAttr(norm.command)}}" disabled></label>
-                          <label class="compact-field"><span>事件名称</span><input type="text" value="${{ebEscapeAttr(norm.name)}}" disabled></label>
-                        </div>
-                        <div class="world-book-toolbar" style="margin-top:8px">
-                          <button class="secondary" type="button" data-action="add-entry">+ 添加条目</button>
-                        </div>
-                        <div class="region-entries">${{entriesHtml}}</div>
-                      </div>
-                    </details>
-                  `;
-
-                  const eventDetails = eventEl.querySelector(":scope > details");
-                  eventDetails.addEventListener("toggle", () => {{
-                    if (eventDetails.open) ebOpenState.events.add(eventKey);
-                    else ebOpenState.events.delete(eventKey);
-                    ebHasCapturedOpenState = true;
-                    ebPersistOpenState();
-                  }});
-
-                  eventEl.querySelector("[data-action='add-entry']").addEventListener("click", (clickEvent) => {{
-                    clickEvent.preventDefault();
-                    clickEvent.stopPropagation();
-                    ebCaptureOpenState();
-                    ebSyncFromDom();
-                    const newEntry = ebEntryDefaults(ebState.events[eventIdx].entries.length);
-                    ebState.events[eventIdx].entries.push(newEntry);
-                    const entryKey = ebEntryKey(newEntry, eventIdx, ebState.events[eventIdx].entries.length - 1);
-                    ebOpenState.entries.add(entryKey);
-                    ebOpenState.events.add(eventKey);
-                    ebPersistOpenState();
-                    ebRenderEvents();
-                  }});
-
-                  eventEl.querySelectorAll(".eb-entry").forEach((entryCard, entryIdx) => {{
-                    const entryDetails = entryCard.querySelector("details");
-                    const entryKey = entryCard.dataset.entryKey;
-                    entryDetails.addEventListener("toggle", () => {{
-                      if (entryDetails.open) ebOpenState.entries.add(entryKey);
-                      else ebOpenState.entries.delete(entryKey);
-                      ebHasCapturedOpenState = true;
-                      ebPersistOpenState();
-                    }});
-
-                    entryCard.querySelector(".summary-check").addEventListener("click", (clickEvent) => {{
-                      clickEvent.stopPropagation();
-                    }});
-
-                    entryCard.querySelector("[data-action='delete-entry']").addEventListener("click", (clickEvent) => {{
-                      clickEvent.preventDefault();
-                      clickEvent.stopPropagation();
-                      if (!confirm("确定删除这个条目？")) return;
-                      ebCaptureOpenState();
-                      ebSyncFromDom();
-                      ebState.events[eventIdx].entries.splice(entryIdx, 1);
-                      ebOpenState.entries.delete(entryKey);
-                      ebPersistOpenState();
-                      ebRenderEvents();
-                    }});
-
-                    const titleInput = entryCard.querySelector("[data-field='title']");
-                    const idInput = entryCard.querySelector("[data-field='id']");
-                    const entryTitleEl = entryCard.querySelector(".entry-title");
-                    const refreshEntryTitle = () => {{
-                      entryTitleEl.textContent = titleInput.value.trim() || idInput.value.trim() || `条目 ${{entryIdx + 1}}`;
-                    }};
-                    titleInput.addEventListener("input", refreshEntryTitle);
-                    idInput.addEventListener("input", refreshEntryTitle);
-                  }});
-
-                  eventsEl.appendChild(eventEl);
-                }});
-              }}
-
-              ebForm.addEventListener("submit", () => {{
-                ebSyncFromDom();
-                ebState.events = ebNormalizeEvents(ebState.events);
-                ebContentInput.value = JSON.stringify(ebState, null, 2);
-              }});
-
-              ebLoadOpenState();
-              ebRenderEvents();
-            </script>
-            """,
+            file_id,
+            back_category,
+            note,
+            json.dumps(book, ensure_ascii=False, indent=2),
+            warning=(
+                "事件书已改为扁平事件列表：events 中每个对象就是一个事件，"
+                "allowed_commands 数组声明哪些指令可以触发它。"
+            ),
         )
 
     @classmethod
     def _normalize_event_book(cls, raw: object) -> dict:
         book = dict(raw) if isinstance(raw, dict) else {}
-        required_events = [
-            {
-                "id": "reincarnation",
-                "command": "/魔法少女转生",
-                "name": "魔法少女转生",
-            },
-            {
-                "id": "battle",
-                "command": "/魔法少女战斗",
-                "name": "魔法少女战斗",
-            },
-            {
-                "id": "daily",
-                "command": "/魔法少女日常",
-                "name": "魔法少女日常",
-            },
-            {
-                "id": "corruption",
-                "command": "/魔法少女黑化",
-                "name": "魔法少女黑化",
-            },
-            {
-                "id": "villain_witch_purification",
-                "command": "/反派魔女洗白",
-                "name": "反派魔女洗白",
-            },
-            {
-                "id": "villain_witch_battle",
-                "command": "/反派魔女战斗",
-                "name": "反派魔女战斗",
-            },
-            {
-                "id": "villain_witch_daily",
-                "command": "/反派魔女日常",
-                "name": "反派魔女日常",
-            },
-        ]
         raw_events = book.get("events", [])
         if not isinstance(raw_events, list):
             raw_events = []
 
         normalized_events = []
-        for required in required_events:
-            raw_event = next(
-                (
-                    event
-                    for event in raw_events
-                    if isinstance(event, dict)
-                    and (
-                        str(event.get("id") or "").strip() == required["id"]
-                        or str(event.get("command") or "").strip()
-                        == required["command"]
+        for e_idx, raw_event in enumerate(raw_events):
+            if not isinstance(raw_event, dict):
+                continue
+            raw_entries = raw_event.get("entries", [])
+            is_legacy_group = isinstance(raw_entries, list) and raw_entries
+            if is_legacy_group and not raw_event.get("allowed_commands"):
+                group_command = str(raw_event.get("command") or "").strip()
+                for entry_idx, raw_entry in enumerate(raw_entries):
+                    if not isinstance(raw_entry, dict):
+                        continue
+                    normalized = cls._normalize_event_item(
+                        raw_entry,
+                        fallback_id=f"{raw_event.get('id') or e_idx}_{entry_idx + 1}",
                     )
-                ),
-                {},
+                    if group_command and group_command not in normalized["allowed_commands"]:
+                        normalized["allowed_commands"].insert(0, group_command)
+                    normalized_events.append(normalized)
+                continue
+
+            normalized_events.append(
+                cls._normalize_event_item(raw_event, fallback_id=f"event_{e_idx + 1}")
             )
 
-            raw_entries = raw_event.get("entries", []) if isinstance(raw_event, dict) else []
-            if not isinstance(raw_entries, list):
-                raw_entries = []
-
-            normalized_entries = []
-            for e_idx, raw_entry in enumerate(raw_entries):
-                if not isinstance(raw_entry, dict):
-                    continue
-                keys = raw_entry.get("keys", [])
-                if isinstance(keys, str):
-                    keys = [keys]
-                if not isinstance(keys, list):
-                    keys = []
-                normalized_entries.append({
-                    "id": str(raw_entry.get("id") or f"entry_{e_idx + 1}").strip(),
-                    "title": str(raw_entry.get("title") or ""),
-                    "enabled": raw_entry.get("enabled", True) is not False,
-                    "recursive": raw_entry.get("recursive", True) is not False,
-                    "strategy": (
-                        "always"
-                        if str(raw_entry.get("strategy") or "keyword").strip().lower()
-                        == "always"
-                        else "keyword"
-                    ),
-                    "keys": [str(key).strip() for key in keys if str(key).strip()],
-                    "visible_levels": list(cls._normalize_visible_levels(raw_entry)),
-                    "brief": str(raw_entry.get("brief") or ""),
-                    "content": str(raw_entry.get("content") or ""),
-                })
-
-            normalized_events.append({
-                **required,
-                "entries": normalized_entries,
-            })
-
-        book["version"] = book.get("version", 1)
+        book["version"] = book.get("version", 2)
         book["events"] = normalized_events
         return book
+
+    @classmethod
+    def _normalize_event_item(cls, raw_event: dict, *, fallback_id: str) -> dict:
+        keys = raw_event.get("keys", [])
+        if isinstance(keys, str):
+            keys = [keys]
+        if not isinstance(keys, list):
+            keys = []
+        allowed_commands = cls._normalize_text_list(raw_event.get("allowed_commands"))
+        legacy_command = str(raw_event.get("command") or "").strip()
+        if legacy_command and legacy_command not in allowed_commands:
+            allowed_commands.insert(0, legacy_command)
+        return {
+            "id": str(raw_event.get("id") or fallback_id).strip(),
+            "name": str(raw_event.get("name") or raw_event.get("title") or ""),
+            "enabled": raw_event.get("enabled", True) is not False,
+            "recursive": raw_event.get("recursive", True) is not False,
+            "strategy": (
+                "always"
+                if str(raw_event.get("strategy") or "keyword").strip().lower() == "always"
+                else "keyword"
+            ),
+            "keys": [str(key).strip() for key in keys if str(key).strip()],
+            "visible_levels": list(cls._normalize_visible_levels(raw_event)),
+            "brief": str(raw_event.get("brief") or ""),
+            "content": str(raw_event.get("content") or ""),
+            "allowed_commands": allowed_commands,
+            "event_tags": cls._normalize_text_list(raw_event.get("event_tags")),
+            "location_tags": cls._normalize_text_list(raw_event.get("location_tags")),
+            "compatible_monster_tags": cls._normalize_text_list(
+                raw_event.get("compatible_monster_tags")
+            ),
+            "compatible_battle_types": cls._normalize_text_list(
+                raw_event.get("compatible_battle_types")
+            ),
+            "opening_hook": str(raw_event.get("opening_hook") or ""),
+            "twist_hook": str(raw_event.get("twist_hook") or ""),
+            "ending_hook": str(raw_event.get("ending_hook") or ""),
+            "weight": cls._normalize_int_range(raw_event.get("weight"), 10, 1, 100),
+        }
 
     @classmethod
     def _normalize_monster_book(cls, raw: object) -> dict:
@@ -2150,6 +1661,11 @@ class SaveWebViewer:
                     "keys": [str(key).strip() for key in keys if str(key).strip()],
                     "brief": str(entry.get("brief") or entry.get("summary") or ""),
                     "content": str(entry.get("content") or entry.get("detail") or ""),
+                    "monster_tags": cls._normalize_text_list(entry.get("monster_tags")),
+                    "opening_hooks": cls._normalize_text_list(entry.get("opening_hooks")),
+                    "preferred_locations": cls._normalize_text_list(entry.get("preferred_locations")),
+                    "battle_gimmicks": cls._normalize_text_list(entry.get("battle_gimmicks")),
+                    "ending_hooks": cls._normalize_text_list(entry.get("ending_hooks")),
                     "level_settings": level_settings,
                 }
             )
@@ -2157,6 +1673,34 @@ class SaveWebViewer:
         book["version"] = book.get("version", 1)
         book["entries"] = normalized_entries
         return book
+
+    @staticmethod
+    def _normalize_text_list(value: object) -> list[str]:
+        if isinstance(value, str):
+            raw_items = re.split(r"[\n,，、]+", value)
+        elif isinstance(value, list):
+            raw_items = value
+        else:
+            raw_items = []
+        items: list[str] = []
+        for item in raw_items:
+            text = str(item or "").strip()
+            if text and text not in items:
+                items.append(text)
+        return items
+
+    @staticmethod
+    def _normalize_int_range(
+        value: object,
+        default: int,
+        minimum: int,
+        maximum: int,
+    ) -> int:
+        try:
+            parsed = int(float(value))
+        except Exception:
+            return default
+        return max(minimum, min(maximum, parsed))
 
     @classmethod
     def _normalize_world_book(cls, raw: object) -> dict:
@@ -2273,29 +1817,39 @@ class SaveWebViewer:
         for event in events:
             if not isinstance(event, dict):
                 continue
-            event_name = str(
-                event.get("command") or event.get("name") or event.get("id") or "未知事件"
+            event_name = cls._single_line_text(
+                event.get("name") or event.get("title") or event.get("id") or "未知事件"
             )
-            entries = event.get("entries", [])
-            if not isinstance(entries, list):
-                continue
-
             entry_lines: list[str] = []
-            for entry in entries:
-                if not isinstance(entry, dict):
-                    continue
-                title = cls._single_line_text(
-                    entry.get("title") or entry.get("id") or "条目"
-                )
-                strategy = str(entry.get("strategy") or "keyword")
-                brief = str(entry.get("brief") or "").strip()
-                content = str(entry.get("content") or "").strip()
-                level_text = visible_levels_label(entry.get("visible_levels"))
-                entry_lines.append(f"  [{title}] ({level_text}, {strategy})")
-                if brief:
-                    entry_lines.append(f"    简略: {brief}")
-                if content:
-                    entry_lines.append(f"    详细: {content}")
+            strategy = str(event.get("strategy") or "keyword")
+            level_text = visible_levels_label(event.get("visible_levels"))
+            entry_lines.append(f"  ({level_text}, {strategy})")
+            for field, label in (
+                ("allowed_commands", "适用命令"),
+                ("keys", "关键词"),
+                ("event_tags", "事件标签"),
+                ("location_tags", "地点标签"),
+                ("compatible_monster_tags", "兼容魔物标签"),
+                ("compatible_battle_types", "兼容战斗类型"),
+            ):
+                values = event.get(field) if isinstance(event.get(field), list) else []
+                clean_values = [str(value).strip() for value in values if str(value).strip()]
+                if clean_values:
+                    entry_lines.append(f"  {label}: " + "、".join(clean_values))
+            brief = str(event.get("brief") or "").strip()
+            content = str(event.get("content") or "").strip()
+            if brief:
+                entry_lines.append(f"  简略: {brief}")
+            if content:
+                entry_lines.append(f"  详细: {content}")
+            for field, label in (
+                ("opening_hook", "开场钩子"),
+                ("twist_hook", "变奏钩子"),
+                ("ending_hook", "结尾钩子"),
+            ):
+                text = str(event.get(field) or "").strip()
+                if text:
+                    entry_lines.append(f"  {label}: {text}")
 
             if entry_lines:
                 event_blocks.append(f"【{event_name}】\n" + "\n".join(entry_lines))
@@ -2338,6 +1892,18 @@ class SaveWebViewer:
                 lines.append(f"通用简单设定: {brief}")
             if content:
                 lines.append(f"通用详细设定: {content}")
+            hook_labels = [
+                ("monster_tags", "魔物标签"),
+                ("opening_hooks", "开场钩子"),
+                ("preferred_locations", "适合地点"),
+                ("battle_gimmicks", "战斗机制"),
+                ("ending_hooks", "结束残留"),
+            ]
+            for field, label in hook_labels:
+                values = entry.get(field) if isinstance(entry.get(field), list) else []
+                clean_values = [str(value).strip() for value in values if str(value).strip()]
+                if clean_values:
+                    lines.append(f"{label}: " + "；".join(clean_values))
 
             level_settings = (
                 entry.get("level_settings")
@@ -2547,56 +2113,6 @@ class SaveWebViewer:
 
         raise web.HTTPFound(
             self._url(f"/editable/file?id={quote(file_id, safe='')}&category={self._e(category)}")
-        )
-
-    async def _editable_monster_import_player(self, request: web.Request) -> web.Response:
-        if not self._is_admin(request):
-            return self._forbidden()
-
-        data = await request.post()
-        group_id = str(data.get("group_id", "")).strip()
-        user_id = str(data.get("user_id", "")).strip()
-        entry_index = int(str(data.get("entry_index", "0") or "0"))
-        category = self._editable_back_category(str(data.get("category", "")), "monster_book/default.json")
-        try:
-            player_content = self.repository.read_player_source_file(
-                group_id,
-                user_id,
-                "player_monster_book.json",
-            )
-            player_book = self._normalize_monster_book(json.loads(player_content or "{}"))
-            player_entries = player_book.get("entries", [])
-            if entry_index < 0 or entry_index >= len(player_entries):
-                raise ValueError("玩家魔物不存在")
-            imported = self._normalize_monster_book({"entries": [player_entries[entry_index]]})["entries"][0]
-            current = self._normalize_monster_book(
-                json.loads(self.editable_manager.read_text("monster_book/default.json"))
-            )
-            existing_ids = {
-                str(entry.get("id") or "").strip()
-                for entry in current.get("entries", [])
-                if isinstance(entry, dict)
-            }
-            if imported.get("id") in existing_ids:
-                imported["id"] = f"{imported.get('id')}_player_{int(time.time())}"
-            current.setdefault("entries", []).append(imported)
-            self.editable_manager.write_json_book(
-                "monster_book/default.json",
-                json.dumps(current, ensure_ascii=False, indent=2),
-            )
-        except Exception as exc:
-            return self._html_response(
-                "录入玩家魔物失败",
-                f"""
-                <h1>录入玩家魔物失败</h1>
-                <p class="error">{self._e(exc)}</p>
-                <p><a href="{self._url(f'/editable/file?id=monster_book%2Fdefault.json&category={self._e(category)}')}">返回魔物书</a></p>
-                """,
-                status=400,
-            )
-
-        raise web.HTTPFound(
-            self._url(f"/editable/file?id=monster_book%2Fdefault.json&category={self._e(category)}")
         )
 
     async def _editable_reset(self, request: web.Request) -> web.Response:
@@ -2961,481 +2477,6 @@ class SaveWebViewer:
             """,
         )
 
-    async def _player_monsters(self, request: web.Request) -> web.Response:
-        session = self._session(request)
-        if not session or session["role"] != SESSION_USER_ROLE:
-            return self._forbidden()
-
-        group_id = request.query.get("group_id", "")
-        user_id = request.query.get("user_id", "")
-        if not self._can_access_player(session, user_id):
-            return self._forbidden()
-
-        detail = self.repository.read_save_detail(group_id, user_id)
-        if detail is None:
-            raise web.HTTPNotFound(text="save not found")
-
-        player_data = detail.get("player_data", {})
-        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
-        title_name = self._get_nested(
-            protagonist,
-            ["个人信息", "姓名"],
-            player_data.get("nickname", ""),
-        ) or user_id
-        content = self.repository.read_player_source_file(
-            group_id,
-            user_id,
-            "player_monster_book.json",
-        )
-        try:
-            book = self._normalize_monster_book(json.loads(content or "{}"))
-        except Exception:
-            book = {"version": 1, "entries": []}
-
-        back_url = self._url(
-            f"/player?group_id={quote(group_id, safe='')}&user_id={quote(user_id, safe='')}"
-        )
-        save_url = self._url("/player/monsters/save")
-        book_json = self._json_script_data(book)
-        try:
-            public_book = self._normalize_monster_book(
-                json.loads(self.editable_manager.read_text("monster_book/default.json") or "{}")
-            )
-        except Exception:
-            public_book = {"version": 1, "entries": []}
-        public_book_json = self._json_script_data(public_book)
-
-        return self._html_response(
-            f"魔物制作 - {title_name}",
-            f"""
-            <section class="villain-monster-shell" aria-label="玩家魔物制作">
-              <div class="villain-grid" aria-hidden="true"></div>
-              <header class="villain-monster-head">
-                <a class="player-back-link" href="{back_url}">返回个人档案</a>
-                <p class="player-kicker">Villain Workshop</p>
-                <h1>魔物制作</h1>
-                <p>{self._e(title_name)}的私人反派魔女档案。这里创建的魔物会保存到你的个人文件夹，并作为该反派魔女亲自照护、可在行动中随行的魔物。</p>
-                <button id="show-public-monsters" type="button">查看公共魔物</button>
-              </header>
-
-              <div id="public-monster-modal" class="monster-modal" hidden>
-                <div class="monster-modal-backdrop" data-action="close-public-monsters"></div>
-                <section class="monster-modal-panel" role="dialog" aria-modal="true" aria-labelledby="public-monster-modal-title">
-                  <div class="monster-modal-head">
-                    <div>
-                      <span>Public Monster Book</span>
-                      <h2 id="public-monster-modal-title">公共魔物</h2>
-                    </div>
-                    <button class="secondary compact-button" type="button" data-action="close-public-monsters">关闭</button>
-                  </div>
-                  <div id="public-monster-entries" class="player-monster-submissions"></div>
-                </section>
-              </div>
-              <form id="player-monster-form" class="villain-workbench" method="post" action="{save_url}">
-                <input type="hidden" name="group_id" value="{self._e(group_id)}">
-                <input type="hidden" name="user_id" value="{self._e(user_id)}">
-                <input id="player-monster-content" type="hidden" name="content" value="">
-                <aside class="villain-menu">
-                  <div class="villain-menu-head">
-                    <span>Created</span>
-                    <button id="player-add-monster" type="button">创建魔物</button>
-                  </div>
-                  <div id="player-monster-tabs" class="villain-tabs"></div>
-                </aside>
-                <section id="player-monster-editor" class="villain-editor"></section>
-                <div class="villain-savebar">
-                  <p>注释：ID 用来给管理员和系统识别条目，建议只用英文、数字、下划线；别名就是管理员魔物书里的“关键词”，可写多个称呼方便之后检索。</p>
-                  <button type="submit">保存魔物档案</button>
-                </div>
-              </form>
-              <script>
-                const playerMonsterInitial = {book_json};
-                const publicMonsterBook = {public_book_json};
-                const playerMonsterForm = document.getElementById("player-monster-form");
-                const playerMonsterContent = document.getElementById("player-monster-content");
-                const playerMonsterTabs = document.getElementById("player-monster-tabs");
-                const playerMonsterEditor = document.getElementById("player-monster-editor");
-                const playerAddMonster = document.getElementById("player-add-monster");
-                const showPublicMonsters = document.getElementById("show-public-monsters");
-                const publicMonsterModal = document.getElementById("public-monster-modal");
-                const publicMonsterEntries = document.getElementById("public-monster-entries");
-                const playerMonsterLevels = [
-                  {{ value: 1, label: "F" }},
-                  {{ value: 2, label: "E" }},
-                  {{ value: 3, label: "D" }},
-                  {{ value: 4, label: "C" }},
-                  {{ value: 5, label: "B" }},
-                  {{ value: 6, label: "A" }},
-                  {{ value: 7, label: "S" }},
-                ];
-                const playerMonsterState = {{
-                  ...playerMonsterInitial,
-                  entries: Array.isArray(playerMonsterInitial.entries) ? playerMonsterInitial.entries : [],
-                }};
-                let playerMonsterActive = 0;
-                let playerMonsterEditingLevel = null;
-
-                function pmEscapeHtml(value) {{
-                  return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                }}
-                function pmEscapeAttr(value) {{
-                  return pmEscapeHtml(value).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-                }}
-                function pmSplitKeys(value) {{
-                  return String(value || "").split(/[\\n,，、]/).map((item) => item.trim()).filter(Boolean);
-                }}
-                function pmNormalizeLevels(raw, minLevel, maxLevel) {{
-                  let selected = [];
-                  if (Array.isArray(raw)) {{
-                    selected = raw.map((level) => Number.parseInt(level, 10));
-                  }} else if (typeof raw === "string" && raw.trim()) {{
-                    selected = raw.split(/[,，、\\s]+/).map((level) => {{
-                      const text = String(level).trim().toUpperCase();
-                      const byLabel = playerMonsterLevels.find((item) => item.label === text);
-                      return byLabel ? byLabel.value : Number.parseInt(text, 10);
-                    }});
-                  }} else {{
-                    const minValue = Number.parseInt(minLevel, 10);
-                    const maxValue = Number.parseInt(maxLevel, 10);
-                    const low = Number.isFinite(minValue) ? Math.max(1, Math.min(7, minValue)) : 1;
-                    const high = Number.isFinite(maxValue) ? Math.max(low, Math.min(7, maxValue)) : 7;
-                    selected = playerMonsterLevels.map((item) => item.value).filter((level) => level >= low && level <= high);
-                  }}
-                  const clean = playerMonsterLevels.map((item) => item.value).filter((level) => selected.includes(level));
-                  return clean.length ? clean : playerMonsterLevels.map((item) => item.value);
-                }}
-                function pmNormalizeEntry(entry, index) {{
-                  const rawSettings = entry && typeof entry.level_settings === "object" ? entry.level_settings : {{}};
-                  const monsterLevels = pmNormalizeLevels(entry?.monster_levels, entry?.min_monster_level, entry?.max_monster_level);
-                  const levelSettings = {{}};
-                  monsterLevels.forEach((level) => {{
-                    const raw = rawSettings[String(level)] && typeof rawSettings[String(level)] === "object" ? rawSettings[String(level)] : {{}};
-                    levelSettings[String(level)] = {{
-                      brief: String(raw.brief || ""),
-                      content: String(raw.content || ""),
-                    }};
-                  }});
-                  const keys = Array.isArray(entry?.keys) ? entry.keys : (typeof entry?.keys === "string" ? [entry.keys] : []);
-                  const hasLevelSettingContent = Object.values(levelSettings).some((setting) => (
-                    String(setting.brief || "").trim() || String(setting.content || "").trim()
-                  ));
-                  return {{
-                    id: String(entry?.id || `player_monster_${{index + 1}}`).trim(),
-                    name: String(entry?.name || entry?.title || ""),
-                    visible_levels: pmNormalizeLevels(entry?.visible_levels, entry?.min_level, entry?.max_level),
-                    monster_levels: monsterLevels,
-                    keys: keys.map((key) => String(key).trim()).filter(Boolean),
-                    brief: String(entry?.brief || entry?.summary || ""),
-                    content: String(entry?.content || entry?.detail || ""),
-                    level_settings: levelSettings,
-                    use_level_settings: entry?.use_level_settings === true || Boolean(hasLevelSettingContent),
-                  }};
-                }}
-                function pmDefaultEntry(index) {{
-                  return pmNormalizeEntry({{
-                    id: `player_monster_${{Date.now().toString(36)}}_${{index + 1}}`,
-                    name: "",
-                    visible_levels: playerMonsterLevels.map((item) => item.value),
-                    monster_levels: playerMonsterLevels.map((item) => item.value),
-                    keys: [],
-                    brief: "",
-                    content: "",
-                    level_settings: {{}},
-                    use_level_settings: false,
-                  }}, index);
-                }}
-                function pmLevelLabel(level) {{
-                  return playerMonsterLevels.find((item) => item.value === level)?.label || String(level);
-                }}
-                function pmLevelInputs(field, levels) {{
-                  const selected = new Set(pmNormalizeLevels(levels));
-                  return playerMonsterLevels.map((item) => `
-                    <label class="summary-check level-choice">
-                      <input data-field="${{field}}" type="checkbox" value="${{item.value}}"${{selected.has(item.value) ? " checked" : ""}}> ${{item.label}}
-                    </label>
-                  `).join("");
-                }}
-                function pmSyncActiveFromDom() {{
-                  const entry = playerMonsterState.entries[playerMonsterActive];
-                  if (!entry || !playerMonsterEditor.firstElementChild) return;
-                  const monsterLevels = Array.from(playerMonsterEditor.querySelectorAll("[data-field='monster_level']:checked")).map((input) => Number.parseInt(input.value, 10));
-                  const current = pmNormalizeEntry(entry, playerMonsterActive);
-                  const levelSettings = {{ ...current.level_settings }};
-                  if (playerMonsterEditor.querySelector("[data-mode='levels']")?.classList.contains("active") && playerMonsterEditingLevel) {{
-                    levelSettings[String(playerMonsterEditingLevel)] = {{
-                      brief: playerMonsterEditor.querySelector("[data-field='level_brief']")?.value || "",
-                      content: playerMonsterEditor.querySelector("[data-field='level_content']")?.value || "",
-                    }};
-                  }}
-                  playerMonsterState.entries[playerMonsterActive] = pmNormalizeEntry({{
-                    id: playerMonsterEditor.querySelector("[data-field='id']")?.value || "",
-                    name: playerMonsterEditor.querySelector("[data-field='name']")?.value || "",
-                    visible_levels: Array.from(playerMonsterEditor.querySelectorAll("[data-field='visible_level']:checked")).map((input) => Number.parseInt(input.value, 10)),
-                    monster_levels: monsterLevels,
-                    keys: pmSplitKeys(playerMonsterEditor.querySelector("[data-field='keys']")?.value || ""),
-                    brief: playerMonsterEditor.querySelector("[data-field='brief']")?.value || "",
-                    content: playerMonsterEditor.querySelector("[data-field='content']")?.value || "",
-                    level_settings: levelSettings,
-                    use_level_settings: playerMonsterEditor.querySelector("[data-mode='levels']")?.classList.contains("active"),
-                  }}, playerMonsterActive);
-                }}
-                function pmRenderTabs() {{
-                  playerMonsterTabs.innerHTML = "";
-                  if (!playerMonsterState.entries.length) {{
-                    playerMonsterTabs.innerHTML = '<p class="villain-empty">还没有魔物。先创建一个空档案。</p>';
-                    return;
-                  }}
-                  playerMonsterState.entries.forEach((entry, index) => {{
-                    const normalized = pmNormalizeEntry(entry, index);
-                    const button = document.createElement("button");
-                    button.type = "button";
-                    button.className = index === playerMonsterActive ? "active" : "";
-                    button.textContent = normalized.name || normalized.id || `魔物 ${{index + 1}}`;
-                    button.addEventListener("click", () => {{
-                      pmSyncActiveFromDom();
-                      playerMonsterActive = index;
-                      pmRender();
-                    }});
-                    playerMonsterTabs.appendChild(button);
-                  }});
-                }}
-                function pmRenderEditor() {{
-                  const entry = playerMonsterState.entries[playerMonsterActive];
-                  if (!entry) {{
-                    playerMonsterEditor.innerHTML = `
-                      <div class="villain-empty-editor">
-                        <h2>尚未创建魔物</h2>
-                        <p>点击“创建魔物”会生成一个空白魔物档案，你可以先写名字和别名，再慢慢补设定。</p>
-                      </div>
-                    `;
-                    return;
-                  }}
-                  const normalized = pmNormalizeEntry(entry, playerMonsterActive);
-                  const modeGeneral = !normalized.use_level_settings;
-                  if (!normalized.monster_levels.includes(playerMonsterEditingLevel)) {{
-                    playerMonsterEditingLevel = normalized.monster_levels[0] || null;
-                  }}
-                  const activeLevelSetting = normalized.level_settings[String(playerMonsterEditingLevel)] || {{ brief: "", content: "" }};
-                  const levelButtons = normalized.monster_levels.map((level) => `
-                    <button data-edit-level="${{level}}" class="${{level === playerMonsterEditingLevel ? "active" : ""}}" type="button">${{pmLevelLabel(level)}}</button>
-                  `).join("");
-                  playerMonsterEditor.innerHTML = `
-                    <article class="villain-card">
-                      <div class="villain-editor-head">
-                        <div>
-                          <span>Monster File</span>
-                          <h2>${{pmEscapeHtml(normalized.name || normalized.id || "未命名魔物")}}</h2>
-                        </div>
-                        <button class="danger" data-action="delete" type="button">删除</button>
-                      </div>
-                      <div class="villain-identity-grid">
-                        <label class="compact-field"><span>ID</span><input data-field="id" type="text" value="${{pmEscapeAttr(normalized.id)}}"></label>
-                        <label class="compact-field title-field"><span>魔物名</span><input data-field="name" type="text" value="${{pmEscapeAttr(normalized.name)}}"></label>
-                      </div>
-                      <div class="villain-level-row"><span>可见等级</span><div class="level-choice-row">${{pmLevelInputs("visible_level", normalized.visible_levels)}}</div></div>
-                      <div class="villain-level-row"><span>魔物等级</span><div class="level-choice-row">${{pmLevelInputs("monster_level", normalized.monster_levels)}}</div></div>
-                      <p class="villain-help">可见等级决定管理员在公共魔物书里通常会让哪些玩家等级看到；魔物等级表示这个魔物本身可以对应哪些强度档位。</p>
-                      <label class="block-field">魔物别名 / 关键词（支持中文逗号、英文逗号、顿号或换行分隔）
-                        <textarea data-field="keys" class="keys-editor" spellcheck="false">${{pmEscapeHtml(normalized.keys.join("\\n"))}}</textarea>
-                      </label>
-                      <div class="villain-mode-row" role="group" aria-label="设定模式">
-                        <button data-mode="general" class="${{modeGeneral ? "active" : ""}}" type="button">通用设定</button>
-                        <button data-mode="levels" class="${{!modeGeneral ? "active" : ""}}" type="button">按等级细分</button>
-                      </div>
-                      <div class="villain-mode-note" data-note="general"${{modeGeneral ? "" : " hidden"}}>通用设定适合一个魔物在不同等级下差异不大时使用，只需要填写简单设定和详细设定。</div>
-                      <div class="villain-mode-note" data-note="levels"${{modeGeneral ? " hidden" : ""}}>下方按钮来自“魔物等级”中勾选的等级。点击一个等级后，编辑区只显示该等级的一组简单设定和详细设定。</div>
-                      <section class="villain-general-panel"${{modeGeneral ? "" : " hidden"}}>
-                        <label class="block-field">简单设定
-                          <textarea data-field="brief" class="entry-content-editor villain-brief-editor" rows="3" spellcheck="false">${{pmEscapeHtml(normalized.brief)}}</textarea>
-                        </label>
-                        <label class="block-field">详细设定
-                          <textarea data-field="content" class="entry-content-editor villain-content-editor" rows="8" spellcheck="false">${{pmEscapeHtml(normalized.content)}}</textarea>
-                        </label>
-                      </section>
-                      <section class="villain-level-settings"${{modeGeneral ? " hidden" : ""}}>
-                        <div class="villain-level-switcher" role="group" aria-label="选择要编辑的魔物等级">${{levelButtons}}</div>
-                        <section class="villain-level-panel">
-                          <h3>${{pmLevelLabel(playerMonsterEditingLevel)}} 级魔物设定</h3>
-                          <label class="block-field">简单设定
-                            <textarea data-field="level_brief" class="entry-content-editor villain-brief-editor" rows="3" spellcheck="false">${{pmEscapeHtml(activeLevelSetting.brief)}}</textarea>
-                          </label>
-                          <label class="block-field">详细设定
-                            <textarea data-field="level_content" class="entry-content-editor villain-content-editor" rows="8" spellcheck="false">${{pmEscapeHtml(activeLevelSetting.content)}}</textarea>
-                          </label>
-                        </section>
-                      </section>
-                    </article>
-                  `;
-                  playerMonsterEditor.querySelector("[data-action='delete']").addEventListener("click", () => {{
-                    if (!confirm("确定删除这个魔物？")) return;
-                    playerMonsterState.entries.splice(playerMonsterActive, 1);
-                    playerMonsterActive = Math.max(0, Math.min(playerMonsterActive, playerMonsterState.entries.length - 1));
-                    pmRender();
-                  }});
-                  playerMonsterEditor.querySelectorAll("[data-mode]").forEach((button) => {{
-                    button.addEventListener("click", () => {{
-                      pmSyncActiveFromDom();
-                      playerMonsterEditor.querySelectorAll("[data-mode]").forEach((item) => item.classList.remove("active"));
-                      button.classList.add("active");
-                      const useLevels = button.dataset.mode === "levels";
-                      playerMonsterEditor.querySelector("[data-note='general']").hidden = useLevels;
-                      playerMonsterEditor.querySelector("[data-note='levels']").hidden = !useLevels;
-                      playerMonsterEditor.querySelector(".villain-general-panel").hidden = useLevels;
-                      playerMonsterEditor.querySelector(".villain-level-settings").hidden = !useLevels;
-                    }});
-                  }});
-                  playerMonsterEditor.querySelectorAll("[data-edit-level]").forEach((button) => {{
-                    button.addEventListener("click", () => {{
-                      pmSyncActiveFromDom();
-                      playerMonsterEditingLevel = Number.parseInt(button.dataset.editLevel, 10);
-                      pmRender();
-                    }});
-                  }});
-                  playerMonsterEditor.querySelectorAll("[data-field='monster_level']").forEach((input) => {{
-                    input.addEventListener("change", () => {{
-                      pmSyncActiveFromDom();
-                      const selected = Array.from(playerMonsterEditor.querySelectorAll("[data-field='monster_level']:checked")).map((item) => Number.parseInt(item.value, 10));
-                      if (!selected.includes(playerMonsterEditingLevel)) playerMonsterEditingLevel = selected[0] || null;
-                      pmRender();
-                    }});
-                  }});
-                  playerMonsterEditor.querySelector("[data-field='name']").addEventListener("input", (event) => {{
-                    const title = playerMonsterEditor.querySelector(".villain-editor-head h2");
-                    title.textContent = event.target.value.trim() || playerMonsterEditor.querySelector("[data-field='id']").value.trim() || "未命名魔物";
-                  }});
-                }}
-                function pmRender() {{
-                  playerMonsterState.entries = playerMonsterState.entries.map(pmNormalizeEntry);
-                  if (playerMonsterActive >= playerMonsterState.entries.length) playerMonsterActive = Math.max(0, playerMonsterState.entries.length - 1);
-                  pmRenderTabs();
-                  pmRenderEditor();
-                }}
-                function pmUniqueImportedId(rawId) {{
-                  const base = String(rawId || "public_monster").trim() || "public_monster";
-                  const existing = new Set(playerMonsterState.entries.map((entry) => String(entry.id || "").trim()).filter(Boolean));
-                  if (!existing.has(base)) return base;
-                  let suffix = 2;
-                  while (existing.has(`${{base}}_${{suffix}}`)) suffix += 1;
-                  return `${{base}}_${{suffix}}`;
-                }}
-                function pmRenderPublicMonsters() {{
-                  const entries = Array.isArray(publicMonsterBook.entries) ? publicMonsterBook.entries : [];
-                  if (!entries.length) {{
-                    publicMonsterEntries.innerHTML = '<p class="villain-empty">公共魔物书暂时没有魔物。</p>';
-                    return;
-                  }}
-                  publicMonsterEntries.innerHTML = entries.map((entry, index) => {{
-                    const normalized = pmNormalizeEntry(entry, index);
-                    return `
-                      <article class="player-monster-submission">
-                        <div class="player-monster-submission-head">
-                          <div>
-                            <span>公共魔物</span>
-                            <h3>${{pmEscapeHtml(normalized.name || normalized.id || `魔物 ${{index + 1}}`)}}</h3>
-                          </div>
-                          <button type="button" data-copy-public-monster="${{index}}">拷贝到我的魔物书</button>
-                        </div>
-                        <p><strong>等级：</strong>${{pmEscapeHtml(normalized.monster_levels.map(pmLevelLabel).join("/") || "未设置")}}</p>
-                        <p><strong>别名：</strong>${{pmEscapeHtml(normalized.keys.join("、") || "无")}}</p>
-                        <p>${{pmEscapeHtml(normalized.brief || normalized.content || "暂无简介")}}</p>
-                      </article>
-                    `;
-                  }}).join("");
-                  publicMonsterEntries.querySelectorAll("[data-copy-public-monster]").forEach((button) => {{
-                    button.addEventListener("click", () => {{
-                      pmSyncActiveFromDom();
-                      const index = Number.parseInt(button.dataset.copyPublicMonster, 10);
-                      const imported = pmNormalizeEntry(entries[index] || {{}}, playerMonsterState.entries.length);
-                      imported.id = pmUniqueImportedId(imported.id);
-                      playerMonsterState.entries.push(imported);
-                      playerMonsterActive = playerMonsterState.entries.length - 1;
-                      publicMonsterModal.hidden = true;
-                      pmRender();
-                      alert("已拷贝到你的魔物书编辑区，请点击“保存魔物档案”完成保存。");
-                    }});
-                  }});
-                }}
-                showPublicMonsters.addEventListener("click", () => {{
-                  pmSyncActiveFromDom();
-                  pmRenderPublicMonsters();
-                  publicMonsterModal.hidden = false;
-                }});
-                publicMonsterModal.querySelectorAll("[data-action='close-public-monsters']").forEach((button) => {{
-                  button.addEventListener("click", () => {{
-                    publicMonsterModal.hidden = true;
-                  }});
-                }});
-                playerAddMonster.addEventListener("click", () => {{
-                  pmSyncActiveFromDom();
-                  playerMonsterState.entries.push(pmDefaultEntry(playerMonsterState.entries.length));
-                  playerMonsterActive = playerMonsterState.entries.length - 1;
-                  pmRender();
-                }});
-                playerMonsterForm.addEventListener("submit", () => {{
-                  pmSyncActiveFromDom();
-                  const payload = {{
-                    version: playerMonsterState.version || 1,
-                    entries: playerMonsterState.entries.map((entry, index) => {{
-                      const normalized = pmNormalizeEntry(entry, index);
-                      return {{
-                        id: normalized.id,
-                        name: normalized.name,
-                        visible_levels: normalized.visible_levels,
-                        monster_levels: normalized.monster_levels,
-                        keys: normalized.keys,
-                        brief: normalized.brief,
-                        content: normalized.content,
-                        level_settings: normalized.use_level_settings ? normalized.level_settings : Object.fromEntries(
-                          normalized.monster_levels.map((level) => [String(level), {{ brief: "", content: "" }}])
-                        ),
-                      }};
-                    }}),
-                  }};
-                  playerMonsterContent.value = JSON.stringify(payload, null, 2);
-                }});
-                pmRender();
-              </script>
-            </section>
-            """,
-        )
-
-    async def _player_monsters_save(self, request: web.Request) -> web.Response:
-        session = self._session(request)
-        if not session or session["role"] != SESSION_USER_ROLE:
-            return self._forbidden()
-
-        data = await request.post()
-        group_id = str(data.get("group_id", "")).strip()
-        user_id = str(data.get("user_id", "")).strip()
-        content = str(data.get("content", "")).strip() or "{}"
-        if not group_id or not user_id:
-            raise web.HTTPBadRequest(text="missing group_id or user_id")
-        if not self._can_access_player(session, user_id):
-            return self._forbidden()
-
-        try:
-            normalized = self._normalize_monster_book(json.loads(content))
-            self.repository.write_player_source_file(
-                group_id,
-                user_id,
-                "player_monster_book.json",
-                json.dumps(normalized, ensure_ascii=False, indent=2),
-            )
-        except Exception as exc:
-            return self._html_response(
-                "保存魔物制作失败",
-                f"""
-                <h1>保存魔物制作失败</h1>
-                <p class="error">{self._e(exc)}</p>
-                <p><a class="button-link secondary-link" href="{self._url(f'/player/monsters?group_id={quote(group_id, safe="")}&user_id={quote(user_id, safe="")}')}">返回魔物制作</a></p>
-                """,
-                status=400,
-            )
-
-        raise self._redirect(
-            f"/player/monsters?group_id={quote(group_id, safe='')}&user_id={quote(user_id, safe='')}"
-        )
-
     def _player_site_detail_response(
         self,
         group_id: str,
@@ -3513,9 +2554,6 @@ class SaveWebViewer:
         relationship_url = self._url(
             f"/player/relationships?group_id={quote(group_id, safe='')}&user_id={quote(user_id, safe='')}"
         )
-        monster_url = self._url(
-            f"/player/monsters?group_id={quote(group_id, safe='')}&user_id={quote(user_id, safe='')}"
-        )
 
         return self._html_response(
             page_name,
@@ -3526,7 +2564,6 @@ class SaveWebViewer:
               </div>
               <nav class="player-floating-actions" aria-label="档案操作">
                 <a class="player-floating-action" href="{relationship_url}" title="关系图">关系图</a>
-                <a class="player-floating-action villain-action" href="{monster_url}" title="魔物制作">魔物制作</a>
               </nav>
               <header class="player-detail-hero">
                 <a class="player-back-link" href="{self._url('/')}">返回个人档案</a>
@@ -4285,42 +3322,6 @@ class SaveWebViewer:
             </section>
         """
 
-    def _player_monster_submissions(self) -> list[dict[str, Any]]:
-        submissions: list[dict[str, Any]] = []
-        for save in self.repository.list_saves():
-            group_id = str(save.get("group_id") or "")
-            user_id = str(save.get("user_id") or "")
-            if not group_id or not user_id:
-                continue
-            try:
-                content = self.repository.read_player_source_file(
-                    group_id,
-                    user_id,
-                    "player_monster_book.json",
-                )
-                if not content.strip():
-                    continue
-                book = self._normalize_monster_book(json.loads(content))
-            except Exception as exc:
-                logger.warning(f"读取玩家魔物书失败: group={group_id} user={user_id} {exc}")
-                continue
-            for index, entry in enumerate(book.get("entries", [])):
-                if not isinstance(entry, dict):
-                    continue
-                submissions.append(
-                    {
-                        "group_id": group_id,
-                        "user_id": user_id,
-                        "city_name": self.repository.get_city_name(group_id),
-                        "player_name": save.get("target_name")
-                        or save.get("nickname")
-                        or user_id,
-                        "entry_index": index,
-                        "entry": entry,
-                    }
-                )
-        return submissions
-
     def _player_clear_form(
         self,
         group_id: str,
@@ -4417,15 +3418,7 @@ class SaveWebViewer:
         if not group_id or not user_id:
             raise web.HTTPBadRequest(text="missing group_id or user_id")
 
-        delete_monsters = str(data.get("delete_monsters", "")).strip() in {
-            "1",
-            "true",
-            "on",
-            "yes",
-        }
-        self.repository.delete_player_save(
-            group_id, user_id, delete_monsters=delete_monsters
-        )
+        self.repository.delete_player_save(group_id, user_id)
         raise self._redirect("/")
 
     def _is_authorized(self, request: web.Request) -> bool:
@@ -5154,13 +4147,6 @@ class SaveWebViewer:
     .monster-modal-head {{ display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #e5ebf2; background: #f8fafc; }}
     .monster-modal-head span {{ display: block; color: #68707d; font-size: 12px; font-weight: 900; text-transform: uppercase; }}
     .monster-modal-head h2 {{ margin: 2px 0 0; color: #172033; }}
-    .player-monster-submissions {{ display: grid; gap: 10px; padding: 14px; overflow: auto; }}
-    .player-monster-submission {{ padding: 12px; border: 1px solid #dde2ea; border-radius: 8px; background: #fff; }}
-    .player-monster-submission-head {{ display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }}
-    .player-monster-submission-head span {{ color: #68707d; font-size: 12px; font-weight: 800; }}
-    .player-monster-submission-head h3 {{ margin: 3px 0 0; color: #172033; }}
-    .player-monster-submission p {{ margin: 8px 0; color: #303846; }}
-    .player-monster-submission pre {{ max-height: 260px; }}
     .delete-modal[hidden] {{ display: none; }}
     .delete-modal {{ position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; padding: 24px; }}
     .delete-modal-backdrop {{ position: absolute; inset: 0; background: rgba(15, 23, 42, .54); backdrop-filter: blur(4px); }}
@@ -5370,3 +4356,7 @@ class SaveWebViewer:
         if category == "text_completion":
             return "文本补全"
         return "世界背景"
+
+
+
+

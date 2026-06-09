@@ -46,7 +46,6 @@ class PlayerSaveRepository:
     SOURCE_FILE_NAMES = {
         "player_data.json",
         "player_data_update.json",
-        "player_monster_book.json",
         "relationships.json",
         "cameo_memory.jsonl",
         "daily_memory.jsonl",
@@ -1086,19 +1085,17 @@ class PlayerSaveRepository:
             candidates.append(npc)
         return candidates
 
-    def build_villain_monster_candidates(
+    def build_public_monster_candidates(
         self,
-        group_id: str,
-        user_id: str,
         *,
         player_level: int,
-        include_overleveled: bool = False,
     ) -> list[dict[str, Any]]:
+        if self.editable_manager is None:
+            return []
         return self._read_monster_candidates_from_path(
-            self.get_user_dir(group_id, user_id) / "player_monster_book.json",
+            self.editable_manager.monster_book_path,
             player_level=player_level,
-            source="player",
-            include_overleveled=include_overleveled,
+            source="public",
         )
 
     def _read_monster_candidates_from_path(
@@ -1178,6 +1175,12 @@ class PlayerSaveRepository:
         if not name and not content and not brief:
             return None
 
+        keys = entry.get("keys", [])
+        if isinstance(keys, str):
+            keys = [keys]
+        if not isinstance(keys, list):
+            keys = []
+
         return {
             "id": str(entry.get("id") or fallback_id).strip(),
             "name": name,
@@ -1185,10 +1188,31 @@ class PlayerSaveRepository:
             "visible_levels": [level_label(level) for level in visible_levels],
             "monster_levels": [level_label(level) for level in selectable_levels],
             "default_levels": [level_label(level) for level in default_levels],
+            "keys": [str(key).strip() for key in keys if str(key).strip()],
             "brief": brief,
             "content": content,
             "level_settings": usable_level_settings,
+            "monster_tags": PlayerSaveRepository._normalize_text_list(entry.get("monster_tags")),
+            "opening_hooks": PlayerSaveRepository._normalize_text_list(entry.get("opening_hooks")),
+            "preferred_locations": PlayerSaveRepository._normalize_text_list(entry.get("preferred_locations")),
+            "battle_gimmicks": PlayerSaveRepository._normalize_text_list(entry.get("battle_gimmicks")),
+            "ending_hooks": PlayerSaveRepository._normalize_text_list(entry.get("ending_hooks")),
         }
+
+    @staticmethod
+    def _normalize_text_list(value: object) -> list[str]:
+        if isinstance(value, str):
+            raw_items = re.split(r"[\n,，、]+", value)
+        elif isinstance(value, list):
+            raw_items = value
+        else:
+            raw_items = []
+        items: list[str] = []
+        for item in raw_items:
+            text = str(item or "").strip()
+            if text and text not in items:
+                items.append(text[:160])
+        return items[:12]
 
     def read_save_detail(self, group_id: str, user_id: str) -> dict[str, Any] | None:
         user_dir = self.get_user_dir(group_id, user_id)
@@ -1335,9 +1359,7 @@ class PlayerSaveRepository:
 
         self._atomic_write_json(user_dir / "player_data_update.json", player_data)
 
-    def delete_player_save(
-        self, group_id: str, user_id: str, *, delete_monsters: bool = True
-    ) -> bool:
+    def delete_player_save(self, group_id: str, user_id: str) -> bool:
         user_dir = self.get_user_dir(group_id, user_id)
         root = self.root_dir.resolve()
         target = user_dir.resolve()
@@ -1347,21 +1369,8 @@ class PlayerSaveRepository:
             return False
 
         self.delete_cameo_memories_by_source(group_id, user_id)
-        if delete_monsters:
-            shutil.rmtree(user_dir)
-            self._cleanup_empty_parent_dirs(user_dir)
-            return True
-
-        for child in user_dir.iterdir():
-            if child.name == "player_monster_book.json":
-                continue
-            if child.is_dir():
-                shutil.rmtree(child)
-            else:
-                child.unlink()
-        if not any(user_dir.iterdir()):
-            user_dir.rmdir()
-            self._cleanup_empty_parent_dirs(user_dir)
+        shutil.rmtree(user_dir)
+        self._cleanup_empty_parent_dirs(user_dir)
         return True
 
     def delete_cameo_memories_by_source(self, group_id: str, source_user_id: str) -> int:

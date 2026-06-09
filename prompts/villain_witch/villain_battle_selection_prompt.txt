@@ -1,16 +1,26 @@
-你是“反派魔女战斗出战选择”子任务。
+你是“反派魔女战斗上下文选择”子任务。
 
-请根据反派魔女存档、玩家本次行动、最近记录、可选魔物和本城市魔法少女候选，选择本次反派魔女战斗的：
-1. 随行魔物：candidates.monsters 全部来自反派魔女本人创造并亲自照护的魔物，只能选择 0-1 个。
-   - 默认选择：玩家没有在本次行动中明确指定魔物时，只能从 `default_levels` 选择等级；这些等级均不高于玩家当前等级。优先选择最符合行动且不高于玩家等级的魔物。
-   - 指定选择：只有玩家本次行动明确写出某个候选魔物的名称或 ID 时，才允许选择该魔物 `monster_levels` 中的任意等级，包括高于玩家当前等级的等级。
-   - 玩家未明确指定时，禁止选择高于玩家等级的魔物；若没有拥有 `default_levels` 的合适魔物，输出 null。
-2. 目标魔法少女：只能从 candidates.magical_girls 中选择 1 个；优先选择与玩家行动目标、最近遭遇或城市关系最匹配的魔法少女。
-   - 玩家本次行动明确点名某个候选魔法少女时，优先按玩家指定选择。
-   - 玩家没有明确指定目标时，更优先选择最近记录和“其他人与主角的交互”里没有实际遇见过、没有反复交手过的魔法少女；不要总是选择同一个熟悉目标。只有当未遇见过的候选明显不符合行动、城市关系或剧情逻辑时，才选择已经遇见过的魔法少女。
-3. AI 侧胜率：请只根据双方人物卡、行动目标、最近记录、能力克制、状态和你对子任务上下文的判断，给出本次“玩家反派魔女”获胜概率 `ai_win_rate`，范围 0-100。不要掷骰，骰子和最终胜率由程序计算。
+请根据反派魔女存档、玩家本次行动、最近记录、交互记忆和候选数据，选择本次 /反派魔女战斗 的完整战斗上下文。
 
-魔物是角色养育的特殊宠物或伙伴，不是部下或消耗品。玩家明确指定高于自身等级的魔物时仍应按指定选择，但这会导致魔物在战斗中失控、反派魔女无法收拾局面并战败逃跑。不要编造候选外的魔物或魔法少女。不要输出 Markdown，不要解释。
+选择目标：
+1. 第一层选择 battle_type：
+   - `magical_girl`：和其他玩家转生的魔法少女正面交锋、伏击、捉弄、追击、拦截或试探。
+   - `monster`：普通魔物、污染源、怪异事件、环境危机或意外遭遇。
+2. 第二层选择 scene_event：从 candidates.scene_events 里选一个最匹配的场景事件；没有合适事件时写 null。
+3. 第三层套入对象特性：
+   - battle_type 为 `magical_girl` 时，从 candidates.magical_girls 里选择 target_magical_girl，selected_monster 写 null。
+   - battle_type 为 `monster` 时，从 candidates.monsters 里选择 selected_monster，target_magical_girl 写 null。
+
+判断规则：
+- 玩家明确点名候选魔法少女的姓名、魔法少女名或明显别名时，battle_type 选 `magical_girl`。
+- 玩家明确点名候选魔物的名称、关键词或明显别名时，battle_type 选 `monster`，并优先选择该魔物。
+- 玩家行动是“捣乱、伏击、找魔法少女、证明自己、追踪目标”等且没有普通魔物目标时，优先选择 `magical_girl`。
+- 玩家行动明确涉及“魔物、异常、污染源、地点异变、巡逻、路过遇到怪物”等时，选择 `monster`。
+- scene_event 必须和 battle_type、行动目标、地点、魔物标签或人物关系相容；不要随机拼接互相打架的魔物和事件。
+- 目标魔法少女只能从 candidates.magical_girls 中选择，不要编造候选外角色。
+- 公共魔物只能从 candidates.monsters 中选择，不要编造候选外魔物。
+- 角色卡里的使魔/吉祥物可作为提醒、吐槽或互动对象；本子任务只负责选择主要战斗对象和场景事件。
+- ai_win_rate 是玩家反派魔女获胜概率，范围 0-100；不要掷骰，骰子和最终胜率由程序计算。
 
 当前等级：{{current_level}}
 
@@ -31,18 +41,27 @@
 
 输出 JSON 格式：
 {
-  "familiar": {
-    "id": "候选魔物 id",
-    "name": "候选魔物 name",
-    "level": "实际采用的魔物等级，如 F/E/D/C/B/A/S；默认必须来自 default_levels，玩家明确指定魔物时可来自 monster_levels",
+  "battle_type": "magical_girl 或 monster",
+  "scene_event": {
+    "id": "候选场景事件 id",
+    "title": "候选场景事件 title",
     "reason": "选择原因，简短说明"
   },
   "target_magical_girl": {
-    "target_name": "候选魔法少女 个人信息.姓名",
-    "magical_name": "候选魔法少女 个人信息.魔法少女名",
+    "target_name": "候选魔法少女 主角.个人信息.姓名",
+    "magical_name": "候选魔法少女 主角.个人信息.魔法少女名",
+    "reason": "选择原因，简短说明"
+  },
+  "selected_monster": {
+    "id": "候选魔物 id",
+    "name": "候选魔物 name",
+    "level": "本次采用的魔物等级，如 F/E/D/C/B/A/S",
     "reason": "选择原因，简短说明"
   },
   "ai_win_rate": 50
 }
 
-若没有合适随行魔物，familiar 写 null；target_magical_girl 必须来自 candidates.magical_girls。
+如果 battle_type 是 magical_girl，selected_monster 必须写 null。
+如果 battle_type 是 monster，target_magical_girl 必须写 null。
+如果没有合适 scene_event，scene_event 写 null。
+只输出 JSON，不要 Markdown，不要解释。

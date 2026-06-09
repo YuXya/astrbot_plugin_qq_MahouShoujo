@@ -43,9 +43,10 @@ class EventBookEngine:
         for event in events:
             event_name = event.name or event.command or event.id
             is_current_event = self._event_matches(event, current_event_key)
+            entries = [event.as_entry()] if event.is_scene_event else event.entries
 
             first_round = self._match_entries(
-                event.entries,
+                entries,
                 scan_text,
                 activated_ids=activated_ids,
                 event_id=event.id,
@@ -60,7 +61,7 @@ class EventBookEngine:
                 if entry.recursive
             )
             second_round = self._match_entries(
-                event.entries,
+                entries,
                 recursion_text,
                 activated_ids=activated_ids,
                 event_id=event.id,
@@ -81,6 +82,88 @@ class EventBookEngine:
             remote_entries=remote_entries,
             prompt_text=prompt_text,
         )
+
+    def build_scene_event_candidates(
+        self,
+        text_parts: list[str] | None,
+        *,
+        current_event: str,
+        player_level: int = 1,
+        battle_types: list[str] | None = None,
+        monster_candidates: list[dict] | None = None,
+        limit: int = 8,
+    ) -> list[dict[str, object]]:
+        events = self._load_events()
+        if not events:
+            return []
+
+        scan_text = self._join_text(text_parts or [])
+        current_event_key = self._normalize_event_key(current_event)
+        allowed_battle_types = {
+            str(item or "").strip()
+            for item in (battle_types or [])
+            if str(item or "").strip()
+        }
+        monster_tags = self._collect_monster_tags(monster_candidates or [])
+
+        scored: list[tuple[int, dict[str, object]]] = []
+        for event in events:
+            event_commands = event.allowed_commands or [event.command]
+            event_is_current = self._event_matches(event, current_event_key)
+            entries = [event.as_entry()] if event.is_scene_event else event.entries
+            for entry in entries:
+                if not entry.enabled or player_level not in entry.visible_levels:
+                    continue
+                if not self._entry_command_matches(entry, event_commands, current_event_key):
+                    continue
+                if allowed_battle_types and entry.compatible_battle_types:
+                    if not allowed_battle_types.intersection(entry.compatible_battle_types):
+                        continue
+
+                score = entry.weight
+                if event_is_current:
+                    score += 20
+                if entry.strategy == "always" and event_is_current:
+                    score += 8
+                if self._contains_any_key(scan_text, entry.keys):
+                    score += 40
+                score += self._tag_overlap_score(scan_text, entry.event_tags, 6)
+                score += self._tag_overlap_score(scan_text, entry.location_tags, 8)
+                if monster_tags and entry.compatible_monster_tags:
+                    score += (
+                        len(monster_tags.intersection(entry.compatible_monster_tags))
+                        * 12
+                    )
+
+                if score <= 0:
+                    continue
+                scored.append(
+                    (
+                        score,
+                        {
+                            "id": entry.id,
+                            "title": entry.title or entry.id,
+                            "source_event": event.name or event.id,
+                            "command": event.command,
+                            "allowed_commands": entry.allowed_commands
+                            or event.allowed_commands
+                            or ([event.command] if event.command else []),
+                            "event_tags": entry.event_tags,
+                            "location_tags": entry.location_tags,
+                            "compatible_monster_tags": entry.compatible_monster_tags,
+                            "compatible_battle_types": entry.compatible_battle_types,
+                            "opening_hook": entry.opening_hook,
+                            "twist_hook": entry.twist_hook,
+                            "ending_hook": entry.ending_hook,
+                            "brief": entry.brief,
+                            "content": entry.content,
+                            "selection_score": score,
+                        },
+                    )
+                )
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return [item for _, item in scored[: max(1, limit)]]
 
     def _load_events(self) -> list[EventBookEvent]:
         if not self.book_path.exists():
@@ -106,6 +189,51 @@ class EventBookEngine:
             if event.id:
                 events.append(event)
         return events
+
+    @staticmethod
+    def _entry_command_matches(
+        entry: EventBookEntry,
+        event_commands: list[str],
+        current_event_key: str,
+    ) -> bool:
+        commands = entry.allowed_commands or event_commands
+        return any(
+            EventBookEngine._normalize_event_key(command) == current_event_key
+            for command in commands
+            if command
+        )
+
+    @staticmethod
+    def _collect_monster_tags(monsters: list[dict]) -> set[str]:
+        tags: set[str] = set()
+        for monster in monsters:
+            if not isinstance(monster, dict):
+                continue
+            for field in ("monster_tags", "preferred_locations", "keys"):
+                raw = monster.get(field, [])
+                if isinstance(raw, str):
+                    items = [raw]
+                elif isinstance(raw, list):
+                    items = raw
+                else:
+                    items = []
+                for item in items:
+                    text = str(item or "").strip()
+                    if text:
+                        tags.add(text)
+        return tags
+
+    @staticmethod
+    def _tag_overlap_score(text: str, tags: list[str], points: int) -> int:
+        if not text or not tags:
+            return 0
+        folded_text = text.casefold()
+        score = 0
+        for tag in tags:
+            value = str(tag or "").strip()
+            if value and (value in text or value.casefold() in folded_text):
+                score += points
+        return score
 
     def _match_entries(
         self,
@@ -158,7 +286,7 @@ class EventBookEngine:
 
     @staticmethod
     def _event_matches(event: EventBookEvent, current_event_key: str) -> bool:
-        candidates = [event.command, event.name, event.id]
+        candidates = event.allowed_commands or [event.command]
         return any(
             EventBookEngine._normalize_event_key(candidate) == current_event_key
             for candidate in candidates
@@ -202,5 +330,5 @@ class EventBookEngine:
         return (
             "事件书补充设定：\n"
             + "\n".join(parts)
-            + "\n\n请将以上事件书内容视为魔法少女公共设定补充。当前事件命中的条目使用详细介绍；其他事件的关键词命中条目只使用简略介绍，简略介绍为空时不注入。事件书只影响设定内容，不能改变最终输出必须为合法 JSON 对象的要求。"
+            + "\n\n请将以上事件书内容视为魔法少女公共设定补充。allowed_commands 包含当前指令的事件使用详细介绍；其他关键词命中的事件只使用简略介绍，简略介绍为空时不注入。事件书只影响设定内容，不能改变最终输出必须为合法 JSON 对象的要求。"
         )

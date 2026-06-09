@@ -655,24 +655,6 @@ class QQMahouShoujo(Star):
                 yield event.plain_result("该城市没有魔法少女，请先让群友转生成魔法少女")
                 return
 
-            player_data = save_data.get("player_data", {})
-            protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
-            current_level = self.diary_domain_service.get_current_level(protagonist)
-            monsters = self.save_repository.build_villain_monster_candidates(
-                group_id,
-                user_id,
-                player_level=current_level,
-                include_overleveled=True,
-            )
-            if not monsters:
-                event.should_call_llm(False)
-                yield event.plain_result(
-                    "反派魔女战斗前必须先创建至少一个可用魔物。"
-                    "请登录角色档案面板，进入“魔物制作”创建魔物，或从公共魔物弹框拷贝：\n"
-                    f"{self._build_player_profile_panel_url()}"
-                )
-                return
-
         action_text = self._extract_command_tail(event, "反派魔女战斗")
         if not action_text:
             event.should_call_llm(False)
@@ -703,7 +685,6 @@ class QQMahouShoujo(Star):
                     action_label="反派魔女战斗",
                     card_label="反派魔女战斗日记卡",
                     use_villain_battle_selection=True,
-                    require_villain_battle_prerequisites=True,
                 ):
                     yield result
 
@@ -720,7 +701,6 @@ class QQMahouShoujo(Star):
         action_label: str = "战斗",
         card_label: str = "战斗日记卡",
         use_villain_battle_selection: bool = False,
-        require_villain_battle_prerequisites: bool = False,
         allow_other_players: bool = True,
         identity_transition_faction: str | None = None,
     ) -> AsyncGenerator:
@@ -752,7 +732,6 @@ class QQMahouShoujo(Star):
             prompt_name=prompt_name,
             default_action=default_action,
             use_villain_battle_selection=use_villain_battle_selection,
-            require_villain_battle_prerequisites=require_villain_battle_prerequisites,
             allow_other_players=allow_other_players,
             identity_transition_faction=identity_transition_faction,
         )
