@@ -1523,16 +1523,391 @@ class SaveWebViewer:
                 content,
                 warning=f"事件书 JSON 解析失败，请先修复原始 JSON：{exc}",
             )
-        return self._plain_editable_file_response(
+
+        book_json = self._json_script_data(book)
+        storage_key = "qq_mahoushoujo:event_book:open_events_flat"
+        source_url = self._url(
+            f"/editable/source?id={quote(file_id, safe='')}&category={self._e(back_category)}"
+        )
+        export_url = self._url(f"/editable/export?id={quote(file_id, safe='')}")
+        key_info_export_url = self._url(
+            f"/editable/export/key-info?id={quote(file_id, safe='')}"
+        )
+        return self._html_response(
             title,
-            file_id,
-            back_category,
-            note,
-            json.dumps(book, ensure_ascii=False, indent=2),
-            warning=(
-                "事件书已改为扁平事件列表：events 中每个对象就是一个事件，"
-                "allowed_commands 数组声明哪些指令可以触发它。"
-            ),
+            f"""
+            <h1>{self._e(title)}</h1>
+            <p><a href="{self._url(f'/editable?category={self._e(back_category)}')}">返回{self._e(self._editable_category_title(back_category))}</a></p>
+            <p class="muted">{self._e(file_id)}</p>
+            <p class="muted">事件书是扁平事件列表：每个事件通过 allowed_commands 声明可被哪些指令触发。同一个事件可以同时服务魔法少女日常、反派魔女日常、魔法少女战斗和反派魔女战斗。</p>
+            <div class="source-actions">
+              <a class="button-link secondary-link" href="{source_url}">编辑源码</a>
+              <a class="button-link secondary-link" href="{export_url}">导出 JSON</a>
+              <a class="button-link secondary-link" href="{key_info_export_url}">导出关键信息 TXT</a>
+              <form class="inline-import-form" method="post" action="{self._url('/editable/import')}" enctype="multipart/form-data">
+                <input type="hidden" name="id" value="{self._e(file_id)}">
+                <input type="hidden" name="category" value="{self._e(back_category)}">
+                <input name="import_file" type="file" accept=".json,application/json">
+                <button class="secondary compact-button" type="submit">导入 JSON</button>
+              </form>
+            </div>
+            <form id="event-book-form" method="post" action="{self._url('/editable/save')}">
+              <input type="hidden" name="id" value="{self._e(file_id)}">
+              <input type="hidden" name="category" value="{self._e(back_category)}">
+              <input id="event-book-content" type="hidden" name="content" value="">
+              <label for="note">资源说明 / 注释</label>
+              <textarea id="note" class="note-editor" name="note" spellcheck="false">{self._e(note)}</textarea>
+              <div class="world-book-toolbar">
+                <div>
+                  <h2>事件列表</h2>
+                  <p class="muted">每个事件可配置适用指令、关键词、事件标签、地点标签、兼容魔物标签、兼容战斗类型和开场/变奏/结尾钩子。</p>
+                </div>
+                <button id="add-event" type="button">+ 添加事件</button>
+              </div>
+              <div id="event-book-events"></div>
+              <div class="actions">
+                <button type="submit">保存</button>
+              </div>
+            </form>
+            <form method="post" action="{self._url('/editable/reset')}" onsubmit="return confirm('确定恢复为当前代码内置默认内容？旧文件会先自动备份。');">
+              <input type="hidden" name="id" value="{self._e(file_id)}">
+              <input type="hidden" name="category" value="{self._e(back_category)}">
+              <button class="secondary" type="submit">恢复当前默认内容</button>
+            </form>
+            <script>
+              const initialEventBook = {book_json};
+              const eventEntriesEl = document.getElementById("event-book-events");
+              const eventForm = document.getElementById("event-book-form");
+              const eventContentInput = document.getElementById("event-book-content");
+              const addEventButton = document.getElementById("add-event");
+              const eventStorageKey = "{self._e(storage_key)}";
+              const eventLevelOptions = [
+                {{ value: 1, label: "F" }},
+                {{ value: 2, label: "E" }},
+                {{ value: 3, label: "D" }},
+                {{ value: 4, label: "C" }},
+                {{ value: 5, label: "B" }},
+                {{ value: 6, label: "A" }},
+                {{ value: 7, label: "S" }},
+              ];
+              const commandOptions = [
+                "/魔法少女转生",
+                "/反派魔女转生",
+                "/魔法少女战斗",
+                "/魔法少女日常",
+                "/魔法少女黑化",
+                "/反派魔女洗白",
+                "/反派魔女战斗",
+                "/反派魔女日常",
+              ];
+              const battleTypeOptions = [
+                "monster",
+                "villain_witch",
+                "magical_girl",
+                "environment_crisis",
+              ];
+              const eventState = {{
+                ...initialEventBook,
+                events: Array.isArray(initialEventBook.events) ? initialEventBook.events : [],
+              }};
+              let eventOpenKeys = new Set();
+              let eventHasLoadedOpenState = false;
+
+              function eventDefaults(index) {{
+                return {{
+                  id: `event_${{index + 1}}`,
+                  name: "",
+                  enabled: true,
+                  recursive: true,
+                  strategy: "keyword",
+                  weight: 10,
+                  keys: [],
+                  visible_levels: eventLevelOptions.map((item) => item.value),
+                  allowed_commands: [],
+                  event_tags: [],
+                  location_tags: [],
+                  compatible_monster_tags: [],
+                  compatible_battle_types: [],
+                  opening_hook: "",
+                  twist_hook: "",
+                  ending_hook: "",
+                  brief: "",
+                  content: "",
+                }};
+              }}
+
+              function eventNormalizeEntry(entry, index) {{
+                return {{
+                  id: String(entry.id || `event_${{index + 1}}`).trim(),
+                  name: String(entry.name || entry.title || ""),
+                  enabled: entry.enabled !== false,
+                  recursive: entry.recursive !== false,
+                  strategy: entry.strategy === "always" ? "always" : "keyword",
+                  weight: eventNormalizeWeight(entry.weight),
+                  keys: eventSplitList(entry.keys),
+                  visible_levels: eventNormalizeLevels(entry.visible_levels, entry.min_level, entry.max_level),
+                  allowed_commands: eventSplitList(entry.allowed_commands || entry.command),
+                  event_tags: eventSplitList(entry.event_tags),
+                  location_tags: eventSplitList(entry.location_tags),
+                  compatible_monster_tags: eventSplitList(entry.compatible_monster_tags),
+                  compatible_battle_types: eventSplitList(entry.compatible_battle_types),
+                  opening_hook: String(entry.opening_hook || ""),
+                  twist_hook: String(entry.twist_hook || ""),
+                  ending_hook: String(entry.ending_hook || ""),
+                  brief: String(entry.brief || ""),
+                  content: String(entry.content || ""),
+                }};
+              }}
+
+              function eventNormalizeWeight(value) {{
+                const parsed = Number.parseInt(value, 10);
+                if (!Number.isFinite(parsed)) return 10;
+                return Math.max(1, Math.min(100, parsed));
+              }}
+
+              function eventNormalizeLevels(raw, minLevel, maxLevel) {{
+                let selected = [];
+                if (Array.isArray(raw)) {{
+                  selected = raw.map((level) => Number.parseInt(level, 10));
+                }} else if (typeof raw === "string" && raw.trim()) {{
+                  selected = raw.split(/[,，、\\s]+/).map((level) => {{
+                    const trimmed = String(level).trim().toUpperCase();
+                    const byLabel = eventLevelOptions.find((item) => item.label === trimmed);
+                    return byLabel ? byLabel.value : Number.parseInt(trimmed, 10);
+                  }});
+                }} else {{
+                  const minValue = Number.parseInt(minLevel, 10);
+                  const maxValue = Number.parseInt(maxLevel, 10);
+                  const low = Number.isFinite(minValue) ? Math.max(1, Math.min(7, minValue)) : 1;
+                  const high = Number.isFinite(maxValue) ? Math.max(low, Math.min(7, maxValue)) : 7;
+                  selected = eventLevelOptions.map((item) => item.value).filter((level) => level >= low && level <= high);
+                }}
+                const clean = eventLevelOptions.map((item) => item.value).filter((level) => selected.includes(level));
+                return clean.length ? clean : eventLevelOptions.map((item) => item.value);
+              }}
+
+              function eventLevelsLabel(levels) {{
+                const normalized = eventNormalizeLevels(levels);
+                if (normalized.length === eventLevelOptions.length) return "F-S";
+                return normalized.map((level) => eventLevelOptions.find((item) => item.value === level)?.label || String(level)).join("/");
+              }}
+
+              function eventLevelInputs(levels) {{
+                const selected = new Set(eventNormalizeLevels(levels));
+                return eventLevelOptions.map((item) => `
+                  <label class="summary-check level-choice">
+                    <input data-field="visible_level" type="checkbox" value="${{item.value}}"${{selected.has(item.value) ? " checked" : ""}}> ${{item.label}}
+                  </label>
+                `).join("");
+              }}
+
+              function eventCommandInputs(commands) {{
+                const selected = new Set(eventSplitList(commands));
+                return commandOptions.map((command) => `
+                  <label class="summary-check command-choice">
+                    <input data-field="allowed_command" type="checkbox" value="${{eventEscapeAttr(command)}}"${{selected.has(command) ? " checked" : ""}}> ${{eventEscapeHtml(command)}}
+                  </label>
+                `).join("");
+              }}
+
+              function eventBattleTypeInputs(types) {{
+                const selected = new Set(eventSplitList(types));
+                return battleTypeOptions.map((type) => `
+                  <label class="summary-check command-choice">
+                    <input data-field="compatible_battle_type" type="checkbox" value="${{eventEscapeAttr(type)}}"${{selected.has(type) ? " checked" : ""}}> ${{eventEscapeHtml(type)}}
+                  </label>
+                `).join("");
+              }}
+
+              function eventSplitList(value) {{
+                const raw = Array.isArray(value) ? value.join("\\n") : String(value || "");
+                return raw.split(/[\\n,，、]/).map((item) => item.trim()).filter(Boolean);
+              }}
+
+              function eventSyncFromDom() {{
+                eventState.events = Array.from(eventEntriesEl.querySelectorAll(".event-entry")).map((card, index) => eventNormalizeEntry({{
+                  id: card.querySelector("[data-field='id']").value,
+                  name: card.querySelector("[data-field='name']").value,
+                  enabled: card.querySelector("[data-field='enabled']").checked,
+                  recursive: card.querySelector("[data-field='recursive']").checked,
+                  strategy: card.querySelector("[data-field='strategy']").value,
+                  weight: card.querySelector("[data-field='weight']").value,
+                  keys: eventSplitList(card.querySelector("[data-field='keys']").value),
+                  visible_levels: Array.from(card.querySelectorAll("[data-field='visible_level']:checked")).map((input) => Number.parseInt(input.value, 10)),
+                  allowed_commands: Array.from(card.querySelectorAll("[data-field='allowed_command']:checked")).map((input) => input.value),
+                  event_tags: eventSplitList(card.querySelector("[data-field='event_tags']").value),
+                  location_tags: eventSplitList(card.querySelector("[data-field='location_tags']").value),
+                  compatible_monster_tags: eventSplitList(card.querySelector("[data-field='compatible_monster_tags']").value),
+                  compatible_battle_types: Array.from(card.querySelectorAll("[data-field='compatible_battle_type']:checked")).map((input) => input.value),
+                  opening_hook: card.querySelector("[data-field='opening_hook']").value,
+                  twist_hook: card.querySelector("[data-field='twist_hook']").value,
+                  ending_hook: card.querySelector("[data-field='ending_hook']").value,
+                  brief: card.querySelector("[data-field='brief']").value,
+                  content: card.querySelector("[data-field='content']").value,
+                }}, index));
+              }}
+
+              function eventEntryKey(entry, index) {{
+                return String(entry.id || entry.name || `event_${{index + 1}}`).trim();
+              }}
+
+              function eventLoadOpenState() {{
+                try {{
+                  const raw = localStorage.getItem(eventStorageKey);
+                  if (!raw) return;
+                  const data = JSON.parse(raw);
+                  if (data && Array.isArray(data.openKeys)) {{
+                    eventOpenKeys = new Set(data.openKeys.map(String));
+                    eventHasLoadedOpenState = true;
+                  }}
+                }} catch (error) {{
+                  console.warn("failed to load event book open state", error);
+                }}
+              }}
+
+              function eventPersistOpenState() {{
+                try {{
+                  localStorage.setItem(eventStorageKey, JSON.stringify({{ openKeys: Array.from(eventOpenKeys) }}));
+                }} catch (error) {{
+                  console.warn("failed to save event book open state", error);
+                }}
+              }}
+
+              function eventCaptureOpenState() {{
+                eventOpenKeys = new Set();
+                eventEntriesEl.querySelectorAll(".event-entry").forEach((card) => {{
+                  const details = card.querySelector("details");
+                  if (card.dataset.entryKey && details && details.open) eventOpenKeys.add(card.dataset.entryKey);
+                }});
+                eventHasLoadedOpenState = true;
+                eventPersistOpenState();
+              }}
+
+              function eventRenderEntries() {{
+                eventEntriesEl.innerHTML = "";
+                eventState.events.forEach((entry, index) => {{
+                  const normalized = eventNormalizeEntry(entry, index);
+                  const entryKey = eventEntryKey(normalized, index);
+                  const isOpen = eventHasLoadedOpenState && eventOpenKeys.has(entryKey);
+                  const card = document.createElement("section");
+                  card.className = "world-entry event-entry";
+                  card.dataset.entryKey = entryKey;
+                  const summaryTitle = normalized.name || normalized.id || `事件 ${{index + 1}}`;
+                  const commandLabel = normalized.allowed_commands.length ? normalized.allowed_commands.join(" / ") : "未选择指令";
+                  const typeLabel = normalized.compatible_battle_types.length ? normalized.compatible_battle_types.join(" / ") : "不限战斗类型";
+                  card.innerHTML = `
+                    <details${{isOpen ? " open" : ""}}>
+                      <summary class="world-entry-head">
+                        <span class="entry-title">${{eventEscapeHtml(summaryTitle)}}</span>
+                        <span class="muted" style="margin-left:4px">可见 ${{eventLevelsLabel(normalized.visible_levels)}} · ${{eventEscapeHtml(commandLabel)}} · ${{eventEscapeHtml(typeLabel)}}</span>
+                        <label class="summary-check"><input data-field="enabled" type="checkbox"${{normalized.enabled ? " checked" : ""}}> 启用</label>
+                        <button class="danger" type="button" data-action="delete">删除</button>
+                      </summary>
+                      <div class="world-entry-body">
+                        <div class="world-entry-grid">
+                          <label class="compact-field"><span>ID</span><input data-field="id" type="text" value="${{eventEscapeAttr(normalized.id)}}"></label>
+                          <label class="compact-field title-field"><span>事件名</span><input data-field="name" type="text" value="${{eventEscapeAttr(normalized.name)}}"></label>
+                          <label class="compact-field"><span>权重</span><input data-field="weight" type="number" min="1" max="100" value="${{normalized.weight}}"></label>
+                          <label class="compact-field"><span>触发方式</span>
+                            <select data-field="strategy">
+                              <option value="keyword"${{normalized.strategy === "keyword" ? " selected" : ""}}>关键词命中</option>
+                              <option value="always"${{normalized.strategy === "always" ? " selected" : ""}}>总是注入</option>
+                            </select>
+                          </label>
+                          <div class="compact-field level-field"><span>可见等级</span><div class="level-choice-row">${{eventLevelInputs(normalized.visible_levels)}}</div></div>
+                        </div>
+                        <div class="compact-field level-field"><span>适用指令</span><div class="level-choice-row">${{eventCommandInputs(normalized.allowed_commands)}}</div></div>
+                        <div class="compact-field level-field"><span>兼容战斗类型</span><div class="level-choice-row">${{eventBattleTypeInputs(normalized.compatible_battle_types)}}</div></div>
+                        <label class="summary-check" style="margin-top:8px"><input data-field="recursive" type="checkbox"${{normalized.recursive ? " checked" : ""}}> 允许递归命中补充设定</label>
+                        <label class="block-field">关键词（支持中文逗号、英文逗号、顿号或换行分隔）
+                          <textarea data-field="keys" class="keys-editor" spellcheck="false">${{eventEscapeHtml(normalized.keys.join("\\n"))}}</textarea>
+                        </label>
+                        <label class="block-field">事件标签（传闻调查、偶遇、求救、巡逻、追踪、误会、地点异常、任务委托、主动袭击等）
+                          <textarea data-field="event_tags" class="keys-editor" spellcheck="false">${{eventEscapeHtml(normalized.event_tags.join("\\n"))}}</textarea>
+                        </label>
+                        <label class="block-field">地点标签（学校、旧校舍、下水道、商店街、梦境、镜子、雨夜等）
+                          <textarea data-field="location_tags" class="keys-editor" spellcheck="false">${{eventEscapeHtml(normalized.location_tags.join("\\n"))}}</textarea>
+                        </label>
+                        <label class="block-field">兼容魔物标签（每行一个；留空表示不限制魔物）
+                          <textarea data-field="compatible_monster_tags" class="keys-editor" spellcheck="false">${{eventEscapeHtml(normalized.compatible_monster_tags.join("\\n"))}}</textarea>
+                        </label>
+                        <label class="block-field">场景开场钩子
+                          <textarea data-field="opening_hook" class="entry-content-editor" spellcheck="false" style="height:60px">${{eventEscapeHtml(normalized.opening_hook)}}</textarea>
+                        </label>
+                        <label class="block-field">场景变奏 / 第三方扰动
+                          <textarea data-field="twist_hook" class="entry-content-editor" spellcheck="false" style="height:60px">${{eventEscapeHtml(normalized.twist_hook)}}</textarea>
+                        </label>
+                        <label class="block-field">场景结尾钩子
+                          <textarea data-field="ending_hook" class="entry-content-editor" spellcheck="false" style="height:60px">${{eventEscapeHtml(normalized.ending_hook)}}</textarea>
+                        </label>
+                        <label class="block-field">简略介绍（其他指令关键词命中时注入；为空则不注入）
+                          <textarea data-field="brief" class="entry-content-editor" spellcheck="false" style="height:60px">${{eventEscapeHtml(normalized.brief)}}</textarea>
+                        </label>
+                        <label class="block-field">详细介绍（当前指令命中或 always 时注入）
+                          <textarea data-field="content" class="entry-content-editor" spellcheck="false">${{eventEscapeHtml(normalized.content)}}</textarea>
+                        </label>
+                      </div>
+                    </details>
+                  `;
+                  const detailsEl = card.querySelector("details");
+                  detailsEl.addEventListener("toggle", () => {{
+                    if (detailsEl.open) eventOpenKeys.add(entryKey);
+                    else eventOpenKeys.delete(entryKey);
+                    eventHasLoadedOpenState = true;
+                    eventPersistOpenState();
+                  }});
+                  card.querySelector("[data-action='delete']").addEventListener("click", (event) => {{
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (!confirm("确定删除这个事件？")) return;
+                    eventCaptureOpenState();
+                    eventSyncFromDom();
+                    eventState.events.splice(index, 1);
+                    eventOpenKeys.delete(entryKey);
+                    eventPersistOpenState();
+                    eventRenderEntries();
+                  }});
+                  const refreshTitle = () => {{
+                    card.querySelector(".entry-title").textContent =
+                      card.querySelector("[data-field='name']").value.trim()
+                      || card.querySelector("[data-field='id']").value.trim()
+                      || `事件 ${{index + 1}}`;
+                  }};
+                  card.querySelector("[data-field='name']").addEventListener("input", refreshTitle);
+                  card.querySelector("[data-field='id']").addEventListener("input", refreshTitle);
+                  eventEntriesEl.appendChild(card);
+                }});
+              }}
+
+              function eventEscapeHtml(value) {{
+                return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+              }}
+
+              function eventEscapeAttr(value) {{
+                return eventEscapeHtml(value).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+              }}
+
+              addEventButton.addEventListener("click", () => {{
+                eventCaptureOpenState();
+                eventSyncFromDom();
+                const newEntry = eventDefaults(eventState.events.length);
+                eventState.events.push(newEntry);
+                eventOpenKeys.add(eventEntryKey(newEntry, eventState.events.length - 1));
+                eventHasLoadedOpenState = true;
+                eventPersistOpenState();
+                eventRenderEntries();
+              }});
+
+              eventForm.addEventListener("submit", () => {{
+                eventSyncFromDom();
+                eventContentInput.value = JSON.stringify(eventState, null, 2);
+              }});
+
+              eventState.events = eventState.events.map(eventNormalizeEntry);
+              eventLoadOpenState();
+              eventRenderEntries();
+            </script>
+            """,
         )
 
     @classmethod
