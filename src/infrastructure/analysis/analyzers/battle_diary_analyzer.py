@@ -198,7 +198,30 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         )
         cameo_memories_text = self._format_cameo_memories(cameo_memories)
         logs_text = self._format_logs(logs)
-        teammate_info = self._format_teammate_info(nearby_players)
+        context_teammates = (selection_context or {}).get("selected_teammates")
+        teammate_info = self._format_teammate_info(
+            context_teammates if isinstance(context_teammates, list) else nearby_players
+        )
+        selected_enemies = self._as_list((selection_context or {}).get("selected_enemies"))
+        selected_monsters = [
+            enemy for enemy in selected_enemies
+            if isinstance(enemy, dict) and not enemy.get("主角")
+        ]
+        selected_player_enemies = [
+            enemy for enemy in selected_enemies
+            if isinstance(enemy, dict) and enemy.get("主角")
+        ]
+        first_monster = selected_monsters[0] if selected_monsters else (
+            (selection_context or {}).get("selected_monster")
+        )
+        first_villain = (selection_context or {}).get("target_villain_witch")
+        first_magical = (selection_context or {}).get("target_magical_girl")
+        for enemy in selected_player_enemies:
+            faction = str(enemy.get("阵营") or "").strip()
+            if faction == "反派魔女" and first_villain is None:
+                first_villain = enemy
+            elif faction == "魔法少女" and first_magical is None:
+                first_magical = enemy
 
         return self.editable_manager.render_prompt(
             prompt_name,
@@ -214,9 +237,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "teammate_count": teammate_info["count"],
                 "recent_record_count": teammate_info["recent_record_count"],
                 "teammates_json": teammate_info["json"],
-                "selected_monster_json": self._json_dump(
-                    (selection_context or {}).get("selected_monster")
-                ),
+                "selected_enemies_json": self._json_dump(selected_enemies),
+                "selected_monster_json": self._json_dump(first_monster),
                 "scene_event_json": self._json_dump(
                     (selection_context or {}).get("scene_event")
                 ),
@@ -224,14 +246,10 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                     (selection_context or {}).get("battle_type") or "monster"
                 ),
                 "target_villain_witch_json": self._json_dump(
-                    self._prompt_protagonist_profile(
-                        (selection_context or {}).get("target_villain_witch")
-                    )
+                    self._prompt_protagonist_profile(first_villain)
                 ),
                 "target_magical_girl_json": self._json_dump(
-                    self._prompt_protagonist_profile(
-                        (selection_context or {}).get("target_magical_girl")
-                    )
+                    self._prompt_protagonist_profile(first_magical)
                 ),
                 "battle_odds_json": self._json_dump(
                     (selection_context or {}).get("battle_odds")
@@ -248,6 +266,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         cameo_memories: list[dict] | None,
         villain_witch_candidates: list[dict],
         monster_candidates: list[dict],
+        teammate_candidates: list[dict],
         umo: str | None = None,
     ) -> dict[str, object]:
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
@@ -264,15 +283,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             battle_types=["monster", "villain_witch", "environment_crisis"],
             monster_candidates=monster_candidates,
         )
-        if not villain_witch_candidates:
-            return self._magical_monster_context(
-                player_data=player_data,
-                monster_candidates=monster_candidates,
-                scene_event_candidates=scene_event_candidates,
-                current_level=current_level,
-                text_parts=text_parts,
-            )
-
         prompt = self.editable_manager.render_prompt(
             "magical_battle_target_selection_prompt",
             {
@@ -282,6 +292,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "cameo_memories_text": self._format_cameo_memories(cameo_memories),
                 "candidates_json": self._json_dump(
                     {
+                        "teammates": self._prompt_protagonist_profiles(
+                            teammate_candidates
+                        ),
                         "villain_witches": self._prompt_protagonist_profiles(
                             villain_witch_candidates
                         ),
@@ -317,6 +330,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 scene_event_candidates=scene_event_candidates,
                 current_level=current_level,
                 text_parts=text_parts,
+                teammate_candidates=teammate_candidates,
             )
 
         battle_type = str(parsed.get("battle_type") or "").strip()
@@ -327,30 +341,40 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 scene_event_candidates=scene_event_candidates,
                 current_level=current_level,
                 text_parts=text_parts,
-                selected_monster=parsed.get("selected_monster"),
+                selected_monster=parsed.get("selected_enemies") or parsed.get("selected_monster"),
                 scene_event=parsed.get("scene_event"),
                 ai_win_rate=parsed.get("ai_win_rate"),
+                teammate_candidates=teammate_candidates,
+                selected_teammates=parsed.get("selected_teammates"),
             )
 
-        target = self._resolve_selected_villain_witch(
-            parsed.get("target_villain_witch"),
+        targets = self._resolve_selected_villain_witches(
+            parsed.get("selected_enemies") or parsed.get("target_villain_witch"),
             villain_witch_candidates,
         )
-        if not target:
+        if not targets:
             return self._magical_monster_context(
                 player_data=player_data,
                 monster_candidates=monster_candidates,
                 scene_event_candidates=scene_event_candidates,
                 current_level=current_level,
                 text_parts=text_parts,
-                selected_monster=parsed.get("selected_monster"),
+                selected_monster=parsed.get("selected_enemies") or parsed.get("selected_monster"),
                 scene_event=parsed.get("scene_event"),
                 ai_win_rate=parsed.get("ai_win_rate"),
+                teammate_candidates=teammate_candidates,
+                selected_teammates=parsed.get("selected_teammates"),
             )
+        teammates = self._resolve_selected_profiles(
+            parsed.get("selected_teammates"),
+            teammate_candidates,
+        )
         return {
             "battle_type": "villain_witch",
-            "target_villain_witch": target,
+            "target_villain_witch": targets[0] if targets else None,
             "selected_monster": None,
+            "selected_teammates": teammates,
+            "selected_enemies": targets,
             "scene_event": self._resolve_selected_scene_event(
                 parsed.get("scene_event"), scene_event_candidates
             ) or self._select_scene_event(
@@ -361,7 +385,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             ),
             "battle_odds": self._build_battle_odds_context(
                 player_data=player_data,
-                opponent_data=target,
+                teammate_data=teammates,
+                enemy_data=targets,
                 battle_kind="magical_girl_vs_villain_witch",
                 ai_win_rate=parsed.get("ai_win_rate"),
             ),
@@ -376,6 +401,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         cameo_memories: list[dict] | None,
         monster_candidates: list[dict],
         magical_girl_candidates: list[dict],
+        teammate_candidates: list[dict],
         umo: str | None = None,
     ) -> dict[str, object]:
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
@@ -392,15 +418,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             battle_types=["magical_girl", "monster", "environment_crisis"],
             monster_candidates=monster_candidates,
         )
-        if not magical_girl_candidates:
-            return self._villain_monster_context(
-                player_data=player_data,
-                monster_candidates=monster_candidates,
-                scene_event_candidates=scene_event_candidates,
-                current_level=current_level,
-                text_parts=text_parts,
-            )
-
         prompt = self.editable_manager.render_prompt(
             "villain_battle_selection_prompt",
             {
@@ -411,6 +428,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "cameo_memories_text": self._format_cameo_memories(cameo_memories),
                 "candidates_json": self._json_dump(
                     {
+                        "teammates": self._prompt_protagonist_profiles(
+                            teammate_candidates
+                        ),
                         "magical_girls": self._prompt_protagonist_profiles(
                             magical_girl_candidates
                         ),
@@ -439,24 +459,15 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
 
         success, parsed, error = parse_json_object_response(result_text)
         if not success or not isinstance(parsed, dict):
-            logger.warning(f"反派魔女战斗出战选择 JSON 解析失败，使用候选兜底: {error}")
-            target = magical_girl_candidates[0]
-            return {
-                "battle_type": "magical_girl",
-                "target_magical_girl": target,
-                "selected_monster": None,
-                "scene_event": self._select_scene_event(
-                    scene_event_candidates,
-                    battle_type="magical_girl",
-                    selected_monster=None,
-                    text_parts=text_parts,
-                ),
-                "battle_odds": self._build_battle_odds_context(
-                    player_data=player_data,
-                    opponent_data=target,
-                    battle_kind="villain_witch_vs_magical_girl",
-                ),
-            }
+            logger.warning(f"反派魔女战斗出战选择 JSON 解析失败，按魔物战斗处理: {error}")
+            return self._villain_monster_context(
+                player_data=player_data,
+                monster_candidates=monster_candidates,
+                scene_event_candidates=scene_event_candidates,
+                current_level=current_level,
+                text_parts=text_parts,
+                teammate_candidates=teammate_candidates,
+            )
 
         battle_type = str(parsed.get("battle_type") or "magical_girl").strip()
         if battle_type == "monster":
@@ -466,19 +477,40 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 scene_event_candidates=scene_event_candidates,
                 current_level=current_level,
                 text_parts=text_parts,
-                selected_monster=parsed.get("selected_monster"),
+                selected_monster=parsed.get("selected_enemies") or parsed.get("selected_monster"),
                 scene_event=parsed.get("scene_event"),
                 ai_win_rate=parsed.get("ai_win_rate"),
+                teammate_candidates=teammate_candidates,
+                selected_teammates=parsed.get("selected_teammates"),
             )
 
-        target = self._resolve_selected_magical_girl(
-            parsed.get("target_magical_girl"),
+        targets = self._resolve_selected_magical_girls(
+            parsed.get("selected_enemies") or parsed.get("target_magical_girl"),
             magical_girl_candidates,
-        ) or magical_girl_candidates[0]
+        )
+        if not targets:
+            return self._villain_monster_context(
+                player_data=player_data,
+                monster_candidates=monster_candidates,
+                scene_event_candidates=scene_event_candidates,
+                current_level=current_level,
+                text_parts=text_parts,
+                selected_monster=parsed.get("selected_enemies") or parsed.get("selected_monster"),
+                scene_event=parsed.get("scene_event"),
+                ai_win_rate=parsed.get("ai_win_rate"),
+                teammate_candidates=teammate_candidates,
+                selected_teammates=parsed.get("selected_teammates"),
+            )
+        teammates = self._resolve_selected_profiles(
+            parsed.get("selected_teammates"),
+            teammate_candidates,
+        )
         return {
             "battle_type": "magical_girl",
-            "target_magical_girl": target,
+            "target_magical_girl": targets[0] if targets else None,
             "selected_monster": None,
+            "selected_teammates": teammates,
+            "selected_enemies": targets,
             "scene_event": self._resolve_selected_scene_event(
                 parsed.get("scene_event"), scene_event_candidates
             ) or self._select_scene_event(
@@ -489,7 +521,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             ),
             "battle_odds": self._build_battle_odds_context(
                 player_data=player_data,
-                opponent_data=target,
+                teammate_data=teammates,
+                enemy_data=targets,
                 battle_kind="villain_witch_vs_magical_girl",
                 ai_win_rate=parsed.get("ai_win_rate"),
             ),
@@ -506,6 +539,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         selected_monster: object = None,
         scene_event: object = None,
         ai_win_rate: object = None,
+        teammate_candidates: list[dict] | None = None,
+        selected_teammates: object = None,
     ) -> dict[str, object]:
         resolved_scene = self._resolve_selected_scene_event(
             scene_event, scene_event_candidates
@@ -515,17 +550,20 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             selected_monster=None,
             text_parts=text_parts,
         )
-        resolved_monster = self._resolve_selected_monster(
+        resolved_monsters = self._resolve_selected_monsters(
             selected_monster,
             monster_candidates,
             current_level=current_level,
             action_text="\n".join(text_parts),
-        ) or self._select_public_monster(
+        )
+        resolved_monster = (resolved_monsters[0] if resolved_monsters else None) or self._select_public_monster(
             monster_candidates,
             current_level=current_level,
             text_parts=text_parts,
             scene_event=resolved_scene,
         )
+        if not resolved_monsters and resolved_monster:
+            resolved_monsters = [resolved_monster]
         if not resolved_scene:
             resolved_scene = self._select_scene_event(
                 scene_event_candidates,
@@ -533,14 +571,21 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 selected_monster=resolved_monster,
                 text_parts=text_parts,
             )
+        teammates = self._resolve_selected_profiles(
+            selected_teammates,
+            teammate_candidates or [],
+        )
         return {
             "battle_type": "monster",
             "target_villain_witch": None,
             "selected_monster": resolved_monster,
+            "selected_teammates": teammates,
+            "selected_enemies": resolved_monsters,
             "scene_event": resolved_scene,
             "battle_odds": self._build_battle_odds_context(
                 player_data=player_data,
-                opponent_data=None,
+                teammate_data=teammates,
+                enemy_data=resolved_monsters,
                 battle_kind="magical_girl_vs_monster",
                 ai_win_rate=ai_win_rate,
             ),
@@ -557,6 +602,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         selected_monster: object = None,
         scene_event: object = None,
         ai_win_rate: object = None,
+        teammate_candidates: list[dict] | None = None,
+        selected_teammates: object = None,
     ) -> dict[str, object]:
         resolved_scene = self._resolve_selected_scene_event(
             scene_event, scene_event_candidates
@@ -566,17 +613,20 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             selected_monster=None,
             text_parts=text_parts,
         )
-        resolved_monster = self._resolve_selected_monster(
+        resolved_monsters = self._resolve_selected_monsters(
             selected_monster,
             monster_candidates,
             current_level=current_level,
             action_text="\n".join(text_parts),
-        ) or self._select_public_monster(
+        )
+        resolved_monster = (resolved_monsters[0] if resolved_monsters else None) or self._select_public_monster(
             monster_candidates,
             current_level=current_level,
             text_parts=text_parts,
             scene_event=resolved_scene,
         )
+        if not resolved_monsters and resolved_monster:
+            resolved_monsters = [resolved_monster]
         if not resolved_scene:
             resolved_scene = self._select_scene_event(
                 scene_event_candidates,
@@ -584,14 +634,21 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 selected_monster=resolved_monster,
                 text_parts=text_parts,
             )
+        teammates = self._resolve_selected_profiles(
+            selected_teammates,
+            teammate_candidates or [],
+        )
         return {
             "battle_type": "monster",
             "target_magical_girl": None,
             "selected_monster": resolved_monster,
+            "selected_teammates": teammates,
+            "selected_enemies": resolved_monsters,
             "scene_event": resolved_scene,
             "battle_odds": self._build_battle_odds_context(
                 player_data=player_data,
-                opponent_data=None,
+                teammate_data=teammates,
+                enemy_data=resolved_monsters,
                 battle_kind="villain_witch_vs_monster",
                 ai_win_rate=ai_win_rate,
             ),
@@ -601,16 +658,26 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         self,
         *,
         player_data: dict,
-        opponent_data: dict | None,
         battle_kind: str,
+        opponent_data: dict | None = None,
         ai_win_rate: object = None,
         force_lose: bool = False,
         force_reason: str = "",
+        teammate_data: list[dict] | None = None,
+        enemy_data: list[dict] | None = None,
     ) -> dict[str, object]:
         """Build deterministic battle odds used by the diary prompt."""
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
-        player_level = self.domain_service.get_current_level(protagonist)
-        opponent_level = self._profile_level(opponent_data) if opponent_data else player_level
+        player_level = self._team_level([protagonist] + [
+            self._prompt_protagonist_profile(item) or item
+            for item in (teammate_data or [])
+            if isinstance(item, dict)
+        ])
+        enemies = [item for item in (enemy_data or []) if isinstance(item, dict)]
+        if enemies:
+            opponent_level = self._team_level(enemies)
+        else:
+            opponent_level = self._profile_level(opponent_data) if opponent_data else player_level
         d20 = random.randint(1, 20)
         ai_rate = self._clamp_percent(ai_win_rate, default=50)
 
@@ -629,23 +696,14 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             code_rate = 100
             dice_result = "critical_success"
             outcome = "player_win"
-        elif battle_kind in {"magical_girl_vs_monster", "villain_witch_vs_monster"}:
-            # Monster fights use a flatter rule: AI side is neutral 50, code side is 25 + d20.
-            ai_rate = 50
-            code_rate = max(0, min(100, 25 + d20))
-            final_rate = round((code_rate + ai_rate) / 2)
-            dice_result = "failure" if d20 < 10 else "success"
-            outcome = "player_win" if final_rate >= 50 else "player_lose"
         else:
-            power_rate = max(5, min(95, 50 + (player_level - opponent_level) * 12))
             if d20 < 10:
-                dice_rate = 10 + (d20 - 2) * 5
+                code_rate = 10 + (d20 - 2) * 5
                 dice_result = "failure"
             else:
-                dice_rate = 55 + round((d20 - 10) * (40 / 9))
+                code_rate = 55 + round((d20 - 10) * (40 / 9))
                 dice_result = "success"
-            code_rate = round((dice_rate * 0.5 + power_rate * 0.2) / 0.7)
-            final_rate = round(dice_rate * 0.5 + power_rate * 0.2 + ai_rate * 0.3)
+            final_rate = round(code_rate * 0.5 + ai_rate * 0.5)
             outcome = "player_win" if final_rate >= 50 else "player_lose"
 
         closeness = 50 - abs(final_rate - 50)
@@ -671,6 +729,23 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             "tempo": tempo,
             "force_reason": force_reason,
         }
+
+    def _team_level(self, members: list[dict]) -> int:
+        levels: list[int] = []
+        for item in members:
+            if not isinstance(item, dict):
+                continue
+            if item.get("selected_level"):
+                levels.append(parse_level_label(str(item.get("selected_level") or "")))
+                continue
+            levels.append(self.domain_service.get_current_level(
+                self._prompt_protagonist_profile(item) or item
+            ))
+        if not levels:
+            return 0
+        strongest = max(levels)
+        support_bonus = min(2, max(0, len(levels) - 1))
+        return min(6, strongest + support_bonus)
 
     def _profile_level(self, item: object) -> int:
         profile = self._prompt_protagonist_profile(item)
@@ -1010,41 +1085,47 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                     for level in candidate.get("default_levels", [])
                     if str(level or "").strip()
                 ]
-                action = str(action_text or "")
-                keys = [
-                    str(key or "").strip()
-                    for key in candidate.get("keys", [])
-                    if str(key or "").strip()
-                ]
-                explicitly_requested = bool(
-                    (candidate_name and candidate_name in action)
-                    or (candidate_id and candidate_id in action)
-                    or any(key in action for key in keys)
-                )
                 if not selectable_levels:
                     return None
                 if selected_level not in selectable_levels:
                     selected_level = ""
-                if (
-                    selected_level
-                    and parse_level_label(selected_level) > current_level
-                    and not explicitly_requested
-                ):
-                    selected_level = ""
                 if not selected_level:
-                    if not default_levels and not explicitly_requested:
-                        return None
                     selected_level = default_levels[-1] if default_levels else selectable_levels[0]
                 resolved["selected_level"] = selected_level
                 resolved["monster_levels"] = [selected_level]
-                resolved["explicitly_requested"] = explicitly_requested
-                resolved["overleveled"] = parse_level_label(selected_level) > current_level
                 resolved["level_settings"] = self._selected_level_settings(
                     resolved.get("level_settings"),
                     selected_level,
                 )
                 return resolved
         return None
+
+    def _resolve_selected_monsters(
+        self,
+        selected: object,
+        candidates: list[dict],
+        *,
+        current_level: int,
+        action_text: str,
+    ) -> list[dict]:
+        selected_items = self._as_list(selected)
+        resolved: list[dict] = []
+        seen: set[str] = set()
+        for item in selected_items:
+            monster = self._resolve_selected_monster(
+                item,
+                candidates,
+                current_level=current_level,
+                action_text=action_text,
+            )
+            if not monster:
+                continue
+            key = str(monster.get("id") or monster.get("name") or len(resolved))
+            if key in seen:
+                continue
+            seen.add(key)
+            resolved.append(monster)
+        return resolved[:5]
 
     @staticmethod
     def _selected_level_settings(
@@ -1106,6 +1187,17 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 return resolved
         return None
 
+    def _resolve_selected_villain_witches(
+        self,
+        selected: object,
+        candidates: list[dict],
+    ) -> list[dict]:
+        return self._resolve_selected_profile_list(
+            selected,
+            candidates,
+            self._resolve_selected_villain_witch,
+        )
+
     @staticmethod
     def _resolve_selected_magical_girl(
         selected: object,
@@ -1127,6 +1219,86 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 resolved["selection_reason"] = str(selected.get("reason") or "").strip()
                 return resolved
         return None
+
+    def _resolve_selected_magical_girls(
+        self,
+        selected: object,
+        candidates: list[dict],
+    ) -> list[dict]:
+        return self._resolve_selected_profile_list(
+            selected,
+            candidates,
+            self._resolve_selected_magical_girl,
+        )
+
+    def _resolve_selected_profiles(
+        self,
+        selected: object,
+        candidates: list[dict],
+    ) -> list[dict]:
+        return self._resolve_selected_profile_list(
+            selected,
+            candidates,
+            self._resolve_selected_profile,
+        )
+
+    @staticmethod
+    def _resolve_selected_profile(selected: object, candidates: list[dict]) -> dict | None:
+        if not selected or not isinstance(selected, dict):
+            return None
+        selected_target = str(selected.get("target_name") or selected.get("name") or "").strip()
+        selected_magical = str(selected.get("magical_name") or selected.get("魔法少女名") or "").strip()
+        selected_villain = str(
+            selected.get("villain_witch_name")
+            or selected.get("villain_name")
+            or selected.get("反派魔女名")
+            or ""
+        ).strip()
+        selected_user = str(selected.get("_user_id") or selected.get("user_id") or "").strip()
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            if selected_user and selected_user == str(candidate.get("_user_id") or "").strip():
+                resolved = dict(candidate)
+                resolved["selection_reason"] = str(selected.get("reason") or "").strip()
+                return resolved
+            if selected_target and selected_target == str(candidate.get("target_name") or "").strip():
+                resolved = dict(candidate)
+                resolved["selection_reason"] = str(selected.get("reason") or "").strip()
+                return resolved
+            if selected_magical and selected_magical == str(candidate.get("魔法少女名") or "").strip():
+                resolved = dict(candidate)
+                resolved["selection_reason"] = str(selected.get("reason") or "").strip()
+                return resolved
+            if selected_villain and selected_villain == str(candidate.get("反派魔女名") or "").strip():
+                resolved = dict(candidate)
+                resolved["selection_reason"] = str(selected.get("reason") or "").strip()
+                return resolved
+        return None
+
+    @staticmethod
+    def _resolve_selected_profile_list(selected: object, candidates: list[dict], resolver) -> list[dict]:
+        selected_items = BattleDiaryAnalyzer._as_list(selected)
+        resolved: list[dict] = []
+        seen: set[str] = set()
+        for item in selected_items:
+            profile = resolver(item, candidates)
+            if not profile:
+                continue
+            key = str(profile.get("_user_id") or profile.get("target_name") or len(resolved))
+            if key in seen:
+                continue
+            seen.add(key)
+            resolved.append(profile)
+        return resolved[:5]
+
+    @staticmethod
+    def _as_list(value: object) -> list:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return value
+        return [value]
 
     @staticmethod
     def _normalize_teammate_names(data: dict[str, object]) -> list[str]:

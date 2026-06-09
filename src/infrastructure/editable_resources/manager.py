@@ -434,11 +434,11 @@ class EditableResourceManager:
                 "{{player_name}}、{{current_level}}（字母等级 F/E/D/C/B/A/S）、"
                 "{{logs_text}}、{{cameo_memories_text}}、{{current_world_date}}、{{action}}、"
                 "{{supplement_text}}（世界书+状态书+事件书+技能书+性癖书命中的补充设定，未命中时为空）、"
-                "{{teammates_json}}（命中其他存档角色名时的队友公开字段 JSON；未命中时为空数组）。"
+                "{{teammates_json}}（战斗中为子任务选出的队友 JSON；日常/黑化等为命中其他存档角色名时的队友公开字段 JSON；未命中时为空数组）。"
             ),
             self.PROMPT_FILES["magical_battle_target_selection_prompt"]: (
                 "用于 /魔法少女战斗 正文生成前的后台目标判断。使用子任务 LLM Provider，"
-                "选择 battle_type、scene_event、公共魔物或目标反派魔女，并给出 AI 侧胜率判断。"
+                "选择 battle_type、scene_event、selected_teammates、selected_enemies，并给出 AI 侧胜率判断。"
             ),
             self.PROMPT_FILES["daily_diary_prompt"]: (
                 "用于 /魔法少女日常 的完整 Prompt。变量与战斗日记 Prompt 相同，"
@@ -450,7 +450,7 @@ class EditableResourceManager:
             ),
             self.PROMPT_FILES["villain_witch_purification_prompt"]: (
                 "用于 /反派魔女洗白 的完整 Prompt。除通用日记变量外，还可用 "
-                "{{selected_monster_json}} 和 {{target_magical_girl_json}}，"
+                "{{teammates_json}}、{{selected_enemies_json}}、{{selected_monster_json}} 和 {{target_magical_girl_json}}，"
                 "发给 AI 的 user message 就是这个模板渲染后的结果；要求仍返回兼容日记卡的纯 JSON。"
             ),
             self.PROMPT_FILES["villain_witch_battle_prompt"]: (
@@ -464,7 +464,7 @@ class EditableResourceManager:
             ),
             self.PROMPT_FILES["villain_battle_selection_prompt"]: (
                 "用于 /反派魔女战斗 正文生成前的后台出战选择。使用子任务 LLM Provider，"
-                "选择 battle_type、scene_event、公共魔物或目标魔法少女，并给出 AI 侧胜率判断。"
+                "选择 battle_type、scene_event、selected_teammates、selected_enemies，并给出 AI 侧胜率判断。"
             ),
             self.PROMPT_FILES["relationship_summary_prompt"]: (
                 "用于多人 /魔法少女战斗 结束后的后台人物关系总结。发给 AI 的 user message 就是这个模板渲染后的结果。"

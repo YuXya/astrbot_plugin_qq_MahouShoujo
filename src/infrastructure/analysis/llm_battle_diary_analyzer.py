@@ -104,6 +104,7 @@ class LLMBattleDiaryAnalyzer:
         cameo_memories: list[dict] | None = None,
         monster_candidates: list[dict] | None = None,
         magical_girl_candidates: list[dict] | None = None,
+        teammate_candidates: list[dict] | None = None,
         umo: str | None = None,
     ) -> dict[str, object]:
         return await self.analyzer.select_villain_battle_context(
@@ -113,6 +114,7 @@ class LLMBattleDiaryAnalyzer:
             cameo_memories=cameo_memories,
             monster_candidates=monster_candidates or [],
             magical_girl_candidates=magical_girl_candidates or [],
+            teammate_candidates=teammate_candidates or [],
             umo=umo,
         )
 
@@ -125,6 +127,7 @@ class LLMBattleDiaryAnalyzer:
         cameo_memories: list[dict] | None = None,
         villain_witch_candidates: list[dict] | None = None,
         monster_candidates: list[dict] | None = None,
+        teammate_candidates: list[dict] | None = None,
         umo: str | None = None,
     ) -> dict[str, object]:
         return await self.analyzer.select_magical_battle_context(
@@ -134,5 +137,6 @@ class LLMBattleDiaryAnalyzer:
             cameo_memories=cameo_memories,
             villain_witch_candidates=villain_witch_candidates or [],
             monster_candidates=monster_candidates or [],
+            teammate_candidates=teammate_candidates or [],
             umo=umo,
         )

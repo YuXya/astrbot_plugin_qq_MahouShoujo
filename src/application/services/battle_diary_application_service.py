@@ -67,16 +67,7 @@ class BattleDiaryApplicationService:
                     action_text=action_text,
                     umo=umo,
                 )
-                target = selection_context.get("target_magical_girl") if selection_context else None
-                battle_type = str((selection_context or {}).get("battle_type") or "magical_girl")
-                if battle_type != "monster" and (not isinstance(target, dict) or not target):
-                    command_label = str(event_command or "/反派魔女战斗").strip() or "/反派魔女战斗"
-                    return BattleDiaryExecutionResult(
-                        success=False,
-                        text=f"当前城市没有可作为目标的魔法少女存档，暂时不能发起 {command_label}。",
-                        error="target_magical_girl_not_found",
-                    )
-                nearby_players = [target] if isinstance(target, dict) and target else []
+                nearby_players = self._context_player_participants(selection_context)
             elif prompt_name == "battle_diary_prompt":
                 selection_context = await self._select_magical_battle_context(
                     group_id=group_id,
@@ -87,28 +78,7 @@ class BattleDiaryApplicationService:
                     action_text=action_text,
                     umo=umo,
                 )
-                if allow_other_players:
-                    mentioned_players = self.save_repository.find_mentioned_npcs(
-                        group_id,
-                        user_id,
-                        [action_text, self._logs_text_for_teammate_scan(logs)],
-                        recent_record_count=self.config_manager.get_teammate_recent_record_count(),
-                    )
-                    semantic_players = await self._infer_semantic_teammates(
-                        group_id=group_id,
-                        user_id=user_id,
-                        player_data=player_data,
-                        logs=logs,
-                        cameo_memories=cameo_memories,
-                        action_text=action_text,
-                        umo=umo,
-                    )
-                    nearby_players = self._merge_nearby_players(
-                        mentioned_players,
-                        semantic_players,
-                    )
-                else:
-                    nearby_players = []
+                nearby_players = self._context_player_participants(selection_context)
             elif allow_other_players:
                 mentioned_players = self.save_repository.find_mentioned_npcs(
                     group_id,
@@ -331,6 +301,11 @@ class BattleDiaryApplicationService:
             user_id,
             recent_record_count=recent_record_count,
         )
+        teammate_candidates = self.save_repository.build_city_villain_witch_candidates(
+            group_id,
+            user_id,
+            recent_record_count=recent_record_count,
+        )
         monster_candidates = self.save_repository.build_public_monster_candidates(
             player_level=current_level,
         )
@@ -341,6 +316,7 @@ class BattleDiaryApplicationService:
             cameo_memories=cameo_memories,
             monster_candidates=monster_candidates,
             magical_girl_candidates=target_candidates,
+            teammate_candidates=teammate_candidates,
             umo=umo,
         )
 
@@ -363,6 +339,11 @@ class BattleDiaryApplicationService:
             user_id,
             recent_record_count=recent_record_count,
         )
+        teammate_candidates = self.save_repository.build_city_magical_girl_candidates(
+            group_id,
+            user_id,
+            recent_record_count=recent_record_count,
+        )
         monster_candidates = self.save_repository.build_public_monster_candidates(
             player_level=current_level,
         )
@@ -373,6 +354,7 @@ class BattleDiaryApplicationService:
             cameo_memories=cameo_memories,
             villain_witch_candidates=target_candidates,
             monster_candidates=monster_candidates,
+            teammate_candidates=teammate_candidates,
             umo=umo,
         )
 
@@ -536,6 +518,24 @@ class BattleDiaryApplicationService:
                 if source == "mentioned_by_action":
                     existing["_source"] = source
         return merged
+
+    @classmethod
+    def _context_player_participants(cls, selection_context: dict[str, object] | None) -> list[dict]:
+        if not isinstance(selection_context, dict):
+            return []
+        players: list[dict] = []
+        for key in ("selected_teammates", "selected_enemies"):
+            raw_items = selection_context.get(key)
+            if isinstance(raw_items, dict):
+                raw_iter = [raw_items]
+            elif isinstance(raw_items, list):
+                raw_iter = raw_items
+            else:
+                raw_iter = []
+            for item in raw_iter:
+                if isinstance(item, dict) and item.get("主角"):
+                    players.append(item)
+        return cls._merge_nearby_players(players)
 
     @staticmethod
     def _source_profile_from_player_data(player_data: dict, fallback_name: str) -> dict[str, str]:
