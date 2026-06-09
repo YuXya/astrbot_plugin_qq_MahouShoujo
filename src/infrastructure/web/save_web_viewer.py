@@ -1242,6 +1242,7 @@ class SaveWebViewer:
                 return {{
                   id: `monster_${{index + 1}}`,
                   name: "",
+                  enabled: true,
                   visible_levels: monsterLevelOptions.map((item) => item.value),
                   monster_levels: monsterLevelOptions.map((item) => item.value),
                   keys: [],
@@ -1272,6 +1273,7 @@ class SaveWebViewer:
                 return {{
                   id: String(entry.id || `monster_${{index + 1}}`).trim(),
                   name: String(entry.name || entry.title || ""),
+                  enabled: entry.enabled !== false,
                   visible_levels: monsterNormalizeLevels(entry.visible_levels, entry.min_level, entry.max_level),
                   monster_levels: monsterLevels,
                   keys: keys.map((key) => String(key).trim()).filter(Boolean),
@@ -1336,6 +1338,7 @@ class SaveWebViewer:
                   return monsterNormalizeEntry({{
                     id: card.querySelector("[data-field='id']").value,
                     name: card.querySelector("[data-field='name']").value,
+                    enabled: card.querySelector("[data-field='enabled']").checked,
                     visible_levels: Array.from(card.querySelectorAll("[data-field='visible_level']:checked")).map((input) => Number.parseInt(input.value, 10)),
                     monster_levels: monsterLevels,
                     keys: monsterSplitKeys(card.querySelector("[data-field='keys']").value),
@@ -1412,6 +1415,7 @@ class SaveWebViewer:
                       <summary class="world-entry-head">
                         <span class="entry-title">${{monsterEscapeHtml(summaryTitle)}}</span>
                         <span class="muted" style="margin-left:4px">可见 ${{monsterLevelsLabel(normalized.visible_levels)}} / 魔物 ${{monsterLevelsLabel(normalized.monster_levels)}}</span>
+                        <label class="summary-check"><input data-field="enabled" type="checkbox"${{normalized.enabled ? " checked" : ""}}> 启用</label>
                         <button class="danger" type="button" data-action="delete">删除</button>
                       </summary>
                       <div class="world-entry-body">
@@ -2140,6 +2144,7 @@ class SaveWebViewer:
                 {
                     "id": str(entry.get("id") or fallback_id).strip(),
                     "name": str(entry.get("name") or entry.get("title") or ""),
+                    "enabled": entry.get("enabled", True) is not False,
                     "visible_levels": list(cls._normalize_visible_levels(entry)),
                     "monster_levels": list(monster_levels),
                     "keys": [str(key).strip() for key in keys if str(key).strip()],
