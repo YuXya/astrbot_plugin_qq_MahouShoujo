@@ -1,887 +1,485 @@
 {
-  "version": 2,
-  "events": [
+  "version": 3,
+  "categories": [
     {
-      "id": "rumor_investigation",
-      "name": "传闻调查",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 25,
-      "keys": [
-        "传闻",
-        "都市传说",
-        "调查",
-        "听说",
-        "目击",
-        "流言"
-      ],
-      "visible_levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/魔法少女战斗",
-        "/魔法少女日常",
-        "/反派魔女日常"
-      ],
-      "event_tags": [
-        "传闻调查",
-        "都市传说",
-        "目击"
-      ],
-      "location_tags": [
-        "学校",
-        "旧校舍",
-        "商店街",
-        "车站",
-        "夜晚"
-      ],
-      "compatible_monster_tags": [
-        "urban_legend",
-        "school",
-        "ghost",
-        "night",
-        "mirror"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "villain_witch"
-      ],
-      "opening_hook": "主角从同学、路人或匿名消息里听到异常传闻，沿着目击地点主动去确认。",
-      "twist_hook": "传闻里的细节有一处和现实不符，说明现场还有第二层误导或别的目击者。",
-      "ending_hook": "战后留下新的传闻碎片、照片、口罩、符纸、镜面裂纹或未解释的目击记录。",
-      "content": "传闻调查用于把战斗写成有来源的遭遇，而不是无缘无故感应到敌人。开场应先给出流言、匿名消息、目击照片、奇怪失物或委托线索，让主角主动前往确认；抵达后再把魔物显形细节、场地异常或目标角色行动嵌入同一个入口。适合加入黄油向的尴尬传闻，例如衣装被弄湿、夜路有人听见暧昧低语、橱窗倒影不对等，但事件本身只负责遭遇框架，不替代魔物特性。"
+      "id": "monster_enemy",
+      "name": "与敌人是魔物",
+      "events": [
+        {
+          "id": "rumor_investigation",
+          "name": "调查传闻",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["传闻", "调查传闻", "流言", "谣言", "都市传说", "怪谈"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/魔法少女日常", "/反派魔女战斗"],
+          "event_tags": ["情报调查", "都市传说", "怪谈"],
+          "location_tags": ["城市", "学校", "商业街", "夜晚", "巷道"],
+          "compatible_monster_tags": ["urban_legend", "school", "ghost", "night", "mirror"],
+          "compatible_battle_types": ["monster", "environment_crisis"],
+          "opening_hook": "主角追查最近扩散的怪谈传闻，发现传闻背后有魔物借由人群恐惧成形。",
+          "twist_hook": "传闻会随着旁观者的想象改变魔物能力，战场气氛越紧张，魔物越容易变强。",
+          "ending_hook": "击退魔物后，传闻并未完全消失，只留下一个新的细节等待后续追查。",
+          "content": "调查传闻事件强调线索搜集和突发战斗。适合把魔物写成都市怪谈、学校怪影、镜中异象或深夜目击物。战斗氛围可以带有压迫、误解和围观压力。"
+        },
+        {
+          "id": "patrol_anomaly",
+          "name": "巡逻异常",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["巡逻", "夜巡", "异常", "巡查", "例行巡逻", "巡街"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/魔法少女日常", "/反派魔女战斗", "/反派魔女日常"],
+          "event_tags": ["巡逻", "异常处理", "遭遇"],
+          "location_tags": ["城市", "公园", "街区", "河岸", "废弃地"],
+          "compatible_monster_tags": ["patrol", "beast", "night", "pollution", "ambush"],
+          "compatible_battle_types": ["monster", "environment_crisis"],
+          "opening_hook": "例行巡逻中，熟悉的街景忽然出现不合常理的污染痕迹。",
+          "twist_hook": "异常源会主动避开视线，迫使主角在移动中判断真正的魔物位置。",
+          "ending_hook": "危机解除后，巡逻记录里多出一段无法解释的空白。",
+          "content": "巡逻异常事件适合普通魔物、污染源或路过异常。泛战斗输入可以从此类事件池随机抽取，但不要固定为唯一默认事件。"
+        },
+        {
+          "id": "rescue_signal",
+          "name": "收到求救信号",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["求救", "救援", "呼救", "救人", "救命", "信号"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/魔法少女日常", "/反派魔女战斗"],
+          "event_tags": ["救援", "人质", "紧急事件"],
+          "location_tags": ["居民区", "学校", "商场", "医院", "车站"],
+          "compatible_monster_tags": ["hostage", "parasite", "sound", "shadow", "crowd"],
+          "compatible_battle_types": ["monster"],
+          "opening_hook": "求救信号断断续续传来，现场却看不到明显的受害者。",
+          "twist_hook": "魔物模仿求救声吸引猎物，真正的被困者被藏在污染结界边缘。",
+          "ending_hook": "救援成功后，获救者只记得一阵甜腻的低语和逐渐收紧的黑影。",
+          "content": "收到求救信号事件适合救援、护送和搜索战。战斗可描写紧迫感、束缚感和战损压力，但避免露骨内容。"
+        },
+        {
+          "id": "pollution_source_cleanup",
+          "name": "清除污染源",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["污染", "污染源", "净化", "清除", "净化污染", "异常污染"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/魔法少女日常", "/反派魔女战斗", "/反派魔女日常"],
+          "event_tags": ["净化", "污染源", "环境危机"],
+          "location_tags": ["下水道", "废弃工厂", "河岸", "地下空间", "城市边缘"],
+          "compatible_monster_tags": ["pollution", "slime", "plant", "parasite", "environment"],
+          "compatible_battle_types": ["monster", "environment_crisis"],
+          "opening_hook": "污染源像一颗脉动的核心扎在场地深处，不断向外释放魔力污渍。",
+          "twist_hook": "污染会缠住衣摆、武器或影子，制造行动受限和判断延迟。",
+          "ending_hook": "核心被净化后，残留污染化作细碎光尘，短暂映出某个幕后视线。",
+          "content": "清除污染源事件强调场地压迫和净化目标。适合黏液、藤蔓、寄生、暗影和环境型魔物。"
+        },
+        {
+          "id": "accidental_encounter",
+          "name": "意外遭遇",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["遭遇", "偶遇", "路过", "突然", "遇到", "撞见"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["遭遇战", "突发", "随机事件"],
+          "location_tags": ["城市", "街道", "公园", "学校", "郊区"],
+          "compatible_monster_tags": ["beast", "shadow", "slime", "night", "ambush"],
+          "compatible_battle_types": ["monster"],
+          "opening_hook": "一次看似普通的经过突然被魔物撕开日常边界。",
+          "twist_hook": "魔物并不是孤立出现，附近环境也被轻微污染，随时可能干扰战斗。",
+          "ending_hook": "战斗结束得很快，但留下的痕迹说明这不是单纯的巧合。",
+          "content": "意外遭遇只是魔物池中的一个普通事件。玩家只说与魔物战斗或找魔物战斗时，不要固定选择此事件，应在魔物池里随机挑选。"
+        },
+        {
+          "id": "school_after_hours",
+          "name": "放学后校园异变",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["学校", "校园", "放学后", "教室", "社团", "天台"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/魔法少女日常", "/反派魔女战斗"],
+          "event_tags": ["校园", "放学后", "结界"],
+          "location_tags": ["学校", "教室", "走廊", "体育馆", "天台"],
+          "compatible_monster_tags": ["school", "mirror", "ghost", "sound", "shadow"],
+          "compatible_battle_types": ["monster"],
+          "opening_hook": "放学后的校园忽然安静得过分，空教室里传来不属于学生的脚步声。",
+          "twist_hook": "走廊和教室会在结界里错位，主角必须边寻找出口边迎战。",
+          "ending_hook": "结界消散后，黑板上残留一行像是挑衅的粉笔字。",
+          "content": "校园异变适合学校怪谈、镜面魔物、声音魔物和影子魔物。可加入制服战损、尴尬围困和距离压迫。"
+        },
+        {
+          "id": "shopping_district_distortion",
+          "name": "商业街扭曲",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["商业街", "商场", "购物", "店铺", "橱窗", "人群"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/魔法少女日常", "/反派魔女战斗"],
+          "event_tags": ["商业街", "人群", "空间扭曲"],
+          "location_tags": ["商业街", "商场", "车站", "步行街"],
+          "compatible_monster_tags": ["crowd", "mirror", "illusion", "sound", "urban_legend"],
+          "compatible_battle_types": ["monster", "environment_crisis"],
+          "opening_hook": "热闹的商业街忽然变得像舞台布景，橱窗倒影开始擅自行动。",
+          "twist_hook": "人群的视线会增加战斗羞耻和行动压力，魔物试图利用围观制造破绽。",
+          "ending_hook": "扭曲解除后，监控里只剩下一段雪花和破碎光影。",
+          "content": "商业街扭曲适合公开场合、围观压力、幻象与镜面系魔物。软色情风格可体现为狼狈、贴近、被注视和衣装破损的暧昧张力。"
+        },
+        {
+          "id": "night_alley_chase",
+          "name": "夜巷追击",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["夜巷", "巷子", "追击", "追踪", "小巷", "夜晚"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["追击", "夜晚", "狭窄地形"],
+          "location_tags": ["巷道", "夜晚", "街区", "后巷"],
+          "compatible_monster_tags": ["night", "ambush", "shadow", "beast", "speed"],
+          "compatible_battle_types": ["monster"],
+          "opening_hook": "目标从灯光边缘一闪而过，把主角引向狭窄潮湿的后巷。",
+          "twist_hook": "巷道空间狭小，魔物擅长贴近、扑压和从死角偷袭。",
+          "ending_hook": "追击结束后，墙面上的爪痕指向更深处的污染源。",
+          "content": "夜巷追击适合速度型、暗影型和野兽型魔物。战斗风格偏近身压迫、狼狈闪避和战损紧张。"
+        },
+        {
+          "id": "abandoned_factory_core",
+          "name": "废弃工厂核心",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["工厂", "废弃工厂", "仓库", "机器", "核心", "设施"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["废弃设施", "核心破坏", "重型战斗"],
+          "location_tags": ["废弃工厂", "仓库", "地下空间", "城市边缘"],
+          "compatible_monster_tags": ["machine", "pollution", "armor", "slime", "plant"],
+          "compatible_battle_types": ["monster", "environment_crisis"],
+          "opening_hook": "废弃工厂深处的旧机器重新运转，污染魔力像蒸汽一样从管道缝隙溢出。",
+          "twist_hook": "场地机关会限制走位，魔物借助传送带、铁链或管线逼近。",
+          "ending_hook": "核心破碎时，工厂短暂亮起，像是在回应某个远程控制者。",
+          "content": "废弃工厂核心适合高压设施战。可写束缚、压制、金属冷感和战斗服受损，但不要写露骨性行为。"
+        },
+        {
+          "id": "mirror_boundary",
+          "name": "镜面边界",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["镜子", "镜面", "倒影", "镜界", "反射", "玻璃"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/魔法少女日常", "/反派魔女战斗"],
+          "event_tags": ["镜界", "倒影", "精神压迫"],
+          "location_tags": ["学校", "商场", "浴场外区", "更衣室外区", "玻璃幕墙"],
+          "compatible_monster_tags": ["mirror", "illusion", "ghost", "mind", "urban_legend"],
+          "compatible_battle_types": ["monster"],
+          "opening_hook": "镜面里的倒影慢了半拍，随后露出和本人不同的表情。",
+          "twist_hook": "镜面会映出主角最不愿被看见的狼狈姿态，干扰她的判断。",
+          "ending_hook": "镜面恢复正常时，倒影似乎比本人多眨了一次眼。",
+          "content": "镜面边界适合幻象、精神压迫和倒影魔物。软色情风格以羞耻、被迫直视狼狈、暧昧低语为主。"
+        },
+        {
+          "id": "subway_last_train",
+          "name": "末班地铁异响",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["地铁", "车站", "末班车", "列车", "站台", "轨道"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["交通设施", "封闭空间", "追逐"],
+          "location_tags": ["车站", "地铁", "地下空间", "隧道"],
+          "compatible_monster_tags": ["sound", "shadow", "speed", "machine", "crowd"],
+          "compatible_battle_types": ["monster", "environment_crisis"],
+          "opening_hook": "末班地铁停在不该出现的站台，车门打开后只有潮湿的黑暗。",
+          "twist_hook": "列车广播会重复主角的呼吸声，魔物借由回音判断位置。",
+          "ending_hook": "列车重新启动后，站名表上多出一个从未存在的站点。",
+          "content": "末班地铁异响适合封闭空间追逐、声音系魔物和高速袭击。"
+        },
+        {
+          "id": "park_lake_mist",
+          "name": "公园湖雾",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["公园", "湖", "雾", "湖边", "树林", "湿气"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/魔法少女日常", "/反派魔女战斗"],
+          "event_tags": ["自然场地", "雾气", "迷失"],
+          "location_tags": ["公园", "湖边", "树林", "夜晚"],
+          "compatible_monster_tags": ["water", "mist", "plant", "ghost", "night"],
+          "compatible_battle_types": ["monster"],
+          "opening_hook": "公园湖面升起反季节的雾，雾中传来像在水下说话的声音。",
+          "twist_hook": "湿雾会削弱视线并黏住动作，魔物从水面倒影里伸出肢体。",
+          "ending_hook": "湖雾散去后，岸边留下不属于任何人的湿脚印。",
+          "content": "公园湖雾适合水、雾、植物和幽灵类魔物。"
+        },
+        {
+          "id": "hospital_midnight_round",
+          "name": "医院午夜巡查",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["医院", "病房", "护士站", "午夜", "病患", "巡查"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/魔法少女日常", "/反派魔女战斗"],
+          "event_tags": ["医院", "救援", "精神污染"],
+          "location_tags": ["医院", "病房", "走廊", "地下空间"],
+          "compatible_monster_tags": ["parasite", "mind", "sound", "ghost", "pollution"],
+          "compatible_battle_types": ["monster"],
+          "opening_hook": "午夜医院的呼叫铃同时响起，所有病房门缝都透出暗淡魔力。",
+          "twist_hook": "魔物会伪装成需要照看的伤患，引诱主角靠近。",
+          "ending_hook": "净化结束后，病例夹里出现一页没有姓名的诊断记录。",
+          "content": "医院午夜巡查适合精神污染、寄生和救援战。"
+        },
+        {
+          "id": "festival_lantern_shadow",
+          "name": "祭典灯影骚动",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["祭典", "灯笼", "烟火", "摊位", "庆典", "庙会"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/魔法少女日常", "/反派魔女战斗"],
+          "event_tags": ["祭典", "人群", "伪装"],
+          "location_tags": ["商业街", "神社", "广场", "夜晚"],
+          "compatible_monster_tags": ["crowd", "illusion", "fire", "shadow", "urban_legend"],
+          "compatible_battle_types": ["monster"],
+          "opening_hook": "祭典灯笼一盏接一盏熄灭，影子却在地面上越拉越长。",
+          "twist_hook": "魔物混在人群和摊位阴影里，让主角难以使用大范围攻击。",
+          "ending_hook": "烟火升空时，所有人都以为刚才只是特别节目。",
+          "content": "祭典灯影骚动适合人群伪装、火光影子和公开场合压力。"
+        },
+        {
+          "id": "dream_leak",
+          "name": "梦境泄漏",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["梦", "梦境", "睡眠", "噩梦", "幻梦", "昏睡"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/魔法少女日常", "/反派魔女战斗", "/反派魔女日常"],
+          "event_tags": ["梦境", "精神战", "幻象"],
+          "location_tags": ["住宅区", "学校", "医院", "结界"],
+          "compatible_monster_tags": ["dream", "mind", "illusion", "parasite", "ghost"],
+          "compatible_battle_types": ["monster"],
+          "opening_hook": "清醒的街道忽然混入梦境碎片，现实像被柔软的黑纱覆盖。",
+          "twist_hook": "魔物会借梦境放大主角的羞怯、犹豫或执念。",
+          "ending_hook": "梦境闭合后，主角醒着却记得梦里某个温热而危险的低语。",
+          "content": "梦境泄漏适合精神战和幻象战。软色情风格以暗示、羞耻梦境和心理压迫为主，不写露骨性行为。"
+        },
+        {
+          "id": "rooftop_signal_beast",
+          "name": "屋顶信号兽",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["屋顶", "楼顶", "信号", "天线", "高处", "坠落"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["高处", "信号干扰", "机动战"],
+          "location_tags": ["屋顶", "城市", "学校", "高楼"],
+          "compatible_monster_tags": ["flying", "sound", "machine", "beast", "wind"],
+          "compatible_battle_types": ["monster"],
+          "opening_hook": "城市信号突然紊乱，屋顶天线间蹲伏着吞食电波的魔物。",
+          "twist_hook": "强风和高度让每一次被扑倒、拖拽或失衡都更加危险。",
+          "ending_hook": "信号恢复时，某条未发送的信息却已经抵达未知收件人。",
+          "content": "屋顶信号兽适合高机动空中战、信号干扰和高处压迫。"
+        }
+      ]
     },
     {
-      "id": "patrol_anomaly",
-      "name": "巡逻异常",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 20,
-      "keys": [
-        "巡逻",
-        "异常",
-        "污染",
-        "结界",
-        "自由战斗",
-        "路过"
-      ],
-      "visible_levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/魔法少女战斗",
-        "/魔法少女日常",
-        "/反派魔女战斗",
-        "/反派魔女日常"
-      ],
-      "event_tags": [
-        "巡逻",
-        "地点异常",
-        "污染扩散"
-      ],
-      "location_tags": [
-        "街巷",
-        "公园",
-        "下水道",
-        "商店街",
-        "雨夜"
-      ],
-      "compatible_monster_tags": [
-        "slime",
-        "tentacle",
-        "plant",
-        "shadow",
-        "water",
-        "night"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "environment_crisis"
-      ],
-      "opening_hook": "主角在巡逻或路过时发现地点状态不对：地面、灯光、气味、人群反应或结界边缘先出现异常。",
-      "twist_hook": "异常会改变地形或限制行动，让战斗不只是正面互殴。",
-      "ending_hook": "净化后现场仍残留污渍、碎片、气味或短暂失真的空间，提示污染源可能还没完全断掉。",
-      "content": "巡逻异常用于让战斗从地点状态变化开始。开场先写灯光、气味、地面触感、人群反应、结界边缘或空间回声不对，再让主角在巡逻或路过时被迫处理；魔物的显形方式应嵌在这些异常里。适合软色情战斗场地：湿滑地面、缠绕影子、雾气贴肤、镜面放大狼狈姿态、温泉热气或舞台灯光，但重点仍是动作推进和现场机制。"
-    },
-    {
-      "id": "rescue_call",
-      "name": "求救信号",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 18,
-      "keys": [
-        "求救",
-        "救人",
-        "救援",
-        "尖叫",
-        "失踪",
-        "保护"
-      ],
-      "visible_levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/魔法少女战斗",
-        "/魔法少女日常",
-        "/反派魔女日常"
-      ],
-      "event_tags": [
-        "求救",
-        "救援",
-        "保护"
-      ],
-      "location_tags": [
-        "学校",
-        "商店街",
-        "公园",
-        "河边",
-        "废弃建筑"
-      ],
-      "compatible_monster_tags": [
-        "ghost",
-        "water",
-        "doll",
-        "shadow",
-        "vine",
-        "tentacle"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "villain_witch",
-        "environment_crisis"
-      ],
-      "opening_hook": "主角先接到求救、听见尖叫或发现有人被困，再被迫进入战斗。",
-      "twist_hook": "被救对象、求救声或现场痕迹可能被魔物伪装利用。",
-      "ending_hook": "救援成功后，受害者只记得片段，留下一个能指向后续异常的细节。",
-      "content": "求救信号用于给战斗一个即时目标：保护、转移、解救、拖延或打断异常影响。开场可以是尖叫、通讯中断、匿名求救、被困者留下的物品，主角先确认有人受困，再遭遇魔物或敌对角色。软色情元素应来自救援压力下的战损、衣装凌乱、暧昧误会或魔物制造的羞耻困境；被救对象只作为事件压力，不要把无关路人写成露骨受害者。"
-    },
-    {
-      "id": "tracking_trace",
-      "name": "追踪痕迹",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 16,
-      "keys": [
-        "追踪",
-        "追击",
-        "痕迹",
-        "尾随",
-        "线索",
-        "搜寻"
-      ],
-      "visible_levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/魔法少女战斗",
-        "/魔法少女日常",
-        "/反派魔女战斗",
-        "/反派魔女日常"
-      ],
-      "event_tags": [
-        "追踪",
-        "线索",
-        "伏击"
-      ],
-      "location_tags": [
-        "街巷",
-        "车站",
-        "旧校舍",
-        "屋顶",
-        "废弃建筑"
-      ],
-      "compatible_monster_tags": [
-        "urban_legend",
-        "ghost",
-        "shadow",
-        "doll",
-        "vampire",
-        "fox"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "villain_witch",
-        "magical_girl"
-      ],
-      "opening_hook": "主角沿着近期记录或现场痕迹追踪目标，抵达时发现目标已经布置好反击或诱饵。",
-      "twist_hook": "痕迹中途分叉，迫使主角在保护现场、继续追击和识破诱饵之间选择。",
-      "ending_hook": "战后保留一条可继续追踪的线索，但它可能指向另一个地点或另一个人。",
-      "content": "追踪痕迹用于把战斗写成一次行动的结果。主角沿着近期记录、魔力残渣、脚印、湿痕、断裂饰品、红线、蛛丝或镜面裂纹推进，抵达时发现目标已经留下诱饵或反击布置。适合把黄油向细节做成线索：香气、黏液、衣料纤维、异常温度、被偷走的小饰品等；中段应出现追踪分叉，让主角在保护现场、继续追击和识破诱饵之间做选择。"
-    },
-    {
-      "id": "mischief_ambush",
-      "name": "恶作剧伏击",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 24,
-      "keys": [
-        "伏击",
-        "恶作剧",
-        "捉弄",
-        "证明",
-        "找魔法少女",
-        "袭击"
-      ],
-      "visible_levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/反派魔女战斗",
-        "/反派魔女日常"
-      ],
-      "event_tags": [
-        "主动袭击",
-        "伏击",
-        "误导"
-      ],
-      "location_tags": [
-        "学校",
-        "街巷",
-        "商店街",
-        "屋顶",
-        "夜晚"
-      ],
-      "compatible_monster_tags": [
-        "shadow",
-        "doll",
-        "mirror",
-        "fox",
-        "succubus"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "magical_girl"
-      ],
-      "opening_hook": "反派魔女主动布置一个小陷阱、假线索或恶作剧，把目标或异常引到自己能出手的位置。",
-      "twist_hook": "现场的布置并不完全受主角控制，目标、魔物或路人反应会打乱节奏。",
-      "ending_hook": "战后留下明显带有反派魔女风格的痕迹、挑衅标记或被误会的线索。",
-      "content": "恶作剧伏击用于反派魔女或主动方制造局面后开战。开场可以是假线索、小陷阱、挑衅标记、舞台灯光或故意留下的暧昧痕迹，把目标引到适合出手的位置；但现场不能完全受主角控制，魔物、路人反应或目标反击会打乱节奏。适合轻快嘴硬、黄油擦边的战斗：衣装机关、羞耻误会、缎带陷阱、镜面挑衅等，重点是动作、失误和临场调整。"
-    },
-    {
-      "id": "accidental_monster_encounter",
-      "name": "意外魔物遭遇",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 18,
-      "keys": [
-        "魔物",
-        "异常",
-        "污染",
-        "巡逻",
-        "路过",
-        "怪物"
-      ],
-      "visible_levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/反派魔女战斗"
-      ],
-      "event_tags": [
-        "偶遇",
-        "地点异常",
-        "污染扩散"
-      ],
-      "location_tags": [
-        "街巷",
-        "公园",
-        "下水道",
-        "废弃建筑",
-        "夜晚"
-      ],
-      "compatible_monster_tags": [
-        "slime",
-        "tentacle",
-        "plant",
-        "shadow",
-        "ghost",
-        "water"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "environment_crisis"
-      ],
-      "opening_hook": "反派魔女正在行动途中撞见公共魔物或污染源，不得不先处理这个麻烦。",
-      "twist_hook": "魔物会干扰主角原本的计划，让她一边嘴硬一边调整策略。",
-      "ending_hook": "处理完异常后，现场留下可被魔法少女误读的痕迹。",
-      "content": "意外魔物遭遇用于让反派魔女战斗不总是玩家战。开场写主角正在捣乱、追踪、布置陷阱或嘴硬行动途中，突然撞见公共魔物、污染源或地点异常，不得不先处理这个麻烦。软色情方向来自魔物把主角原计划搅乱：衣装被黏住、幻觉误导、缎带缠绕、香雾打断台词等；场景事件只负责“意外撞上”的结构，具体压迫感仍由魔物书提供。"
-    },
-    {
-      "id": "rival_chase",
-      "name": "宿敌追逐",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 16,
-      "keys": [
-        "追",
-        "追逐",
-        "追击",
-        "拦截",
-        "逃跑",
-        "目标"
-      ],
-      "visible_levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/反派魔女战斗",
-        "/反派魔女日常"
-      ],
-      "event_tags": [
-        "追踪",
-        "追逐",
-        "拦截"
-      ],
-      "location_tags": [
-        "街巷",
-        "车站",
-        "屋顶",
-        "商店街",
-        "夜晚"
-      ],
-      "compatible_monster_tags": [
-        "shadow",
-        "vampire",
-        "fox",
-        "mirror"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "magical_girl"
-      ],
-      "opening_hook": "双方沿着街区、屋顶或结界边缘追逐，战斗从移动中的试探和拦截开始。",
-      "twist_hook": "追逐路线经过人群、结界裂口或另一个异常地点，迫使双方短暂改变优先级。",
-      "ending_hook": "战后双方都留下能被对方继续追查的线索。",
-      "content": "宿敌追逐用于移动战和追逐战框架，避免站桩互殴。双方沿街区、屋顶、旧校舍走廊、结界边缘或舞台后台追逐，在转角、遮挡、高低差和人群边缘不断交换优势。可加入黄油向战损与误会：披风被勾住、裙摆被风掀乱、镜面倒影暴露位置、湿滑地面导致贴近交错，但这些细节服务动作节奏和角色选择，不要拖成纯景物描写。"
-    },
-    {
-      "id": "lost_item_commission",
-      "name": "失物委托",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 19,
-      "keys": [
-        "失物",
-        "遗失",
-        "找东西",
-        "委托",
-        "道具",
-        "饰品"
-      ],
-      "visible_levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/魔法少女战斗",
-        "/魔法少女日常",
-        "/反派魔女战斗",
-        "/反派魔女日常"
-      ],
-      "event_tags": [
-        "失物委托",
-        "道具线索",
-        "小型调查"
-      ],
-      "location_tags": [
-        "学校",
-        "商店街",
-        "车站",
-        "旧校舍",
-        "街巷"
-      ],
-      "compatible_monster_tags": [
-        "mimic",
-        "doll",
-        "fox",
-        "mirror",
-        "living",
-        "armor"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "villain_witch",
-        "environment_crisis"
-      ],
-      "opening_hook": "主角接到寻找失物、回收道具或确认异常饰品的委托，循着物品最后出现的位置展开调查。",
-      "twist_hook": "失物并不是单纯被偷走，而是被魔物拟态、被结界复制，或主动把人引向某个地点。",
-      "ending_hook": "事件结束后，失物留下新的划痕、气味、魔力刻印或一段不属于委托人的记忆。",
-      "content": "失物委托用于把日常行动自然转入异常事件。开场先写委托来源：同伴遗落的变身饰品、商店街失踪的礼盒、车站储物柜里的陌生道具、旧校舍被换走的校徽等；成年主角沿着监控盲区、残留魔力或物品习性追查。可加入轻喜剧和暧昧误会，例如道具误判主人、饰品黏在战斗服上、拟态礼盒突然弹出缎带，但重点是失物如何制造线索、诱饵和战斗入口。"
-    },
-    {
-      "id": "stage_broadcast_accident",
-      "name": "舞台直播事故",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 17,
-      "keys": [
-        "舞台",
-        "直播",
-        "摄影",
-        "演出",
-        "偶像",
-        "聚光灯"
-      ],
-      "visible_levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/魔法少女战斗",
-        "/魔法少女日常",
-        "/反派魔女战斗",
-        "/反派魔女日常"
-      ],
-      "event_tags": [
-        "舞台事故",
-        "公开场合",
-        "视线压力"
-      ],
-      "location_tags": [
-        "舞台",
-        "商店街",
-        "学校",
-        "会场",
-        "镜厅"
-      ],
-      "compatible_monster_tags": [
-        "succubus",
-        "mirror",
-        "spider",
-        "doll",
-        "shadow",
-        "hypno"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "villain_witch",
-        "magical_girl",
-        "environment_crisis"
-      ],
-      "opening_hook": "活动、演出、直播或拍摄现场出现灯光、镜头、音响或观众反应异常，主角必须在公开视线边缘处理。",
-      "twist_hook": "现场设备会把战斗误剪成表演、宣传片或绯闻片段，让主角既要净化异常又要控制影响范围。",
-      "ending_hook": "战后留下无法解释的直播雪花、错位照片、舞台道具或被粉丝二创误读的片段。",
-      "content": "舞台直播事故用于制造公开场合压力。开场可以是校园祭、商店街促销、偶像小舞台、摄影棚、直播间或结界伪装成演出现场；异常先通过灯光追踪、镜头自动对焦、音响低语、观众集体停顿等方式出现。适合写主角在聚光灯下狼狈救场：战斗服反光过强、缎带被舞台机关勾住、镜头误拍到尴尬姿势，但事件重点是公开性、误会、控场和保护普通人。"
-    },
-    {
-      "id": "dream_overlap",
-      "name": "梦境错位",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 18,
-      "keys": [
-        "梦",
-        "梦境",
-        "噩梦",
-        "睡着",
-        "幻觉",
-        "半梦半醒"
-      ],
-      "visible_levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/魔法少女战斗",
-        "/魔法少女日常",
-        "/反派魔女战斗",
-        "/反派魔女日常"
-      ],
-      "event_tags": [
-        "梦境错位",
-        "精神干扰",
-        "现实重叠"
-      ],
-      "location_tags": [
-        "梦境",
-        "寝室幻境",
-        "镜厅",
-        "夜晚",
-        "旧校舍"
-      ],
-      "compatible_monster_tags": [
-        "nightmare",
-        "dream",
-        "succubus",
-        "incubus",
-        "ghost",
-        "mirror"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "villain_witch",
-        "environment_crisis"
-      ],
-      "opening_hook": "主角发现现实细节开始像梦一样错位：钟表停摆、房间扩张、熟人说出不该知道的话或场景突然切换。",
-      "twist_hook": "梦境会读取主角近期战斗、秘密愿望或羞耻记忆，把它们伪装成线索或敌人的话术。",
-      "ending_hook": "醒来后仍有一个现实物件带着梦里的痕迹，提示异常并未完全消失。",
-      "content": "梦境错位用于把战斗写成现实与梦的重叠，而不是单纯昏睡。开场先给出现实漏洞：同一条走廊反复出现、手机时间倒退、同伴台词不连贯、镜子里动作慢半拍；主角需要找出梦境锚点才能稳定场地。暧昧感来自梦境放大视线、布料触感、心跳和秘密愿望，但必须保留清醒反抗、同伴呼唤或净化锚点，不写不可逆精神控制。"
-    },
-    {
-      "id": "festival_night_detour",
-      "name": "节日夜绕路",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 16,
-      "keys": [
-        "祭典",
-        "庙会",
-        "烟花",
-        "夏祭",
-        "集市",
-        "夜市"
-      ],
-      "visible_levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/魔法少女战斗",
-        "/魔法少女日常",
-        "/反派魔女战斗",
-        "/反派魔女日常"
-      ],
-      "event_tags": [
-        "节日活动",
-        "人群掩护",
-        "夜间事件"
-      ],
-      "location_tags": [
-        "商店街",
-        "神社",
-        "河边",
-        "夜晚",
-        "公园"
-      ],
-      "compatible_monster_tags": [
-        "fox",
-        "vampire",
-        "ghost",
-        "water",
-        "shadow",
-        "urban_legend"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "villain_witch",
-        "magical_girl",
-        "environment_crisis"
-      ],
-      "opening_hook": "节日、庙会、夜市或烟花大会中出现小规模异常，主角必须在人群和摊位之间隐蔽行动。",
-      "twist_hook": "异常借助人群、面具、摊位游戏或烟花声隐藏，追查时会不断把普通热闹和魔力痕迹混在一起。",
-      "ending_hook": "战后只剩一个摊位奖品、半张面具、湿掉的烟花票或被误认为节日表演的目击谈资。",
-      "content": "节日夜绕路用于把日常热闹和战斗危机混在一起。开场可以是夏祭、庙会、夜市、烟花大会、商店街抽奖或校园活动；异常藏在人群、摊位灯笼、面具、金鱼袋、棉花糖香气和烟花声里。适合轻松又紧张的事件：主角穿行摊位时被浴衣带、饰品、奖品道具或人群误会拖慢，但重点是保护普通人、隐蔽变身、追查源头和在节日结束前解决问题。"
-    },
-    {
-      "id": "temporary_truce",
-      "name": "临时共斗",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 20,
-      "keys": [
-        "合作",
-        "共斗",
-        "停战",
-        "临时同盟",
-        "误会",
-        "一起"
-      ],
-      "visible_levels": [
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/魔法少女战斗",
-        "/魔法少女日常",
-        "/反派魔女战斗",
-        "/反派魔女日常"
-      ],
-      "event_tags": [
-        "临时共斗",
-        "关系推进",
-        "敌我误会"
-      ],
-      "location_tags": [
-        "街巷",
-        "结界边缘",
-        "废弃建筑",
-        "屋顶",
-        "夜晚"
-      ],
-      "compatible_monster_tags": [
-        "shadow",
-        "tentacle",
-        "spider",
-        "nightmare",
-        "vampire",
-        "slime"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "villain_witch",
-        "magical_girl",
-        "environment_crisis"
-      ],
-      "opening_hook": "主角和本来立场不一致的人被同一个异常困住，被迫先停战、交换情报或并肩破局。",
-      "twist_hook": "共斗对象知道一部分真相但隐藏了关键动机，战斗中会制造信任考验。",
-      "ending_hook": "双方各自带走一半线索，关系没有完全缓和，却留下下次继续纠缠的理由。",
-      "content": "临时共斗用于推动角色关系，不要把所有遭遇写成单人解决。开场让主角和宿敌、目标魔法少女、反派魔女、同伴或误会对象同时被结界困住，眼前威胁比立场冲突更急。事件适合写嘴硬合作、互相救场和不情愿的默契：一个人挡住场地机制，另一个人解读核心规则；暧昧感来自近距离配合、战损遮掩和互相误会，但结尾应保留立场差异与后续线索。"
-    },
-    {
-      "id": "rule_game_domain",
-      "name": "规则游戏结界",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 14,
-      "keys": [
-        "规则",
-        "游戏",
-        "解谜",
-        "赌局",
-        "挑战",
-        "闯关"
-      ],
-      "visible_levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/魔法少女战斗",
-        "/魔法少女日常",
-        "/反派魔女战斗",
-        "/反派魔女日常"
-      ],
-      "event_tags": [
-        "规则怪谈",
-        "解谜战",
-        "结界游戏"
-      ],
-      "location_tags": [
-        "旧校舍",
-        "商店街",
-        "镜厅",
-        "废弃建筑",
-        "车站"
-      ],
-      "compatible_monster_tags": [
-        "urban_legend",
-        "doll",
-        "mirror",
-        "mimic",
-        "nightmare",
-        "fox"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "villain_witch",
-        "environment_crisis"
-      ],
-      "opening_hook": "主角进入一个写着规则、任务或惩罚条件的结界，不能只靠火力，需要先理解玩法。",
-      "twist_hook": "规则文字存在歧义、漏项或反向提示，敌人也会试图利用主角对规则的误读。",
-      "ending_hook": "破局后规则牌、游戏票根、骰子、棋子或说明书碎片仍保留一条未使用的隐藏规则。",
-      "content": "规则游戏结界用于制造解谜战。开场给出明确但不完整的规则：不能回头、必须回答广播、只能踩亮格、抽到红牌就换位置、镜子里的人先行动等；成年主角需要边战斗边测试规则。可加入羞耻但不露骨的惩罚机制，例如动作被迫变慢、台词被改写、战斗服装饰变成计分牌，但重点是规则漏洞、选择代价和聪明破局。"
-    },
-    {
-      "id": "supply_mishap",
-      "name": "补给失控",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 15,
-      "keys": [
-        "补给",
-        "药剂",
-        "新装备",
-        "试作品",
-        "强化",
-        "道具测试"
-      ],
-      "visible_levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/魔法少女战斗",
-        "/魔法少女日常",
-        "/反派魔女战斗",
-        "/反派魔女日常"
-      ],
-      "event_tags": [
-        "补给失控",
-        "装备测试",
-        "轻喜剧事故"
-      ],
-      "location_tags": [
-        "学校",
-        "据点",
-        "商店街",
-        "实验室",
-        "旧校舍"
-      ],
-      "compatible_monster_tags": [
-        "living",
-        "armor",
-        "mimic",
-        "slime",
-        "doll",
-        "hypno"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "villain_witch",
-        "magical_girl",
-        "environment_crisis"
-      ],
-      "opening_hook": "主角测试新装备、药剂、补给或变身辅助道具时，发现它和现场异常产生了意外反应。",
-      "twist_hook": "失控道具不一定是坏的，它会提供短暂优势，同时制造新的限制或误会。",
-      "ending_hook": "事件后道具保留下一个可修复的缺陷、升级灵感或被同伴拿来调侃的记录。",
-      "content": "补给失控用于让日常准备变成事件入口。开场可以是新装备试穿、药剂测试、补给箱开封、魔法终端更新或反派魔女的小发明实验；异常与道具产生共鸣，导致功能跑偏。适合轻喜剧：强化披风太会保护、药剂让咒语尾音变软、靴子自动追踪错误目标、补给箱把主角包装成礼物；但道具也要提供可用优势，让主角通过适应缺陷完成破局。"
-    },
-    {
-      "id": "time_loop_echo",
-      "name": "时间回环余响",
-      "enabled": true,
-      "recursive": true,
-      "strategy": "keyword",
-      "weight": 10,
-      "keys": [
-        "重复",
-        "时间",
-        "倒流",
-        "回环",
-        "钟表",
-        "既视感"
-      ],
-      "visible_levels": [
-        4,
-        5,
-        6,
-        7
-      ],
-      "allowed_commands": [
-        "/魔法少女战斗",
-        "/魔法少女日常",
-        "/反派魔女战斗",
-        "/反派魔女日常"
-      ],
-      "event_tags": [
-        "时间回环",
-        "重复事件",
-        "高阶异常"
-      ],
-      "location_tags": [
-        "车站",
-        "钟楼",
-        "旧校舍",
-        "商店街",
-        "夜晚"
-      ],
-      "compatible_monster_tags": [
-        "urban_legend",
-        "nightmare",
-        "mirror",
-        "ghost",
-        "vampire",
-        "shadow"
-      ],
-      "compatible_battle_types": [
-        "monster",
-        "villain_witch",
-        "environment_crisis"
-      ],
-      "opening_hook": "主角发现同一段数分钟的事件反复发生，只有少数痕迹或记忆能跨过回环。",
-      "twist_hook": "每次回环都会让场地多出一点变化，说明敌人也在学习主角的选择。",
-      "ending_hook": "打破回环后，时钟、车票、照片或战斗服上的破损仍显示出上一轮不存在的痕迹。",
-      "content": "时间回环余响用于较高等级的异常战。开场写同一句广播、同一枚硬币落地、同一辆列车进站或同一盏灯熄灭反复出现；主角逐渐意识到自己被困在短周期里。事件重点是比较每轮差异、保存关键物品、利用敌人记忆盲区破局。暧昧或羞耻细节可以成为跨轮线索，例如同一处衣装破损、同一句被打断的台词、同一枚饰品位置变化，但不要让重复变成拖沓复述。"
+      "id": "character_enemy",
+      "name": "与敌人是魔法少女/反派魔女",
+      "events": [
+        {
+          "id": "direct_challenge_duel",
+          "name": "直接挑战决斗",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["挑战", "决斗", "单挑", "约战", "正面对决", "宣战"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["决斗", "正面对决", "软色情战斗"],
+          "location_tags": ["屋顶", "学校", "公园", "废弃地", "结界"],
+          "compatible_monster_tags": [],
+          "compatible_battle_types": ["villain_witch", "magical_girl"],
+          "opening_hook": "双方以明确挑战开始战斗，距离、视线和言语挑衅都被拉到极近。",
+          "twist_hook": "战斗中可以出现近身压制、武器抵住要害、衣装战损和暧昧羞耻感，但不描写露骨性行为。",
+          "ending_hook": "胜负揭晓后，落败者仍保留尊严与火药味，为下次再战留下余韵。",
+          "content": "直接挑战决斗用于玩家点名挑战某个魔法少女或反派魔女。风格偏软色情战斗：贴身攻防、压制、战损、羞恼和危险暧昧。"
+        },
+        {
+          "id": "rival_rooftop_chase",
+          "name": "宿敌屋顶追逐",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["宿敌", "屋顶", "追逐", "追击", "追踪", "楼顶"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["宿敌", "追逐", "高处战"],
+          "location_tags": ["屋顶", "高楼", "学校", "城市"],
+          "compatible_monster_tags": [],
+          "compatible_battle_types": ["villain_witch", "magical_girl"],
+          "opening_hook": "目标从屋顶边缘回头一笑，故意把追击引向风声强烈的高处。",
+          "twist_hook": "高速追逐中双方多次近距离交错，斗篷、发带或裙摆被风与攻击拉扯出狼狈感。",
+          "ending_hook": "追逐在月光下停住，胜者只差一步就能彻底压住对方。",
+          "content": "宿敌屋顶追逐适合有旧怨或点名追击的人物敌人。战斗重点是速度、挑衅、失衡和贴近压迫。"
+        },
+        {
+          "id": "misunderstood_rescue_clash",
+          "name": "救援误会冲突",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["误会", "救援", "救人", "阻拦", "抢人", "保护"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["误会", "救援", "冲突"],
+          "location_tags": ["城市", "学校", "医院", "居民区", "结界"],
+          "compatible_monster_tags": [],
+          "compatible_battle_types": ["villain_witch", "magical_girl"],
+          "opening_hook": "双方都认为自己是在保护现场，却因为立场和信息差立刻爆发冲突。",
+          "twist_hook": "救援对象、旁观者或结界残留会让双方必须压低火力，战斗更容易变成近身制伏。",
+          "ending_hook": "误会未必完全解开，但双方都意识到对方并非单纯敌人。",
+          "content": "救援误会冲突适合魔法少女与反派魔女因目标冲突而交战。风格可以带有制伏、被误解的羞恼和战损紧张。"
+        },
+        {
+          "id": "corruption_probe",
+          "name": "黑化试探",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["黑化", "试探", "诱导", "污染", "堕落", "动摇"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["黑化试探", "精神压迫", "软色情战斗"],
+          "location_tags": ["结界", "夜晚", "镜界", "废弃地", "地下空间"],
+          "compatible_monster_tags": [],
+          "compatible_battle_types": ["villain_witch", "magical_girl"],
+          "opening_hook": "敌人不急于击倒对手，而是用语言、魔力触碰和心理压迫试探底线。",
+          "twist_hook": "战斗中可以写魔力束缚、贴耳低语、羞耻动摇和战斗服被污染侵蚀，但保持暗示和非露骨。",
+          "ending_hook": "无论胜负，双方心里都留下了一点危险的动摇。",
+          "content": "黑化试探用于人物敌人之间的诱导、试探和精神战。适合软色情风格，但必须停留在暧昧、压迫和羞耻层面。"
+        },
+        {
+          "id": "public_showdown",
+          "name": "公开场合对峙",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["公开", "对峙", "人群", "广场", "围观", "当众"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["公开场合", "对峙", "围观压力"],
+          "location_tags": ["商业街", "广场", "车站", "学校", "祭典"],
+          "compatible_monster_tags": [],
+          "compatible_battle_types": ["villain_witch", "magical_girl"],
+          "opening_hook": "敌人在公开场合现身，迫使主角必须在隐藏身份、保护群众和迎战之间取舍。",
+          "twist_hook": "围观压力会放大每一次失误，战损和被压制的姿态更容易造成羞耻感。",
+          "ending_hook": "人群只记得光影与混乱，真正的挑衅却只落在双方耳中。",
+          "content": "公开场合对峙适合当众挑战、身份压力和群众保护。软色情风格以被注视、狼狈和近身压迫为主。"
+        },
+        {
+          "id": "contract_dispute",
+          "name": "契约纠纷",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["契约", "交易", "纠纷", "条件", "报酬", "交换"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["契约", "交易破裂", "谈判战"],
+          "location_tags": ["咖啡店", "学校", "结界", "废弃地", "商业街"],
+          "compatible_monster_tags": [],
+          "compatible_battle_types": ["villain_witch", "magical_girl"],
+          "opening_hook": "一场本该谈条件的会面，因为契约细节和立场冲突变成战斗。",
+          "twist_hook": "双方都试图夺取契约媒介，争抢过程中可以出现手腕控制、压在墙边和呼吸贴近的紧张感。",
+          "ending_hook": "契约没有完全作废，只是被改写成更危险的下一次约定。",
+          "content": "契约纠纷适合交易失败、谈判破裂和互相试探的人物战。"
+        },
+        {
+          "id": "mirror_domain_duel",
+          "name": "镜界对影战",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["镜界", "镜子", "倒影", "影子", "对影", "镜面"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["镜界", "幻象", "人物战"],
+          "location_tags": ["镜界", "商场", "学校", "结界", "玻璃幕墙"],
+          "compatible_monster_tags": [],
+          "compatible_battle_types": ["villain_witch", "magical_girl"],
+          "opening_hook": "双方被拖入镜面结界，倒影把每一次攻防都放大成无法逃避的画面。",
+          "twist_hook": "镜面会映出双方被压制或动摇的姿态，刺激她们用更激烈的方式证明自己。",
+          "ending_hook": "镜界碎裂时，残留倒影像是在替失败者说出未出口的话。",
+          "content": "镜界对影战适合幻象、羞耻映照、心理动摇和近身决斗。"
+        },
+        {
+          "id": "truce_breakdown",
+          "name": "停战破裂",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["停战", "合作", "背叛", "破裂", "翻脸", "临时同盟"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["停战破裂", "临时同盟", "背叛"],
+          "location_tags": ["结界", "废弃工厂", "地下空间", "城市", "学校"],
+          "compatible_monster_tags": [],
+          "compatible_battle_types": ["villain_witch", "magical_girl"],
+          "opening_hook": "刚刚还并肩处理危机的双方，因为战利品、目标或秘密突然翻脸。",
+          "twist_hook": "彼此熟悉刚才的战斗节奏，所以每一次反制都像贴着弱点落下。",
+          "ending_hook": "破裂的同盟留下新仇，也留下对彼此能力的危险了解。",
+          "content": "停战破裂适合从合作转向人物战。战斗强调熟悉弱点、贴身反制和情绪爆发。"
+        },
+        {
+          "id": "night_ambush_intercept",
+          "name": "夜间伏击拦截",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["伏击", "拦截", "偷袭", "夜袭", "堵截", "埋伏"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["伏击", "夜战", "制伏"],
+          "location_tags": ["夜晚", "巷道", "屋顶", "公园", "地下空间"],
+          "compatible_monster_tags": [],
+          "compatible_battle_types": ["villain_witch", "magical_girl"],
+          "opening_hook": "敌人早已在撤退路线等待，第一击就瞄准行动能力而非生命。",
+          "twist_hook": "伏击战可以出现束缚、压倒、武器贴近喉侧和被迫低声交涉的暧昧危险。",
+          "ending_hook": "拦截结束时，胜者得到情报，败者得到一段难以忘记的屈辱记忆。",
+          "content": "夜间伏击拦截适合抓捕、堵截和偷袭人物敌人。风格偏压制与羞耻，但保持非露骨。"
+        },
+        {
+          "id": "training_challenge",
+          "name": "训练挑战失控",
+          "enabled": true,
+          "recursive": true,
+          "strategy": "keyword",
+          "keys": ["训练", "切磋", "练习", "模拟战", "失控", "比试"],
+          "visible_levels": [1, 2, 3, 4, 5, 6, 7],
+          "allowed_commands": ["/魔法少女战斗", "/反派魔女战斗"],
+          "event_tags": ["训练", "切磋", "失控"],
+          "location_tags": ["训练场", "学校", "结界", "屋顶", "公园"],
+          "compatible_monster_tags": [],
+          "compatible_battle_types": ["villain_witch", "magical_girl"],
+          "opening_hook": "原本只是试探实力的训练，因为一句挑衅或一次过火反击迅速失控。",
+          "twist_hook": "双方都不想先认输，制伏动作和贴身攻防逐渐越过普通切磋的距离。",
+          "ending_hook": "训练结束后，胜负之外还留下微妙的尴尬和不服气。",
+          "content": "训练挑战失控适合切磋、证明实力和关系升温的人物战。软色情风格以暧昧距离、战损和羞恼为主。"
+        }
+      ]
     }
   ]
 }

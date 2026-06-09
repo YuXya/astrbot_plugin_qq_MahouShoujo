@@ -281,12 +281,38 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             self._format_logs(logs),
             self._format_cameo_memories(cameo_memories),
         ]
+        category_ids = self._battle_event_category_ids(
+            action_text,
+            character_keywords=["反派魔女", "敌方魔女", "魔女", "黑化者"],
+        )
+        event_monster_candidates = self._event_monster_candidates(
+            monster_candidates,
+            action_text=action_text,
+            require_monster_pool=category_ids == ["monster_enemy"],
+        )
         scene_event_candidates = self.event_book_engine.build_scene_event_candidates(
             text_parts,
             current_event="/魔法少女战斗",
             player_level=current_level,
             battle_types=["monster", "villain_witch", "environment_crisis"],
-            monster_candidates=monster_candidates,
+            category_ids=category_ids,
+            monster_candidates=event_monster_candidates,
+            limit=80,
+        )
+        if category_ids == ["monster_enemy"]:
+            scene_event_candidates = self._filter_scene_events_for_monsters(
+                scene_event_candidates,
+                event_monster_candidates,
+            )
+        scene_event_candidates = self._prepare_scene_event_candidates(
+            scene_event_candidates,
+            action_text=action_text,
+            memory_text=self._selection_memory_text(logs, cameo_memories),
+        )
+        prompt_monster_candidates = self._prepare_monster_candidates(
+            monster_candidates,
+            action_text=action_text,
+            memory_text=self._selection_memory_text(logs, cameo_memories),
         )
         prompt = self.editable_manager.render_prompt(
             "magical_battle_target_selection_prompt",
@@ -304,7 +330,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                         "villain_witches": self._prompt_protagonist_profiles(
                             villain_witch_candidates
                         ),
-                        "monsters": monster_candidates,
+                        "monsters": prompt_monster_candidates,
                         "scene_events": scene_event_candidates,
                     }
                 ),
@@ -333,7 +359,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             logger.warning(f"魔法少女战斗目标判断 JSON 解析失败，按魔物战斗处理: {error}")
             return self._magical_monster_context(
                 player_data=player_data,
-                monster_candidates=monster_candidates,
+                monster_candidates=prompt_monster_candidates,
                 scene_event_candidates=scene_event_candidates,
                 current_level=current_level,
                 text_parts=text_parts,
@@ -344,7 +370,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         if battle_type != "villain_witch":
             return self._magical_monster_context(
                 player_data=player_data,
-                monster_candidates=monster_candidates,
+                monster_candidates=prompt_monster_candidates,
                 scene_event_candidates=scene_event_candidates,
                 current_level=current_level,
                 text_parts=text_parts,
@@ -362,7 +388,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         if not targets:
             return self._magical_monster_context(
                 player_data=player_data,
-                monster_candidates=monster_candidates,
+                monster_candidates=prompt_monster_candidates,
                 scene_event_candidates=scene_event_candidates,
                 current_level=current_level,
                 text_parts=text_parts,
@@ -418,12 +444,38 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             self._format_logs(logs),
             self._format_cameo_memories(cameo_memories),
         ]
+        category_ids = self._battle_event_category_ids(
+            action_text,
+            character_keywords=["魔法少女", "袭击魔法少女", "找魔法少女", "证明自己"],
+        )
+        event_monster_candidates = self._event_monster_candidates(
+            monster_candidates,
+            action_text=action_text,
+            require_monster_pool=category_ids == ["monster_enemy"],
+        )
         scene_event_candidates = self.event_book_engine.build_scene_event_candidates(
             text_parts,
             current_event="/反派魔女战斗",
             player_level=current_level,
             battle_types=["magical_girl", "monster", "environment_crisis"],
-            monster_candidates=monster_candidates,
+            category_ids=category_ids,
+            monster_candidates=event_monster_candidates,
+            limit=80,
+        )
+        if category_ids == ["monster_enemy"]:
+            scene_event_candidates = self._filter_scene_events_for_monsters(
+                scene_event_candidates,
+                event_monster_candidates,
+            )
+        scene_event_candidates = self._prepare_scene_event_candidates(
+            scene_event_candidates,
+            action_text=action_text,
+            memory_text=self._selection_memory_text(logs, cameo_memories),
+        )
+        prompt_monster_candidates = self._prepare_monster_candidates(
+            monster_candidates,
+            action_text=action_text,
+            memory_text=self._selection_memory_text(logs, cameo_memories),
         )
         prompt = self.editable_manager.render_prompt(
             "villain_battle_selection_prompt",
@@ -441,7 +493,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                         "magical_girls": self._prompt_protagonist_profiles(
                             magical_girl_candidates
                         ),
-                        "monsters": monster_candidates,
+                        "monsters": prompt_monster_candidates,
                         "scene_events": scene_event_candidates,
                     }
                 ),
@@ -470,7 +522,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             logger.warning(f"反派魔女战斗出战选择 JSON 解析失败，按魔物战斗处理: {error}")
             return self._villain_monster_context(
                 player_data=player_data,
-                monster_candidates=monster_candidates,
+                monster_candidates=prompt_monster_candidates,
                 scene_event_candidates=scene_event_candidates,
                 current_level=current_level,
                 text_parts=text_parts,
@@ -481,7 +533,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         if battle_type == "monster":
             return self._villain_monster_context(
                 player_data=player_data,
-                monster_candidates=monster_candidates,
+                monster_candidates=prompt_monster_candidates,
                 scene_event_candidates=scene_event_candidates,
                 current_level=current_level,
                 text_parts=text_parts,
@@ -535,6 +587,245 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 ai_win_rate=parsed.get("ai_win_rate"),
             ),
         }
+
+    @staticmethod
+    def _battle_event_category_ids(
+        action_text: str,
+        *,
+        character_keywords: list[str],
+    ) -> list[str]:
+        text = str(action_text or "")
+        monster_keywords = [
+            "魔物",
+            "怪物",
+            "污染源",
+            "污染",
+            "异常",
+            "怪异",
+            "普通魔物",
+            "路过怪物",
+            "与魔物战斗",
+        ]
+        if any(keyword and keyword in text for keyword in monster_keywords):
+            return ["monster_enemy"]
+        if any(keyword and keyword in text for keyword in character_keywords):
+            return ["character_enemy"]
+        return ["monster_enemy", "character_enemy"]
+
+    def _event_monster_candidates(
+        self,
+        candidates: list[dict],
+        *,
+        action_text: str,
+        require_monster_pool: bool,
+        limit: int = 12,
+    ) -> list[dict]:
+        if not require_monster_pool:
+            return candidates
+        if not candidates:
+            return []
+
+        text = str(action_text or "")
+        if not text.strip():
+            return candidates[:limit]
+        folded = text.casefold()
+        explicit: list[dict] = []
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            values = [
+                str(candidate.get("id") or "").strip(),
+                str(candidate.get("name") or "").strip(),
+                *[str(key or "").strip() for key in candidate.get("keys", [])],
+                *[str(tag or "").strip() for tag in candidate.get("monster_tags", [])],
+            ]
+            if any(value and (value in text or value.casefold() in folded) for value in values):
+                explicit.append(candidate)
+        if explicit:
+            return explicit[:limit]
+        return candidates
+
+    def _filter_scene_events_for_monsters(
+        self,
+        scene_events: list[dict],
+        monster_candidates: list[dict],
+    ) -> list[dict]:
+        if not scene_events:
+            return []
+        monster_tags: set[str] = set()
+        for monster in monster_candidates:
+            if not isinstance(monster, dict):
+                continue
+            monster_tags.update(self._text_set(monster.get("monster_tags")))
+            monster_tags.update(self._text_set(monster.get("keys")))
+            monster_tags.update(self._text_set(monster.get("preferred_locations")))
+
+        filtered: list[dict] = []
+        for event in scene_events:
+            if not isinstance(event, dict):
+                continue
+            compatible_tags = self._text_set(event.get("compatible_monster_tags"))
+            if not compatible_tags:
+                filtered.append(event)
+                continue
+            if not monster_tags or compatible_tags & monster_tags:
+                filtered.append(event)
+        return filtered or scene_events
+
+    def _prepare_scene_event_candidates(
+        self,
+        candidates: list[dict],
+        *,
+        action_text: str,
+        memory_text: str,
+        limit: int = 8,
+    ) -> list[dict]:
+        if not candidates:
+            return []
+
+        explicit = [
+            candidate
+            for candidate in candidates
+            if self._scene_event_explicitly_requested(candidate, action_text)
+        ]
+        pool = explicit or candidates
+        fresh = [
+            candidate
+            for candidate in pool
+            if not self._candidate_seen_in_memory(
+                candidate,
+                memory_text,
+                fields=("id", "title", "source_event"),
+            )
+        ]
+        return self._random_candidate_sample(fresh or pool, limit=limit)
+
+    def _prepare_monster_candidates(
+        self,
+        candidates: list[dict],
+        *,
+        action_text: str,
+        memory_text: str,
+        limit: int = 8,
+    ) -> list[dict]:
+        if not candidates:
+            return []
+        explicit = [
+            candidate
+            for candidate in candidates
+            if self._monster_explicitly_requested(candidate, action_text)
+        ]
+        if explicit:
+            return explicit[:limit]
+        fresh = [
+            candidate
+            for candidate in candidates
+            if not self._candidate_seen_in_memory(
+                candidate,
+                memory_text,
+                fields=("id", "name"),
+            )
+        ]
+        return self._random_candidate_sample(fresh or candidates, limit=limit)
+
+    @staticmethod
+    def _selection_memory_text(
+        logs: list[dict],
+        cameo_memories: list[dict] | None,
+    ) -> str:
+        return "\n".join(
+            [
+                BattleDiaryAnalyzer._json_dump_static(logs),
+                BattleDiaryAnalyzer._json_dump_static(cameo_memories or []),
+            ]
+        )
+
+    @staticmethod
+    def _json_dump_static(value: object) -> str:
+        try:
+            return json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value or "")
+
+    def _scene_event_explicitly_requested(
+        self,
+        candidate: dict,
+        action_text: str,
+    ) -> bool:
+        text = str(action_text or "")
+        if not text.strip():
+            return False
+        folded = text.casefold()
+        generic_terms = {
+            "魔物",
+            "怪物",
+            "战斗",
+            "找",
+            "寻找",
+            "挑战",
+            "魔法少女",
+            "反派魔女",
+            "魔女",
+            "敌人",
+            "目标",
+            "自由战斗",
+        }
+        values: set[str] = set()
+        for field in ("keys", "event_tags", "location_tags"):
+            values.update(self._text_set(candidate.get(field)))
+        for value in values:
+            token = str(value or "").strip()
+            if not token or token in generic_terms:
+                continue
+            if token in text or token.casefold() in folded:
+                return True
+        return False
+
+    def _monster_explicitly_requested(
+        self,
+        candidate: dict,
+        action_text: str,
+    ) -> bool:
+        text = str(action_text or "")
+        if not text.strip():
+            return False
+        folded = text.casefold()
+        values = {
+            str(candidate.get("id") or "").strip(),
+            str(candidate.get("name") or "").strip(),
+            *self._text_set(candidate.get("keys")),
+        }
+        generic_terms = {"魔物", "怪物", "污染", "异常", "战斗"}
+        for value in values:
+            if not value or value in generic_terms:
+                continue
+            if value in text or value.casefold() in folded:
+                return True
+        return False
+
+    @staticmethod
+    def _candidate_seen_in_memory(
+        candidate: dict,
+        memory_text: str,
+        *,
+        fields: tuple[str, ...],
+    ) -> bool:
+        if not memory_text:
+            return False
+        folded = memory_text.casefold()
+        for field in fields:
+            value = str(candidate.get(field) or "").strip()
+            if value and (value in memory_text or value.casefold() in folded):
+                return True
+        return False
+
+    @staticmethod
+    def _random_candidate_sample(candidates: list[dict], *, limit: int) -> list[dict]:
+        clean = [dict(candidate) for candidate in candidates if isinstance(candidate, dict)]
+        if len(clean) <= max(1, limit):
+            random.shuffle(clean)
+            return clean
+        return random.sample(clean, max(1, limit))
 
     def _magical_monster_context(
         self,
@@ -1144,22 +1435,33 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
     ) -> dict | None:
         if not candidates:
             return None
-        scan_text = "\n".join(str(part or "") for part in text_parts)
-        scored: list[tuple[int, dict]] = []
-        for index, candidate in enumerate(candidates):
+        action_text = str(text_parts[0] if text_parts else "")
+        compatible: list[dict] = []
+        for candidate in candidates:
             if not isinstance(candidate, dict):
                 continue
             compatible_types = self._text_set(candidate.get("compatible_battle_types"))
             if compatible_types and battle_type not in compatible_types:
                 continue
-            score = int(candidate.get("selection_score") or 0) + max(0, 20 - index)
-            score += self._scene_monster_score(candidate, selected_monster)
-            score += self._scene_text_score(candidate, scan_text)
-            scored.append((score, candidate))
-        if not scored:
+            compatible.append(candidate)
+        if not compatible:
             return None
-        scored.sort(key=lambda item: item[0], reverse=True)
-        return dict(scored[0][1])
+
+        explicit = [
+            candidate
+            for candidate in compatible
+            if self._scene_event_explicitly_requested(candidate, action_text)
+        ]
+        pool = explicit or compatible
+        if selected_monster:
+            related = [
+                candidate
+                for candidate in pool
+                if self._scene_monster_score(candidate, selected_monster) > 0
+            ]
+            if related:
+                pool = related
+        return dict(random.choice(pool))
 
     def _resolve_selected_scene_event(
         self,
@@ -1198,17 +1500,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             len(monster_tags & compatible) * 20
             + len(monster_locations & location_tags) * 12
         )
-
-    def _scene_text_score(self, scene_event: dict, scan_text: str) -> int:
-        if not scan_text:
-            return 0
-        folded = scan_text.casefold()
-        score = 0
-        for field in ("event_tags", "location_tags"):
-            for value in self._text_set(scene_event.get(field)):
-                if value and (value in scan_text or value.casefold() in folded):
-                    score += 8
-        return score
 
     def _resolve_selected_monster(
         self,

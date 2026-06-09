@@ -408,10 +408,9 @@ class EditableResourceManager:
                 "性癖最高 Lv.5；base_path 是给 AI 输出 update.changes 的路径提示。"
             ),
             "event_book/default.json": (
-                "事件书文件。events 中每个对象就是一个事件，allowed_commands 数组声明哪些指令可以触发该事件，"
-                "同一个事件可以同时用于魔法少女日常、反派魔女日常、魔法少女战斗、反派魔女战斗等多个指令。"
-                "事件可填写关键词、事件标签、地点标签、兼容魔物标签、兼容战斗类型和开场/变奏/结尾钩子，供上下文选择使用。"
-                "visible_levels 为可见主角等级，数字 1-7 对应 F、E、D、C、B、A、S；未填写时默认全部可见。"
+                "Event book v3 uses categories: monster_enemy and character_enemy. "
+                "Each category has an events list; allowed_commands declares usable commands. "
+                "When player text explicitly asks for monsters, monster_enemy events are filtered by compatible public monster tags first."
             ),
             "monster_book/default.json": (
                 "魔物书文件。公共魔物书是普通魔物敌人图鉴，普通魔物战会从这里选择本次敌人或异常源。"

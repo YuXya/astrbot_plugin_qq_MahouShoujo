@@ -14,6 +14,11 @@ except Exception:
 
 
 class EventBookEngine:
+    DEFAULT_EVENT_CATEGORIES = [
+        {"id": "monster_enemy", "name": "与敌人是魔物"},
+        {"id": "character_enemy", "name": "与敌人是魔法少女/反派魔女"},
+    ]
+
     def __init__(
         self,
         book_path: Path | None = None,
@@ -95,6 +100,7 @@ class EventBookEngine:
         current_event: str,
         player_level: int = 1,
         battle_types: list[str] | None = None,
+        category_ids: list[str] | None = None,
         monster_candidates: list[dict] | None = None,
         limit: int = 8,
     ) -> list[dict[str, object]]:
@@ -102,19 +108,22 @@ class EventBookEngine:
         if not events:
             return []
 
-        scan_text = self._join_text(text_parts or [])
         current_event_key = self._normalize_event_key(current_event)
         allowed_battle_types = {
             str(item or "").strip()
             for item in (battle_types or [])
             if str(item or "").strip()
         }
-        monster_tags = self._collect_monster_tags(monster_candidates or [])
-
-        scored: list[tuple[int, dict[str, object]]] = []
+        allowed_category_ids = {
+            str(item or "").strip()
+            for item in (category_ids or [])
+            if str(item or "").strip()
+        }
+        candidates: list[dict[str, object]] = []
         for event in events:
+            if allowed_category_ids and event.category_id not in allowed_category_ids:
+                continue
             event_commands = event.allowed_commands or [event.command]
-            event_is_current = self._event_matches(event, current_event_key)
             entries = [event.as_entry()] if event.is_scene_event else event.entries
             for entry in entries:
                 if not entry.enabled or player_level not in entry.visible_levels:
@@ -125,71 +134,81 @@ class EventBookEngine:
                     if not allowed_battle_types.intersection(entry.compatible_battle_types):
                         continue
 
-                score = entry.weight
-                if event_is_current:
-                    score += 20
-                if entry.strategy == "always" and event_is_current:
-                    score += 8
-                if self._contains_any_key(scan_text, entry.keys):
-                    score += 40
-                score += self._tag_overlap_score(scan_text, entry.event_tags, 6)
-                score += self._tag_overlap_score(scan_text, entry.location_tags, 8)
-                if monster_tags and entry.compatible_monster_tags:
-                    score += (
-                        len(monster_tags.intersection(entry.compatible_monster_tags))
-                        * 12
-                    )
-
-                if score <= 0:
-                    continue
-                scored.append(
-                    (
-                        score,
-                        {
-                            "id": entry.id,
-                            "title": entry.title or entry.id,
-                            "source_event": event.name or event.id,
-                            "command": event.command,
-                            "allowed_commands": entry.allowed_commands
-                            or event.allowed_commands
-                            or ([event.command] if event.command else []),
-                            "event_tags": entry.event_tags,
-                            "location_tags": entry.location_tags,
-                            "compatible_monster_tags": entry.compatible_monster_tags,
-                            "compatible_battle_types": entry.compatible_battle_types,
-                            "opening_hook": entry.opening_hook,
-                            "twist_hook": entry.twist_hook,
-                            "ending_hook": entry.ending_hook,
-                            "content": entry.content,
-                            "selection_score": score,
-                        },
-                    )
+                candidates.append(
+                    {
+                        "id": entry.id,
+                        "category_id": entry.category_id or event.category_id,
+                        "category_name": entry.category_name or event.category_name,
+                        "title": entry.title or entry.id,
+                        "source_event": event.name or event.id,
+                        "command": event.command,
+                        "allowed_commands": entry.allowed_commands
+                        or event.allowed_commands
+                        or ([event.command] if event.command else []),
+                        "event_tags": entry.event_tags,
+                        "location_tags": entry.location_tags,
+                        "compatible_monster_tags": entry.compatible_monster_tags,
+                        "compatible_battle_types": entry.compatible_battle_types,
+                        "opening_hook": entry.opening_hook,
+                        "twist_hook": entry.twist_hook,
+                        "ending_hook": entry.ending_hook,
+                        "content": entry.content,
+                    }
                 )
 
-        scored.sort(key=lambda item: item[0], reverse=True)
-        return [item for _, item in scored[: max(1, limit)]]
+        return candidates[: max(1, limit)]
 
     def _load_events(self) -> list[EventBookEvent]:
         if not self.book_path.exists():
-            logger.warning(f"事件书文件不存在，跳过加载: {self.book_path}")
+            logger.warning(f"事件书文件不存在: {self.book_path}")
             return []
 
         try:
             raw = json.loads(self.book_path.read_text(encoding="utf-8"))
         except Exception as exc:
-            logger.warning(f"事件书 JSON 读取失败，跳过加载: {exc}")
-            return []
-
-        raw_events = raw.get("events", []) if isinstance(raw, dict) else []
-        if not isinstance(raw_events, list):
-            logger.warning("事件书 events 字段不是列表，跳过加载")
+            logger.warning(f"事件书 JSON 读取失败: {exc}")
             return []
 
         events: list[EventBookEvent] = []
+        if isinstance(raw, dict) and isinstance(raw.get("categories"), list):
+            for category_idx, raw_category in enumerate(raw.get("categories", [])):
+                if not isinstance(raw_category, dict):
+                    continue
+                category_id = str(
+                    raw_category.get("id") or f"category_{category_idx + 1}"
+                ).strip()
+                category_name = str(raw_category.get("name") or category_id).strip()
+                raw_events = raw_category.get("events", [])
+                if not isinstance(raw_events, list):
+                    continue
+                for idx, raw_event in enumerate(raw_events):
+                    if not isinstance(raw_event, dict):
+                        continue
+                    event = EventBookEvent.from_dict(
+                        raw_event,
+                        fallback_id=f"{category_id}_{idx + 1}",
+                        category_id=category_id,
+                        category_name=category_name,
+                    )
+                    if event.id:
+                        events.append(event)
+            return events
+
+        raw_events = raw.get("events", []) if isinstance(raw, dict) else []
+        if not isinstance(raw_events, list):
+            logger.warning("事件书 events 字段不是列表")
+            return []
+
+        default_category = self.DEFAULT_EVENT_CATEGORIES[0]
         for idx, raw_event in enumerate(raw_events):
             if not isinstance(raw_event, dict):
                 continue
-            event = EventBookEvent.from_dict(raw_event, fallback_id=str(idx))
+            event = EventBookEvent.from_dict(
+                raw_event,
+                fallback_id=str(idx),
+                category_id=default_category["id"],
+                category_name=default_category["name"],
+            )
             if event.id:
                 events.append(event)
         return events

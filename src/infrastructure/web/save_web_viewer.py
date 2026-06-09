@@ -1535,7 +1535,7 @@ class SaveWebViewer:
             <h1>{self._e(title)}</h1>
             <p><a href="{self._url(f'/editable?category={self._e(back_category)}')}">返回{self._e(self._editable_category_title(back_category))}</a></p>
             <p class="muted">{self._e(file_id)}</p>
-            <p class="muted">事件书是扁平事件列表：每个事件通过 allowed_commands 声明可被哪些指令触发。同一个事件可以同时服务魔法少女日常、反派魔女日常、魔法少女战斗和反派魔女战斗。</p>
+            <p class="muted">事件书按 categories 分为 monster_enemy（与敌人是魔物）和 character_enemy（与敌人是魔法少女/反派魔女）；每个分类下的 events 仍通过 allowed_commands 声明可触发指令。</p>
             <div class="source-actions">
               <a class="button-link secondary-link" href="{source_url}">编辑源码</a>
               <a class="button-link secondary-link" href="{export_url}">导出 JSON</a>
@@ -1623,9 +1623,13 @@ class SaveWebViewer:
                   eventMonstersByTag.get(tag).push(monster);
                 }});
               }});
+              const eventDefaultCategories = [
+                {{ id: "monster_enemy", name: "与敌人是魔物", events: [] }},
+                {{ id: "character_enemy", name: "与敌人是魔法少女/反派魔女", events: [] }},
+              ];
               const eventState = {{
-                ...initialEventBook,
-                events: Array.isArray(initialEventBook.events) ? initialEventBook.events : [],
+                version: 3,
+                categories: eventNormalizeCategories(initialEventBook),
               }};
               let eventOpenKeys = new Set();
               let eventHasLoadedOpenState = false;
@@ -1637,7 +1641,6 @@ class SaveWebViewer:
                   enabled: true,
                   recursive: true,
                   strategy: "keyword",
-                  weight: 10,
                   keys: [],
                   visible_levels: eventLevelOptions.map((item) => item.value),
                   allowed_commands: [],
@@ -1659,7 +1662,6 @@ class SaveWebViewer:
                   enabled: entry.enabled !== false,
                   recursive: entry.recursive !== false,
                   strategy: entry.strategy === "always" ? "always" : "keyword",
-                  weight: eventNormalizeWeight(entry.weight),
                   keys: eventSplitList(entry.keys),
                   visible_levels: eventNormalizeLevels(entry.visible_levels, entry.min_level, entry.max_level),
                   allowed_commands: eventSplitList(entry.allowed_commands || entry.command),
@@ -1674,10 +1676,27 @@ class SaveWebViewer:
                 }};
               }}
 
-              function eventNormalizeWeight(value) {{
-                const parsed = Number.parseInt(value, 10);
-                if (!Number.isFinite(parsed)) return 10;
-                return Math.max(1, Math.min(100, parsed));
+              function eventNormalizeCategories(book) {{
+                const byId = new Map();
+                eventDefaultCategories.forEach((category) => {{
+                  byId.set(category.id, {{ ...category, events: [] }});
+                }});
+                const rawCategories = Array.isArray(book.categories) ? book.categories : [];
+                rawCategories.forEach((category, categoryIndex) => {{
+                  if (!category || typeof category !== "object") return;
+                  const id = String(category.id || `category_${{categoryIndex + 1}}`).trim();
+                  if (!id) return;
+                  const existing = byId.get(id) || {{ id, name: id, events: [] }};
+                  existing.name = String(category.name || existing.name || id);
+                  existing.events = Array.isArray(category.events) ? category.events.map(eventNormalizeEntry) : [];
+                  byId.set(id, existing);
+                }});
+                if (Array.isArray(book.events) && book.events.length) {{
+                  const monsterCategory = byId.get("monster_enemy") || eventDefaultCategories[0];
+                  monsterCategory.events = book.events.map(eventNormalizeEntry);
+                  byId.set("monster_enemy", monsterCategory);
+                }}
+                return Array.from(byId.values());
               }}
 
               function eventNormalizeLevels(raw, minLevel, maxLevel) {{
@@ -1908,25 +1927,30 @@ class SaveWebViewer:
               }}
 
               function eventSyncFromDom() {{
-                eventState.events = Array.from(eventEntriesEl.querySelectorAll(".event-entry")).map((card, index) => eventNormalizeEntry({{
-                  id: card.querySelector("[data-field='id']").value,
-                  name: card.querySelector("[data-field='name']").value,
-                  enabled: card.querySelector("[data-field='enabled']").checked,
-                  recursive: card.querySelector("[data-field='recursive']").checked,
-                  strategy: card.querySelector("[data-field='strategy']").value,
-                  weight: card.querySelector("[data-field='weight']").value,
-                  keys: eventSplitList(card.querySelector("[data-field='keys']").value),
-                  visible_levels: Array.from(card.querySelectorAll("[data-field='visible_level']:checked")).map((input) => Number.parseInt(input.value, 10)),
-                  allowed_commands: Array.from(card.querySelectorAll("[data-field='allowed_command']:checked")).map((input) => input.value),
-                  event_tags: eventSplitList(card.querySelector("[data-field='event_tags']").value),
-                  location_tags: eventSplitList(card.querySelector("[data-field='location_tags']").value),
-                  compatible_monster_tags: eventSplitList(card.querySelector("[data-field='compatible_monster_tags']").value),
-                  compatible_battle_types: Array.from(card.querySelectorAll("[data-field='compatible_battle_type']:checked")).map((input) => input.value),
-                  opening_hook: card.querySelector("[data-field='opening_hook']").value,
-                  twist_hook: card.querySelector("[data-field='twist_hook']").value,
-                  ending_hook: card.querySelector("[data-field='ending_hook']").value,
-                  content: card.querySelector("[data-field='content']").value,
-                }}, index));
+                eventState.categories = eventState.categories.map((category) => {{
+                  const categoryEl = eventEntriesEl.querySelector(`[data-category-id="${{eventEscapeSelector(category.id)}}"]`);
+                  const events = categoryEl
+                    ? Array.from(categoryEl.querySelectorAll(".event-entry")).map((card, index) => eventNormalizeEntry({{
+                        id: card.querySelector("[data-field='id']").value,
+                        name: card.querySelector("[data-field='name']").value,
+                        enabled: card.querySelector("[data-field='enabled']").checked,
+                        recursive: card.querySelector("[data-field='recursive']").checked,
+                        strategy: card.querySelector("[data-field='strategy']").value,
+                        keys: eventSplitList(card.querySelector("[data-field='keys']").value),
+                        visible_levels: Array.from(card.querySelectorAll("[data-field='visible_level']:checked")).map((input) => Number.parseInt(input.value, 10)),
+                        allowed_commands: Array.from(card.querySelectorAll("[data-field='allowed_command']:checked")).map((input) => input.value),
+                        event_tags: eventSplitList(card.querySelector("[data-field='event_tags']").value),
+                        location_tags: eventSplitList(card.querySelector("[data-field='location_tags']").value),
+                        compatible_monster_tags: eventSplitList(card.querySelector("[data-field='compatible_monster_tags']").value),
+                        compatible_battle_types: Array.from(card.querySelectorAll("[data-field='compatible_battle_type']:checked")).map((input) => input.value),
+                        opening_hook: card.querySelector("[data-field='opening_hook']").value,
+                        twist_hook: card.querySelector("[data-field='twist_hook']").value,
+                        ending_hook: card.querySelector("[data-field='ending_hook']").value,
+                        content: card.querySelector("[data-field='content']").value,
+                      }}, index))
+                    : category.events;
+                  return {{ ...category, events }};
+                }});
               }}
 
               function eventEntryKey(entry, index) {{
@@ -1967,7 +1991,22 @@ class SaveWebViewer:
 
               function eventRenderEntries() {{
                 eventEntriesEl.innerHTML = "";
-                eventState.events.forEach((entry, index) => {{
+                eventState.categories.forEach((category, categoryIndex) => {{
+                  const categorySection = document.createElement("section");
+                  categorySection.className = "world-book-category";
+                  categorySection.dataset.categoryId = category.id;
+                  categorySection.innerHTML = `
+                    <div class="world-book-toolbar">
+                      <div>
+                        <h2>${{eventEscapeHtml(category.name || category.id)}}</h2>
+                        <p class="muted">${{eventEscapeHtml(category.id)}} 路 ${{(category.events || []).length}} 个事件</p>
+                      </div>
+                    </div>
+                    <div data-role="category-events"></div>
+                  `;
+                  eventEntriesEl.appendChild(categorySection);
+                  const categoryEventsEl = categorySection.querySelector("[data-role='category-events']");
+                  (category.events || []).forEach((entry, index) => {{
                   const normalized = eventNormalizeEntry(entry, index);
                   const entryKey = eventEntryKey(normalized, index);
                   const isOpen = eventHasLoadedOpenState && eventOpenKeys.has(entryKey);
@@ -1990,7 +2029,6 @@ class SaveWebViewer:
                         <div class="world-entry-grid">
                           <label class="compact-field"><span>ID</span><input data-field="id" type="text" value="${{eventEscapeAttr(normalized.id)}}"></label>
                           <label class="compact-field title-field"><span>事件名</span><input data-field="name" type="text" value="${{eventEscapeAttr(normalized.name)}}"></label>
-                          <label class="compact-field"><span>权重</span><input data-field="weight" type="number" min="1" max="100" value="${{normalized.weight}}"></label>
                           <label class="compact-field"><span>触发方式</span>
                             <select data-field="strategy">
                               <option value="keyword"${{normalized.strategy === "keyword" ? " selected" : ""}}>关键词命中</option>
@@ -2041,7 +2079,7 @@ class SaveWebViewer:
                     if (!confirm("确定删除这个事件？")) return;
                     eventCaptureOpenState();
                     eventSyncFromDom();
-                    eventState.events.splice(index, 1);
+                    category.events.splice(index, 1);
                     eventOpenKeys.delete(entryKey);
                     eventPersistOpenState();
                     eventRenderEntries();
@@ -2054,7 +2092,8 @@ class SaveWebViewer:
                   }};
                   card.querySelector("[data-field='name']").addEventListener("input", refreshTitle);
                   card.querySelector("[data-field='id']").addEventListener("input", refreshTitle);
-                  eventEntriesEl.appendChild(card);
+                  categoryEventsEl.appendChild(card);
+                }});
                 }});
               }}
 
@@ -2066,12 +2105,19 @@ class SaveWebViewer:
                 return eventEscapeHtml(value).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
               }}
 
+              function eventEscapeSelector(value) {{
+                if (window.CSS && CSS.escape) return CSS.escape(String(value));
+                return String(value).replace(/"/g, '\\"');
+              }}
+
               addEventButton.addEventListener("click", () => {{
                 eventCaptureOpenState();
                 eventSyncFromDom();
-                const newEntry = eventDefaults(eventState.events.length);
-                eventState.events.push(newEntry);
-                eventOpenKeys.add(eventEntryKey(newEntry, eventState.events.length - 1));
+                const targetCategory = eventState.categories.find((category) => category.id === "monster_enemy") || eventState.categories[0];
+                targetCategory.events = Array.isArray(targetCategory.events) ? targetCategory.events : [];
+                const newEntry = eventDefaults(targetCategory.events.length);
+                targetCategory.events.push(newEntry);
+                eventOpenKeys.add(eventEntryKey(newEntry, targetCategory.events.length - 1));
                 eventHasLoadedOpenState = true;
                 eventPersistOpenState();
                 eventRenderEntries();
@@ -2082,7 +2128,10 @@ class SaveWebViewer:
                 eventContentInput.value = JSON.stringify(eventState, null, 2);
               }});
 
-              eventState.events = eventState.events.map(eventNormalizeEntry);
+              eventState.categories = eventState.categories.map((category) => ({{
+                ...category,
+                events: Array.isArray(category.events) ? category.events.map(eventNormalizeEntry) : [],
+              }}));
               eventLoadOpenState();
               eventRenderEntries();
             </script>
@@ -2092,10 +2141,48 @@ class SaveWebViewer:
     @classmethod
     def _normalize_event_book(cls, raw: object) -> dict:
         book = dict(raw) if isinstance(raw, dict) else {}
-        raw_events = book.get("events", [])
-        if not isinstance(raw_events, list):
-            raw_events = []
+        default_categories = [
+            {"id": "monster_enemy", "name": "与敌人是魔物", "events": []},
+            {"id": "character_enemy", "name": "与敌人是魔法少女/反派魔女", "events": []},
+        ]
+        categories_by_id = {
+            item["id"]: {"id": item["id"], "name": item["name"], "events": []}
+            for item in default_categories
+        }
 
+        raw_categories = book.get("categories", [])
+        if isinstance(raw_categories, list):
+            for c_idx, raw_category in enumerate(raw_categories):
+                if not isinstance(raw_category, dict):
+                    continue
+                category_id = str(raw_category.get("id") or f"category_{c_idx + 1}").strip()
+                if not category_id:
+                    continue
+                category = categories_by_id.setdefault(
+                    category_id,
+                    {
+                        "id": category_id,
+                        "name": str(raw_category.get("name") or category_id),
+                        "events": [],
+                    },
+                )
+                category["name"] = str(raw_category.get("name") or category["name"])
+                raw_events = raw_category.get("events", [])
+                if not isinstance(raw_events, list):
+                    raw_events = []
+                category["events"] = cls._normalize_event_items(raw_events)
+
+        raw_events = book.get("events", [])
+        if isinstance(raw_events, list) and raw_events:
+            categories_by_id["monster_enemy"]["events"] = cls._normalize_event_items(raw_events)
+
+        book["version"] = 3
+        book.pop("events", None)
+        book["categories"] = list(categories_by_id.values())
+        return book
+
+    @classmethod
+    def _normalize_event_items(cls, raw_events: list) -> list[dict]:
         normalized_events = []
         for e_idx, raw_event in enumerate(raw_events):
             if not isinstance(raw_event, dict):
@@ -2119,10 +2206,7 @@ class SaveWebViewer:
             normalized_events.append(
                 cls._normalize_event_item(raw_event, fallback_id=f"event_{e_idx + 1}")
             )
-
-        book["version"] = book.get("version", 2)
-        book["events"] = normalized_events
-        return book
+        return normalized_events
 
     @classmethod
     def _normalize_event_item(cls, raw_event: dict, *, fallback_id: str) -> dict:
@@ -2160,7 +2244,6 @@ class SaveWebViewer:
             "opening_hook": str(raw_event.get("opening_hook") or ""),
             "twist_hook": str(raw_event.get("twist_hook") or ""),
             "ending_hook": str(raw_event.get("ending_hook") or ""),
-            "weight": cls._normalize_int_range(raw_event.get("weight"), 10, 1, 100),
         }
 
     @classmethod
@@ -2360,47 +2443,54 @@ class SaveWebViewer:
     @classmethod
     def _format_event_book_key_info(cls, raw: object) -> str:
         book = cls._normalize_event_book(raw)
-        events = book.get("events", [])
-        if not isinstance(events, list):
+        categories = book.get("categories", [])
+        if not isinstance(categories, list):
             return ""
 
         event_blocks: list[str] = []
-        for event in events:
-            if not isinstance(event, dict):
+        for category in categories:
+            if not isinstance(category, dict):
                 continue
-            event_name = cls._single_line_text(
-                event.get("name") or event.get("title") or event.get("id") or "未知事件"
+            category_name = cls._single_line_text(
+                category.get("name") or category.get("id") or "unknown category"
             )
-            entry_lines: list[str] = []
-            strategy = str(event.get("strategy") or "keyword")
-            level_text = visible_levels_label(event.get("visible_levels"))
-            entry_lines.append(f"  ({level_text}, {strategy})")
-            for field, label in (
-                ("allowed_commands", "适用命令"),
-                ("keys", "关键词"),
-                ("event_tags", "事件标签"),
-                ("location_tags", "地点标签"),
-                ("compatible_monster_tags", "兼容魔物标签"),
-                ("compatible_battle_types", "兼容战斗类型"),
-            ):
-                values = event.get(field) if isinstance(event.get(field), list) else []
-                clean_values = [str(value).strip() for value in values if str(value).strip()]
-                if clean_values:
-                    entry_lines.append(f"  {label}: " + "、".join(clean_values))
-            content = str(event.get("content") or "").strip()
-            if content:
-                entry_lines.append(f"  设定: {content}")
-            for field, label in (
-                ("opening_hook", "开场钩子"),
-                ("twist_hook", "变奏钩子"),
-                ("ending_hook", "结尾钩子"),
-            ):
-                text = str(event.get(field) or "").strip()
-                if text:
-                    entry_lines.append(f"  {label}: {text}")
-
-            if entry_lines:
-                event_blocks.append(f"【{event_name}】\n" + "\n".join(entry_lines))
+            events = category.get("events", [])
+            if not isinstance(events, list):
+                continue
+            for event in events:
+                if not isinstance(event, dict):
+                    continue
+                event_name = cls._single_line_text(
+                    event.get("name") or event.get("title") or event.get("id") or "unknown event"
+                )
+                entry_lines: list[str] = [f"  category: {category_name}"]
+                strategy = str(event.get("strategy") or "keyword")
+                level_text = visible_levels_label(event.get("visible_levels"))
+                entry_lines.append(f"  ({level_text}, {strategy})")
+                for field, label in (
+                    ("allowed_commands", "commands"),
+                    ("keys", "keys"),
+                    ("event_tags", "event tags"),
+                    ("location_tags", "location tags"),
+                    ("compatible_monster_tags", "compatible monster tags"),
+                    ("compatible_battle_types", "compatible battle types"),
+                ):
+                    values = event.get(field) if isinstance(event.get(field), list) else []
+                    clean_values = [str(value).strip() for value in values if str(value).strip()]
+                    if clean_values:
+                        entry_lines.append(f"  {label}: " + ", ".join(clean_values))
+                content = str(event.get("content") or "").strip()
+                if content:
+                    entry_lines.append(f"  content: {content}")
+                for field, label in (
+                    ("opening_hook", "opening hook"),
+                    ("twist_hook", "twist hook"),
+                    ("ending_hook", "ending hook"),
+                ):
+                    value = str(event.get(field) or "").strip()
+                    if value:
+                        entry_lines.append(f"  {label}: {value}")
+                event_blocks.append(f"[{event_name}]\n" + "\n".join(entry_lines))
 
         return "\n\n-----------------------------------------------\n\n".join(event_blocks) + ("\n" if event_blocks else "")
 

@@ -8,6 +8,8 @@ from ...shared.levels import ALL_VISIBLE_LEVELS, normalize_visible_levels
 @dataclass(frozen=True)
 class EventBookEntry:
     id: str
+    category_id: str = ""
+    category_name: str = ""
     title: str = ""
     enabled: bool = True
     strategy: str = "keyword"
@@ -23,10 +25,16 @@ class EventBookEntry:
     opening_hook: str = ""
     twist_hook: str = ""
     ending_hook: str = ""
-    weight: int = 10
 
     @classmethod
-    def from_dict(cls, raw: dict, fallback_id: str) -> "EventBookEntry":
+    def from_dict(
+        cls,
+        raw: dict,
+        fallback_id: str,
+        *,
+        category_id: str = "",
+        category_name: str = "",
+    ) -> "EventBookEntry":
         keys = raw.get("keys", [])
         if isinstance(keys, str):
             keys = [keys]
@@ -35,6 +43,8 @@ class EventBookEntry:
 
         return cls(
             id=str(raw.get("id") or fallback_id).strip(),
+            category_id=str(raw.get("category_id") or category_id or "").strip(),
+            category_name=str(raw.get("category_name") or category_name or "").strip(),
             title=str(raw.get("title") or "").strip(),
             enabled=bool(raw.get("enabled", True)),
             strategy=str(raw.get("strategy") or "keyword").strip().lower(),
@@ -58,7 +68,6 @@ class EventBookEntry:
             opening_hook=str(raw.get("opening_hook") or "").strip(),
             twist_hook=str(raw.get("twist_hook") or "").strip(),
             ending_hook=str(raw.get("ending_hook") or "").strip(),
-            weight=cls._normalize_weight(raw.get("weight")),
         )
 
     @staticmethod
@@ -76,17 +85,11 @@ class EventBookEntry:
                 items.append(text)
         return items
 
-    @staticmethod
-    def _normalize_weight(value: object) -> int:
-        try:
-            return max(1, min(100, int(float(value))))
-        except Exception:
-            return 10
-
-
 @dataclass(frozen=True)
 class EventBookEvent:
     id: str
+    category_id: str = ""
+    category_name: str = ""
     command: str = ""
     name: str = ""
     enabled: bool = True
@@ -103,11 +106,17 @@ class EventBookEvent:
     opening_hook: str = ""
     twist_hook: str = ""
     ending_hook: str = ""
-    weight: int = 10
     entries: list[EventBookEntry] = field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, raw: dict, fallback_id: str) -> "EventBookEvent":
+    def from_dict(
+        cls,
+        raw: dict,
+        fallback_id: str,
+        *,
+        category_id: str = "",
+        category_name: str = "",
+    ) -> "EventBookEvent":
         raw_entries = raw.get("entries", [])
         if not isinstance(raw_entries, list):
             raw_entries = []
@@ -116,7 +125,12 @@ class EventBookEvent:
         for idx, raw_entry in enumerate(raw_entries):
             if not isinstance(raw_entry, dict):
                 continue
-            entry = EventBookEntry.from_dict(raw_entry, fallback_id=str(idx))
+            entry = EventBookEntry.from_dict(
+                raw_entry,
+                fallback_id=str(idx),
+                category_id=category_id,
+                category_name=category_name,
+            )
             if entry.id and (
                 entry.title
                 or entry.content
@@ -131,6 +145,8 @@ class EventBookEvent:
 
         return cls(
             id=str(raw.get("id") or fallback_id).strip(),
+            category_id=str(raw.get("category_id") or category_id or "").strip(),
+            category_name=str(raw.get("category_name") or category_name or "").strip(),
             command=str(raw.get("command") or "").strip(),
             name=str(raw.get("name") or "").strip(),
             enabled=bool(raw.get("enabled", True)),
@@ -157,7 +173,6 @@ class EventBookEvent:
             opening_hook=str(raw.get("opening_hook") or "").strip(),
             twist_hook=str(raw.get("twist_hook") or "").strip(),
             ending_hook=str(raw.get("ending_hook") or "").strip(),
-            weight=EventBookEntry._normalize_weight(raw.get("weight")),
             entries=entries,
         )
 
@@ -178,6 +193,8 @@ class EventBookEvent:
     def as_entry(self) -> EventBookEntry:
         return EventBookEntry(
             id=self.id,
+            category_id=self.category_id,
+            category_name=self.category_name,
             title=self.name,
             enabled=self.enabled,
             strategy=self.strategy,
@@ -193,7 +210,6 @@ class EventBookEvent:
             opening_hook=self.opening_hook,
             twist_hook=self.twist_hook,
             ending_hook=self.ending_hook,
-            weight=self.weight,
         )
 
 
