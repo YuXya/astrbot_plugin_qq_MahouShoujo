@@ -60,7 +60,7 @@
 {{selected_monster_json}}
 
 公共魔物 JSON 中：
-- `selected_level` 是本次采用的魔物等级；优先使用对应 `level_settings`，再结合通用 `content`。
+- `selected_level` 是本次采用的魔物等级；`level_settings` 只包含本次等级设定，优先使用它，再结合通用 `content`。
 - `opening_hooks` 是魔物显形或袭击方式，只能嵌入场景入口，不要另起第二个开场；没有场景事件时才用它替代公式化的“感应到异常”。
 - `preferred_locations` 是适合地点；`battle_gimmicks` 是战斗机制差异；`ending_hooks` 是魔物特征残留，只能作为结尾细节补充，不要另起第二个收尾。
 - 公共魔物是本次普通魔物战的敌人或异常源。

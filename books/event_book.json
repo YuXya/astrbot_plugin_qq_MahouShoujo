@@ -395,6 +395,479 @@
         "/反派魔女战斗",
         "/反派魔女日常"
       ]
+    },
+    {
+      "id": "lost_item_commission",
+      "enabled": true,
+      "strategy": "keyword",
+      "keys": [
+        "失物",
+        "遗失",
+        "找东西",
+        "委托",
+        "道具",
+        "饰品"
+      ],
+      "visible_levels": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "event_tags": [
+        "失物委托",
+        "道具线索",
+        "小型调查"
+      ],
+      "location_tags": [
+        "学校",
+        "商店街",
+        "车站",
+        "旧校舍",
+        "街巷"
+      ],
+      "compatible_monster_tags": [
+        "mimic",
+        "doll",
+        "fox",
+        "mirror",
+        "living",
+        "armor"
+      ],
+      "compatible_battle_types": [
+        "monster",
+        "villain_witch",
+        "environment_crisis"
+      ],
+      "opening_hook": "主角接到寻找失物、回收道具或确认异常饰品的委托，循着物品最后出现的位置展开调查。",
+      "twist_hook": "失物并不是单纯被偷走，而是被魔物拟态、被结界复制，或主动把人引向某个地点。",
+      "ending_hook": "事件结束后，失物留下新的划痕、气味、魔力刻印或一段不属于委托人的记忆。",
+      "content": "失物委托用于把日常行动自然转入异常事件。开场先写委托来源：同伴遗落的变身饰品、商店街失踪的礼盒、车站储物柜里的陌生道具、旧校舍被换走的校徽等；成年主角沿着监控盲区、残留魔力或物品习性追查。可加入轻喜剧和暧昧误会，例如道具误判主人、饰品黏在战斗服上、拟态礼盒突然弹出缎带，但重点是失物如何制造线索、诱饵和战斗入口。",
+      "weight": 19,
+      "name": "失物委托",
+      "allowed_commands": [
+        "/魔法少女战斗",
+        "/魔法少女日常",
+        "/反派魔女战斗",
+        "/反派魔女日常"
+      ]
+    },
+    {
+      "id": "stage_broadcast_accident",
+      "enabled": true,
+      "strategy": "keyword",
+      "keys": [
+        "舞台",
+        "直播",
+        "摄影",
+        "演出",
+        "偶像",
+        "聚光灯"
+      ],
+      "visible_levels": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "event_tags": [
+        "舞台事故",
+        "公开场合",
+        "视线压力"
+      ],
+      "location_tags": [
+        "舞台",
+        "商店街",
+        "学校",
+        "会场",
+        "镜厅"
+      ],
+      "compatible_monster_tags": [
+        "succubus",
+        "mirror",
+        "spider",
+        "doll",
+        "shadow",
+        "hypno"
+      ],
+      "compatible_battle_types": [
+        "monster",
+        "magical_girl",
+        "villain_witch",
+        "environment_crisis"
+      ],
+      "opening_hook": "活动、演出、直播或拍摄现场出现灯光、镜头、音响或观众反应异常，主角必须在公开视线边缘处理。",
+      "twist_hook": "现场设备会把战斗误剪成表演、宣传片或绯闻片段，让主角既要净化异常又要控制影响范围。",
+      "ending_hook": "战后留下无法解释的直播雪花、错位照片、舞台道具或被粉丝二创误读的片段。",
+      "content": "舞台直播事故用于制造公开场合压力。开场可以是校园祭、商店街促销、偶像小舞台、摄影棚、直播间或结界伪装成演出现场；异常先通过灯光追踪、镜头自动对焦、音响低语、观众集体停顿等方式出现。适合写成年主角在聚光灯下狼狈救场：战斗服反光过强、缎带被舞台机关勾住、镜头误拍到尴尬姿势，但事件重点是公开性、误会、控场和保护普通人。",
+      "weight": 17,
+      "name": "舞台直播事故",
+      "allowed_commands": [
+        "/魔法少女战斗",
+        "/魔法少女日常",
+        "/反派魔女战斗",
+        "/反派魔女日常"
+      ]
+    },
+    {
+      "id": "dream_overlap",
+      "enabled": true,
+      "strategy": "keyword",
+      "keys": [
+        "梦",
+        "梦境",
+        "噩梦",
+        "睡着",
+        "幻觉",
+        "半梦半醒"
+      ],
+      "visible_levels": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "event_tags": [
+        "梦境错位",
+        "精神干扰",
+        "现实重叠"
+      ],
+      "location_tags": [
+        "梦境",
+        "寝室幻境",
+        "镜厅",
+        "夜晚",
+        "旧校舍"
+      ],
+      "compatible_monster_tags": [
+        "nightmare",
+        "dream",
+        "succubus",
+        "incubus",
+        "ghost",
+        "mirror"
+      ],
+      "compatible_battle_types": [
+        "monster",
+        "villain_witch",
+        "environment_crisis"
+      ],
+      "opening_hook": "主角发现现实细节开始像梦一样错位：钟表停摆、房间扩张、熟人说出不该知道的话或场景突然切换。",
+      "twist_hook": "梦境会读取主角近期战斗、秘密愿望或羞耻记忆，把它们伪装成线索或敌人的话术。",
+      "ending_hook": "醒来后仍有一个现实物件带着梦里的痕迹，提示异常并未完全消失。",
+      "content": "梦境错位用于把战斗写成现实与梦的重叠，而不是单纯昏睡。开场先给出现实漏洞：同一条走廊反复出现、手机时间倒退、同伴台词不连贯、镜子里动作慢半拍；成年主角需要找出梦境锚点才能稳定场地。暧昧感来自梦境放大视线、布料触感、心跳和秘密愿望，但必须保留清醒反抗、同伴呼唤或净化锚点，不写不可逆精神控制。",
+      "weight": 18,
+      "name": "梦境错位",
+      "allowed_commands": [
+        "/魔法少女战斗",
+        "/魔法少女日常",
+        "/反派魔女战斗",
+        "/反派魔女日常"
+      ]
+    },
+    {
+      "id": "festival_night_detour",
+      "enabled": true,
+      "strategy": "keyword",
+      "keys": [
+        "祭典",
+        "庙会",
+        "烟花",
+        "夏祭",
+        "集市",
+        "夜市"
+      ],
+      "visible_levels": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "event_tags": [
+        "节日活动",
+        "人群掩护",
+        "夜间事件"
+      ],
+      "location_tags": [
+        "商店街",
+        "神社",
+        "河边",
+        "夜晚",
+        "公园"
+      ],
+      "compatible_monster_tags": [
+        "fox",
+        "vampire",
+        "ghost",
+        "water",
+        "shadow",
+        "urban_legend"
+      ],
+      "compatible_battle_types": [
+        "monster",
+        "magical_girl",
+        "villain_witch",
+        "environment_crisis"
+      ],
+      "opening_hook": "节日、庙会、夜市或烟花大会中出现小规模异常，主角必须在人群和摊位之间隐蔽行动。",
+      "twist_hook": "异常借助人群、面具、摊位游戏或烟花声隐藏，追查时会不断把普通热闹和魔力痕迹混在一起。",
+      "ending_hook": "战后只剩一个摊位奖品、半张面具、湿掉的烟花票或被误认为节日表演的目击谈资。",
+      "content": "节日夜绕路用于把日常热闹和战斗危机混在一起。开场可以是夏祭、庙会、夜市、烟花大会、商店街抽奖或校园活动；异常藏在人群、摊位灯笼、面具、金鱼袋、棉花糖香气和烟花声里。适合轻松又紧张的事件：成年主角穿行摊位时被浴衣带、饰品、奖品道具或人群误会拖慢，但重点是保护普通人、隐蔽变身、追查源头和在节日结束前解决问题。",
+      "weight": 16,
+      "name": "节日夜绕路",
+      "allowed_commands": [
+        "/魔法少女战斗",
+        "/魔法少女日常",
+        "/反派魔女战斗",
+        "/反派魔女日常"
+      ]
+    },
+    {
+      "id": "temporary_truce",
+      "enabled": true,
+      "strategy": "keyword",
+      "keys": [
+        "合作",
+        "共斗",
+        "停战",
+        "临时同盟",
+        "误会",
+        "一起"
+      ],
+      "visible_levels": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "event_tags": [
+        "临时共斗",
+        "关系推进",
+        "敌我误会"
+      ],
+      "location_tags": [
+        "街巷",
+        "结界边缘",
+        "废弃建筑",
+        "屋顶",
+        "夜晚"
+      ],
+      "compatible_monster_tags": [
+        "shadow",
+        "tentacle",
+        "spider",
+        "nightmare",
+        "vampire",
+        "slime"
+      ],
+      "compatible_battle_types": [
+        "monster",
+        "magical_girl",
+        "villain_witch",
+        "environment_crisis"
+      ],
+      "opening_hook": "主角和本来立场不一致的人被同一个异常困住，被迫先停战、交换情报或并肩破局。",
+      "twist_hook": "共斗对象知道一部分真相但隐藏了关键动机，战斗中会制造信任考验。",
+      "ending_hook": "双方各自带走一半线索，关系没有完全缓和，却留下下次继续纠缠的理由。",
+      "content": "临时共斗用于推动角色关系，不要把所有遭遇写成单人解决。开场让成年主角和宿敌、目标魔法少女、反派魔女、同伴或误会对象同时被结界困住，眼前威胁比立场冲突更急。事件适合写嘴硬合作、互相救场和不情愿的默契：一个人挡住场地机制，另一个人解读核心规则；暧昧感来自近距离配合、战损遮掩和互相误会，但结尾应保留立场差异与后续线索。",
+      "weight": 15,
+      "name": "临时共斗",
+      "allowed_commands": [
+        "/魔法少女战斗",
+        "/魔法少女日常",
+        "/反派魔女战斗",
+        "/反派魔女日常"
+      ]
+    },
+    {
+      "id": "rule_game_domain",
+      "enabled": true,
+      "strategy": "keyword",
+      "keys": [
+        "规则",
+        "游戏",
+        "解谜",
+        "赌局",
+        "挑战",
+        "闯关"
+      ],
+      "visible_levels": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "event_tags": [
+        "规则怪谈",
+        "解谜战",
+        "结界游戏"
+      ],
+      "location_tags": [
+        "旧校舍",
+        "商店街",
+        "镜厅",
+        "废弃建筑",
+        "车站"
+      ],
+      "compatible_monster_tags": [
+        "urban_legend",
+        "doll",
+        "mirror",
+        "mimic",
+        "nightmare",
+        "fox"
+      ],
+      "compatible_battle_types": [
+        "monster",
+        "villain_witch",
+        "environment_crisis"
+      ],
+      "opening_hook": "主角进入一个写着规则、任务或惩罚条件的结界，不能只靠火力，需要先理解玩法。",
+      "twist_hook": "规则文字存在歧义、漏项或反向提示，敌人也会试图利用主角对规则的误读。",
+      "ending_hook": "破局后规则牌、游戏票根、骰子、棋子或说明书碎片仍保留一条未使用的隐藏规则。",
+      "content": "规则游戏结界用于制造解谜战。开场给出明确但不完整的规则：不能回头、必须回答广播、只能踩亮格、抽到红牌就换位置、镜子里的人先行动等；成年主角需要边战斗边测试规则。可加入羞耻但不露骨的惩罚机制，例如动作被迫变慢、台词被改写、战斗服装饰变成计分牌，但重点是规则漏洞、选择代价和聪明破局。",
+      "weight": 14,
+      "name": "规则游戏结界",
+      "allowed_commands": [
+        "/魔法少女战斗",
+        "/魔法少女日常",
+        "/反派魔女战斗",
+        "/反派魔女日常"
+      ]
+    },
+    {
+      "id": "supply_mishap",
+      "enabled": true,
+      "strategy": "keyword",
+      "keys": [
+        "补给",
+        "药剂",
+        "新装备",
+        "试作品",
+        "强化",
+        "道具测试"
+      ],
+      "visible_levels": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "event_tags": [
+        "补给失控",
+        "装备测试",
+        "轻喜剧事故"
+      ],
+      "location_tags": [
+        "学校",
+        "据点",
+        "商店街",
+        "实验室",
+        "旧校舍"
+      ],
+      "compatible_monster_tags": [
+        "living",
+        "armor",
+        "mimic",
+        "slime",
+        "doll",
+        "hypno"
+      ],
+      "compatible_battle_types": [
+        "monster",
+        "magical_girl",
+        "villain_witch",
+        "environment_crisis"
+      ],
+      "opening_hook": "主角测试新装备、药剂、补给或变身辅助道具时，发现它和现场异常产生了意外反应。",
+      "twist_hook": "失控道具不一定是坏的，它会提供短暂优势，同时制造新的限制或误会。",
+      "ending_hook": "事件后道具保留下一个可修复的缺陷、升级灵感或被同伴拿来调侃的记录。",
+      "content": "补给失控用于让日常准备变成事件入口。开场可以是新装备试穿、药剂测试、补给箱开封、魔法终端更新或反派魔女的小发明实验；异常与道具产生共鸣，导致功能跑偏。适合轻喜剧：强化披风太会保护、药剂让咒语尾音变软、靴子自动追踪错误目标、补给箱把主角包装成礼物；但道具也要提供可用优势，让主角通过适应缺陷完成破局。",
+      "weight": 15,
+      "name": "补给失控",
+      "allowed_commands": [
+        "/魔法少女战斗",
+        "/魔法少女日常",
+        "/反派魔女战斗",
+        "/反派魔女日常"
+      ]
+    },
+    {
+      "id": "time_loop_echo",
+      "enabled": true,
+      "strategy": "keyword",
+      "keys": [
+        "重复",
+        "时间",
+        "倒流",
+        "回环",
+        "钟表",
+        "既视感"
+      ],
+      "visible_levels": [
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "event_tags": [
+        "时间回环",
+        "重复事件",
+        "高阶异常"
+      ],
+      "location_tags": [
+        "车站",
+        "钟楼",
+        "旧校舍",
+        "商店街",
+        "夜晚"
+      ],
+      "compatible_monster_tags": [
+        "urban_legend",
+        "nightmare",
+        "mirror",
+        "ghost",
+        "vampire",
+        "shadow"
+      ],
+      "compatible_battle_types": [
+        "monster",
+        "villain_witch",
+        "environment_crisis"
+      ],
+      "opening_hook": "主角发现同一段数分钟的事件反复发生，只有少数痕迹或记忆能跨过回环。",
+      "twist_hook": "每次回环都会让场地多出一点变化，说明敌人也在学习主角的选择。",
+      "ending_hook": "打破回环后，时钟、车票、照片或战斗服上的破损仍显示出上一轮不存在的痕迹。",
+      "content": "时间回环余响用于较高等级的异常战。开场写同一句广播、同一枚硬币落地、同一辆列车进站或同一盏灯熄灭反复出现；成年主角逐渐意识到自己被困在短周期里。事件重点是比较每轮差异、保存关键物品、利用敌人记忆盲区破局。暧昧或羞耻细节可以成为跨轮线索，例如同一处衣装破损、同一句被打断的台词、同一枚饰品位置变化，但不要让重复变成拖沓复述。",
+      "weight": 10,
+      "name": "时间回环余响",
+      "allowed_commands": [
+        "/魔法少女战斗",
+        "/魔法少女日常",
+        "/反派魔女战斗",
+        "/反派魔女日常"
+      ]
     }
   ]
 }

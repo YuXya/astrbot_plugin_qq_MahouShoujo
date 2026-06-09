@@ -1036,10 +1036,28 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                         return None
                     selected_level = default_levels[-1] if default_levels else selectable_levels[0]
                 resolved["selected_level"] = selected_level
+                resolved["monster_levels"] = [selected_level]
                 resolved["explicitly_requested"] = explicitly_requested
                 resolved["overleveled"] = parse_level_label(selected_level) > current_level
+                resolved["level_settings"] = self._selected_level_settings(
+                    resolved.get("level_settings"),
+                    selected_level,
+                )
                 return resolved
         return None
+
+    @staticmethod
+    def _selected_level_settings(
+        level_settings: object,
+        selected_level: str,
+    ) -> dict[str, dict[str, str]]:
+        if not isinstance(level_settings, dict):
+            return {}
+        raw_setting = level_settings.get(selected_level)
+        if not isinstance(raw_setting, dict):
+            return {}
+        content = str(raw_setting.get("content") or "").strip()
+        return {selected_level: {"content": content}} if content else {}
 
     def _resolve_default_monster(
         self,
