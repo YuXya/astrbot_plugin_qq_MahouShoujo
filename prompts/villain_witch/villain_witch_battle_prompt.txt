@@ -55,7 +55,7 @@
 - `player_win_rate` 是玩家反派魔女的最终胜率；`outcome` 为 `player_win` 时反派魔女赢，`player_lose` 时反派魔女输。
 - 越接近 50，战斗越难解难分，要写双方多次交换优势；越接近 0 或 100，战斗越干脆利落。
 - `dice_result` 为 `critical_success` 时反派魔女必须大成功获胜；为 `critical_failure` 或 `forced_failure` 时反派魔女必须战败。
-- 无论 `outcome` 是哪一边输，正文和 `result` 都必须包含“战败 CG”：输家受到轻松、可恢复、偏恶作剧的惩罚；赢家可以得意但不要残酷。
+- 无论 `outcome` 是哪一边输，正文和 `result` 都必须包含“战败 CG”：败者将承受充满羞耻与情色意味的惩罚。
 
 内容要求：
 【叙事导演说明·反派魔女战斗日记】
