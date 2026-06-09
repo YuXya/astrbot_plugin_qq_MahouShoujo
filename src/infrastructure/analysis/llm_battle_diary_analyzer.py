@@ -95,6 +95,29 @@ class LLMBattleDiaryAnalyzer:
             umo=umo,
         )
 
+    async def select_daily_context(
+        self,
+        *,
+        action_text: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict] | None = None,
+        candidates: list[dict] | None = None,
+        monster_candidates: list[dict] | None = None,
+        event_command: str,
+        umo: str | None = None,
+    ) -> dict[str, object]:
+        return await self.analyzer.select_daily_context(
+            action_text=action_text,
+            player_data=player_data,
+            logs=logs,
+            cameo_memories=cameo_memories,
+            candidates=candidates or [],
+            monster_candidates=monster_candidates or [],
+            event_command=event_command,
+            umo=umo,
+        )
+
     async def select_villain_battle_context(
         self,
         *,

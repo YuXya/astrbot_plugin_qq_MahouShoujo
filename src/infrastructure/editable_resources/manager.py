@@ -473,6 +473,8 @@ class EditableResourceManager:
                 "要求 AI 返回纯 JSON，relationships 数组代表单向关系箭头，public_reputations 数组代表城市风评。"
             ),
             self.PROMPT_FILES["teammate_completion_prompt"]: (
+                "用于日常正文生成前的后台日常事件上下文识别；会判断 action_target、names、scene_event 和 selected_monsters。"
+                "可用变量还包括 {{scene_events_json}} 与 {{monster_candidates_json}}。"
                 "用于 /魔法少女战斗 生成前的后台队友语义识别。发给 AI 的 user message 就是这个模板渲染后的结果。"
                 "可用变量：{{action}}、{{player_data_update_json}}、{{logs_text}}、{{cameo_memories_text}}、{{candidates_json}}。"
                 "要求 AI 返回纯 JSON，names 数组中的每一项是候选玩家名或魔法少女名。"

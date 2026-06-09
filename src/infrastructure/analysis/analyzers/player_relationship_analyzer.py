@@ -5,7 +5,11 @@ from typing import Any
 
 from ....utils.logger import logger
 from ..utils.json_utils import parse_json_object_response
-from ..utils.llm_utils import call_provider_with_retry, extract_response_text
+from ..utils.llm_utils import (
+    call_provider_with_retry,
+    extract_response_text,
+    mark_latest_llm_error,
+)
 from .base_analyzer import BaseAnalyzer
 
 
@@ -59,6 +63,7 @@ class PlayerRelationshipAnalyzer(BaseAnalyzer[dict[str, Any]]):
 
         success, parsed, error = parse_json_object_response(result_text)
         if not success or not isinstance(parsed, dict):
+            mark_latest_llm_error(f"{self.get_data_type()} JSON parse failed: {error}")
             logger.error(f"{self.get_data_type()} JSON 解析失败: {error}")
             return {"relationships": [], "public_reputations": []}, result_text
         return self._normalize_result(parsed), result_text

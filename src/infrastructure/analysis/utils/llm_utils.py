@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import traceback
+from dataclasses import asdict, is_dataclass
+from typing import Any
 
 from ....utils.logger import logger
 from ...storage.recent_llm_message_repository import RecentLLMMessageRepository
@@ -14,6 +18,10 @@ def _recent_llm_message_repository() -> RecentLLMMessageRepository:
     if _recent_llm_messages is None:
         _recent_llm_messages = RecentLLMMessageRepository()
     return _recent_llm_messages
+
+
+def mark_latest_llm_error(error: str) -> None:
+    _recent_llm_message_repository().mark_latest_error(error)
 
 
 async def get_provider_id_with_fallback(
@@ -104,7 +112,7 @@ async def call_provider_with_retry(
                 provider_id=provider_id,
                 prompt=prompt,
                 system_prompt=system_prompt,
-                response=extract_response_text(response),
+                response=extract_response_debug_json(response),
             )
             return response
         except Exception as exc:
@@ -120,7 +128,7 @@ async def call_provider_with_retry(
         prompt=prompt,
         system_prompt=system_prompt,
         response="",
-        error=str(last_exc or ""),
+        error=format_exception_detail(last_exc),
     )
     return None
 
@@ -130,6 +138,65 @@ def extract_response_text(response) -> str:
         return ""
     text = getattr(response, "completion_text", None)
     return str(text if text is not None else response).strip()
+
+
+def extract_response_debug_json(response) -> str:
+    if response is None:
+        return ""
+    return json.dumps(
+        _to_jsonable(response),
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+def format_exception_detail(exc: Exception | None) -> str:
+    if exc is None:
+        return ""
+    detail = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)).strip()
+    return detail or f"{type(exc).__name__}: {exc}"
+
+
+def _to_jsonable(value: Any, seen: set[int] | None = None) -> Any:
+    if seen is None:
+        seen = set()
+
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+
+    value_id = id(value)
+    if value_id in seen:
+        return f"<circular {type(value).__name__}>"
+    seen.add(value_id)
+
+    try:
+        if isinstance(value, dict):
+            return {str(key): _to_jsonable(item, seen) for key, item in value.items()}
+        if isinstance(value, (list, tuple, set, frozenset)):
+            return [_to_jsonable(item, seen) for item in value]
+        if is_dataclass(value):
+            return _to_jsonable(asdict(value), seen)
+        if hasattr(value, "model_dump"):
+            return _to_jsonable(value.model_dump(), seen)
+        if hasattr(value, "dict") and callable(value.dict):
+            return _to_jsonable(value.dict(), seen)
+        if hasattr(value, "to_dict") and callable(value.to_dict):
+            return _to_jsonable(value.to_dict(), seen)
+        if hasattr(value, "__dict__"):
+            return {
+                key: _to_jsonable(item, seen)
+                for key, item in vars(value).items()
+                if not key.startswith("_")
+            }
+        return repr(value)
+    except Exception as exc:
+        return {
+            "type": type(value).__name__,
+            "repr": repr(value),
+            "serialization_error": f"{type(exc).__name__}: {exc}",
+        }
+    finally:
+        seen.discard(value_id)
 
 
 def extract_token_usage(response) -> dict[str, int]:

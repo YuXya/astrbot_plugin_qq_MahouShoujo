@@ -13,6 +13,7 @@ from ..utils.llm_utils import (
     call_provider_with_retry,
     extract_response_text,
     extract_token_usage,
+    mark_latest_llm_error,
 )
 
 TDataObject = TypeVar("TDataObject")
@@ -88,6 +89,7 @@ class BaseAnalyzer(ABC, Generic[TDataObject]):
 
         success, parsed, error = parse_json_object_response(result_text)
         if not success or not parsed:
+            mark_latest_llm_error(f"{self.get_data_type()} JSON parse failed: {error}")
             logger.error(f"{self.get_data_type()} JSON 解析失败: {error}")
             return None, token_usage, result_text
 

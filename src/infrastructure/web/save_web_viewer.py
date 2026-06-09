@@ -1814,10 +1814,13 @@ class SaveWebViewer:
                 `;
               }}
 
-              function eventMonsterPickerHtml(tags) {{
+              function eventMonsterPickerHtml(tags, state = {{}}) {{
                 const selectedMonsters = eventMonstersForTags(tags);
                 const selectedIds = new Set(selectedMonsters.map((monster) => monster.id));
                 const unknownTags = eventUnknownMonsterTags(tags);
+                const addOpen = state.addOpen ? " open" : "";
+                const advancedOpen = state.advancedOpen ? " open" : "";
+                const searchValue = String(state.searchValue || "");
                 const selectedHtml = selectedMonsters.length
                   ? selectedMonsters.map((monster) => `
                     <span class="monster-selected-chip">
@@ -1840,12 +1843,12 @@ class SaveWebViewer:
                     </div>
                     <div class="monster-selected-list" data-role="selected-monsters">${{selectedHtml}}</div>
                     ${{unknownHtml}}
-                    <details class="monster-picker-add">
+                    <details class="monster-picker-add"${{addOpen}}>
                       <summary>+ 添加兼容魔物</summary>
-                      <input type="search" data-role="monster-search" placeholder="搜索魔物名、ID、标签、地点..." autocomplete="off">
+                      <input type="search" data-role="monster-search" value="${{eventEscapeAttr(searchValue)}}" placeholder="搜索魔物名、ID、标签、地点..." autocomplete="off">
                       <div class="monster-picker-options" data-role="monster-options">${{optionsHtml}}</div>
                     </details>
-                    <details class="monster-advanced-tags">
+                    <details class="monster-advanced-tags"${{advancedOpen}}>
                       <summary>高级标签明细</summary>
                       <p class="muted">这里是最终保存到 compatible_monster_tags 的内容；未知历史标签会保留。</p>
                       <textarea data-field="compatible_monster_tags" class="keys-editor" spellcheck="false">${{eventEscapeHtml(eventSplitList(tags).join("\\n"))}}</textarea>
@@ -1858,12 +1861,26 @@ class SaveWebViewer:
                 const picker = card.querySelector("[data-role='monster-picker']");
                 if (!picker) return;
                 const textarea = eventMonsterTagsTextarea(card);
+                const pickerState = {{
+                  addOpen: Boolean(picker.querySelector(".monster-picker-add")?.open),
+                  advancedOpen: Boolean(picker.querySelector(".monster-advanced-tags")?.open),
+                  searchValue: picker.querySelector("[data-role='monster-search']")?.value || "",
+                }};
                 const wrapper = document.createElement("div");
-                wrapper.innerHTML = eventMonsterPickerHtml(textarea ? textarea.value : "");
+                wrapper.innerHTML = eventMonsterPickerHtml(textarea ? textarea.value : "", pickerState);
                 picker.replaceWith(wrapper.firstElementChild);
                 eventBindMonsterPicker(card);
+                const refreshedPicker = card.querySelector("[data-role='monster-picker']");
+                if (refreshedPicker) eventApplyMonsterSearch(refreshedPicker, pickerState.searchValue);
                 const summary = card.querySelector("[data-role='monster-summary']");
                 if (summary) summary.textContent = eventCompatibleMonsterSummary(textarea ? textarea.value : []);
+              }}
+
+              function eventApplyMonsterSearch(picker, query) {{
+                const normalizedQuery = String(query || "").trim().toLowerCase();
+                picker.querySelectorAll("[data-action='add-monster']").forEach((button) => {{
+                  button.hidden = normalizedQuery ? !String(button.dataset.search || "").includes(normalizedQuery) : false;
+                }});
               }}
 
               function eventBindMonsterPicker(card) {{
@@ -1878,10 +1895,7 @@ class SaveWebViewer:
                 const searchInput = picker.querySelector("[data-role='monster-search']");
                 if (searchInput) {{
                   searchInput.addEventListener("input", () => {{
-                    const query = searchInput.value.trim().toLowerCase();
-                    picker.querySelectorAll("[data-action='add-monster']").forEach((button) => {{
-                      button.hidden = query ? !String(button.dataset.search || "").includes(query) : false;
-                    }});
+                    eventApplyMonsterSearch(picker, searchInput.value);
                   }});
                 }}
                 const textarea = eventMonsterTagsTextarea(card);

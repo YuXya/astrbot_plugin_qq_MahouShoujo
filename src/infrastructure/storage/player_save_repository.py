@@ -1096,6 +1096,7 @@ class PlayerSaveRepository:
             self.editable_manager.monster_book_path,
             player_level=player_level,
             source="public",
+            include_overleveled=True,
         )
 
     def _read_monster_candidates_from_path(
@@ -1152,7 +1153,7 @@ class PlayerSaveRepository:
             min_level=entry.get("min_monster_level", 1),
             max_level=entry.get("max_monster_level", 7),
         )
-        default_levels = [level for level in monster_levels if level <= player_level]
+        default_levels = list(monster_levels)
         selectable_levels = list(monster_levels) if include_overleveled else default_levels
         if not selectable_levels:
             return None

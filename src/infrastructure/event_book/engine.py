@@ -43,6 +43,7 @@ class EventBookEngine:
         for event in events:
             event_name = event.name or event.command or event.id
             is_current_event = self._event_matches(event, current_event_key)
+            event_commands = event.allowed_commands or [event.command]
             entries = [event.as_entry()] if event.is_scene_event else event.entries
 
             first_round = self._match_entries(
@@ -50,6 +51,8 @@ class EventBookEngine:
                 scan_text,
                 activated_ids=activated_ids,
                 event_id=event.id,
+                event_commands=event_commands,
+                current_event_key=current_event_key,
                 include_always=is_current_event,
                 player_level=player_level,
                 is_current_event=is_current_event,
@@ -65,6 +68,8 @@ class EventBookEngine:
                 recursion_text,
                 activated_ids=activated_ids,
                 event_id=event.id,
+                event_commands=event_commands,
+                current_event_key=current_event_key,
                 include_always=False,
                 player_level=player_level,
                 is_current_event=is_current_event,
@@ -241,6 +246,8 @@ class EventBookEngine:
         *,
         activated_ids: set[tuple[str, str]],
         event_id: str,
+        event_commands: list[str],
+        current_event_key: str,
         include_always: bool,
         player_level: int,
         is_current_event: bool,
@@ -255,6 +262,9 @@ class EventBookEngine:
                 continue
 
             if player_level not in entry.visible_levels:
+                continue
+
+            if not self._entry_command_matches(entry, event_commands, current_event_key):
                 continue
 
             if entry.strategy == "always":

@@ -86,16 +86,20 @@ class BattleDiaryApplicationService:
                     [action_text, self._logs_text_for_teammate_scan(logs)],
                     recent_record_count=self.config_manager.get_teammate_recent_record_count(),
                 )
-                semantic_players = await self._infer_semantic_teammates(
+                selection_context = await self._select_daily_context(
                     group_id=group_id,
                     user_id=user_id,
                     player_data=player_data,
                     logs=logs,
                     cameo_memories=cameo_memories,
                     action_text=action_text,
+                    event_command=event_command,
                     umo=umo,
                 )
-                nearby_players = self._merge_nearby_players(mentioned_players, semantic_players)
+                nearby_players = self._merge_nearby_players(
+                    mentioned_players,
+                    self._context_player_participants(selection_context),
+                )
             else:
                 nearby_players = []
             analysis = await self.llm_analyzer.analyze_diary(
@@ -281,6 +285,44 @@ class BattleDiaryApplicationService:
         except Exception as exc:
             logger.warning(f"队友语义识别失败，已回退直接点名扫描: group={group_id} {exc}")
             return []
+
+    async def _select_daily_context(
+        self,
+        *,
+        group_id: str,
+        user_id: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict],
+        action_text: str,
+        event_command: str,
+        umo: str | None,
+    ) -> dict[str, object]:
+        try:
+            protagonist = player_data.get("涓昏", {}) if isinstance(player_data, dict) else {}
+            current_level = self.domain_service.get_current_level(protagonist)
+            recent_record_count = self.config_manager.get_teammate_recent_record_count()
+            candidates = self.save_repository.build_city_teammate_candidates(
+                group_id,
+                user_id,
+                recent_record_count=recent_record_count,
+            )
+            monster_candidates = self.save_repository.build_public_monster_candidates(
+                player_level=current_level,
+            )
+            return await self.llm_analyzer.select_daily_context(
+                action_text=action_text,
+                player_data=player_data,
+                logs=logs,
+                cameo_memories=cameo_memories,
+                candidates=candidates,
+                monster_candidates=monster_candidates,
+                event_command=event_command,
+                umo=umo,
+            )
+        except Exception as exc:
+            logger.warning(f"daily event context selection failed, fallback to direct mention scan: group={group_id} {exc}")
+            return {}
 
     async def _select_villain_battle_context(
         self,

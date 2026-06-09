@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import random
@@ -15,6 +15,7 @@ from ..utils.llm_utils import (
     call_provider_with_retry,
     extract_response_text,
     extract_token_usage,
+    mark_latest_llm_error,
 )
 from .base_analyzer import BaseAnalyzer
 
@@ -112,6 +113,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
 
         success, parsed, error = parse_json_object_response(result_text)
         if not success or not parsed:
+            mark_latest_llm_error(f"{self.get_data_type()} JSON parse failed: {error}")
             logger.error(f"{self.get_data_type()} JSON 解析失败: {error}")
             return None, token_usage, result_text
 
@@ -242,6 +244,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "scene_event_json": self._json_dump(
                     (selection_context or {}).get("scene_event")
                 ),
+                "action_target_json": self._json_dump(
+                    (selection_context or {}).get("action_target")
+                ),
                 "battle_target_type": str(
                     (selection_context or {}).get("battle_type") or "monster"
                 ),
@@ -286,6 +291,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         prompt = self.editable_manager.render_prompt(
             "magical_battle_target_selection_prompt",
             {
+                "current_level": level_label(current_level),
                 "player_data_update_json": self._json_dump(player_data),
                 "action": action_text.strip(),
                 "logs_text": self._format_logs(logs),
@@ -323,6 +329,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
 
         success, parsed, error = parse_json_object_response(result_text)
         if not success or not isinstance(parsed, dict):
+            mark_latest_llm_error(f"magical battle target selection JSON parse failed: {error}")
             logger.warning(f"魔法少女战斗目标判断 JSON 解析失败，按魔物战斗处理: {error}")
             return self._magical_monster_context(
                 player_data=player_data,
@@ -459,6 +466,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
 
         success, parsed, error = parse_json_object_response(result_text)
         if not success or not isinstance(parsed, dict):
+            mark_latest_llm_error(f"villain battle selection JSON parse failed: {error}")
             logger.warning(f"反派魔女战斗出战选择 JSON 解析失败，按魔物战斗处理: {error}")
             return self._villain_monster_context(
                 player_data=player_data,
@@ -703,7 +711,11 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             else:
                 code_rate = 55 + round((d20 - 10) * (40 / 9))
                 dice_result = "success"
-            final_rate = round(code_rate * 0.5 + ai_rate * 0.5)
+            level_advantage = player_level - opponent_level
+            level_modifier = level_advantage * 12
+            final_rate = self._clamp_percent(
+                round(code_rate * 0.5 + ai_rate * 0.5 + level_modifier)
+            )
             outcome = "player_win" if final_rate >= 50 else "player_lose"
 
         closeness = 50 - abs(final_rate - 50)
@@ -723,6 +735,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             "dice_result": dice_result,
             "code_win_rate": code_rate,
             "ai_win_rate": ai_rate,
+            "level_modifier": level_modifier if not force_lose and d20 not in {1, 20} else 0,
             "player_level": level_label(player_level),
             "opponent_level": level_label(opponent_level),
             "battle_kind": battle_kind,
@@ -745,7 +758,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             return 0
         strongest = max(levels)
         support_bonus = min(2, max(0, len(levels) - 1))
-        return min(6, strongest + support_bonus)
+        return min(7, strongest + support_bonus)
 
     def _profile_level(self, item: object) -> int:
         profile = self._prompt_protagonist_profile(item)
@@ -868,9 +881,139 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
 
         success, parsed, error = parse_json_object_response(result_text)
         if not success or not isinstance(parsed, dict):
+            mark_latest_llm_error(f"teammate completion JSON parse failed: {error}")
             logger.warning(f"队友语义识别 JSON 解析失败，已跳过: {error}")
             return []
         return self._normalize_teammate_names(parsed)
+
+    async def select_daily_context(
+        self,
+        *,
+        action_text: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict] | None,
+        candidates: list[dict],
+        monster_candidates: list[dict],
+        event_command: str,
+        umo: str | None = None,
+    ) -> dict[str, object]:
+        protagonist = player_data.get("涓昏", {}) if isinstance(player_data, dict) else {}
+        protagonist = player_data.get("涓昏", protagonist) if isinstance(player_data, dict) else {}
+        if not protagonist and isinstance(player_data, dict):
+            protagonist = next(
+                (value for value in player_data.values() if isinstance(value, dict)),
+                {},
+            )
+        current_level = self.domain_service.get_current_level(protagonist)
+        text_parts = [
+            action_text,
+            self._format_logs(logs),
+            self._format_cameo_memories(cameo_memories),
+        ]
+        scene_event_candidates = self.event_book_engine.build_scene_event_candidates(
+            text_parts,
+            current_event=event_command,
+            player_level=current_level,
+            battle_types=["daily", "monster", "environment_crisis"],
+            monster_candidates=monster_candidates,
+        )
+        prompt = self.build_teammate_completion_prompt(
+            action_text=action_text,
+            player_data=player_data,
+            logs=logs,
+            cameo_memories=cameo_memories,
+            candidates=candidates,
+            scene_event_candidates=scene_event_candidates,
+            monster_candidates=monster_candidates,
+        )
+        prompt = self._join_optional_prompt_parts(
+            [
+                prompt,
+                (
+                    "日常事件与魔物候选补充：\n"
+                    "从 scene_events 中选择一个适合本次指令和行动的 scene_event；"
+                    "没有合适事件时写 null。\n"
+                    "如果本次日常确实需要轻量异常、魔物、污染源或怪异参与，"
+                    "从 monsters 中选择 selected_monsters；普通生活日常不需要魔物时写 []。\n"
+                    "只能从候选中选择，不要编造。\n"
+                    + self._json_dump(
+                        {
+                            "scene_events": scene_event_candidates,
+                            "monsters": monster_candidates,
+                        }
+                    )
+                ),
+            ]
+        )
+        prompt = self._join_optional_prompt_parts(
+            [
+                prompt,
+                (
+                    "请同时输出 action_target，用于【行动目标判断】。格式：\n"
+                    "{\n"
+                    '  "action_target": {\n'
+                    '    "type": "daily_life / training / social / patrol / investigation / monster_or_anomaly / other",\n'
+                    '    "target": "本次行动目标或对象",\n'
+                    '    "reason": "判断理由，简短说明"\n'
+                    "  }\n"
+                    "}\n"
+                    "action_target 必须根据玩家行动、最近记录、候选玩家、候选场景事件和候选魔物判断；不要编造候选外目标。"
+                ),
+            ]
+        )
+        system_prompt = self.editable_manager.get_prompt("default_system_prompt")
+        if self.config_manager.get_debug_mode():
+            self._save_debug_file("daily_event_context_selection_prompt", prompt)
+
+        response = await call_provider_with_retry(
+            self.context,
+            self.config_manager,
+            prompt=prompt,
+            umo=umo,
+            system_prompt=system_prompt,
+            purpose="日常事件上下文识别",
+            provider_id_override=self.config_manager.get_subtask_llm_provider_id(),
+        )
+        result_text = extract_response_text(response)
+        if self.config_manager.get_debug_mode():
+            self._save_debug_file("daily_event_context_selection_response", result_text)
+
+        success, parsed, error = parse_json_object_response(result_text)
+        if not success or not isinstance(parsed, dict):
+            mark_latest_llm_error(f"daily event context selection JSON parse failed: {error}")
+            logger.warning(f"daily event context selection JSON parse failed, skipped: {error}")
+            parsed = {}
+
+        selected_monsters = self._resolve_selected_monsters(
+            parsed.get("selected_monsters") or parsed.get("selected_enemies"),
+            monster_candidates,
+            current_level=current_level,
+            action_text="\n".join(text_parts),
+        )
+        selected_monster = selected_monsters[0] if selected_monsters else None
+        scene_event = self._resolve_selected_scene_event(
+            parsed.get("scene_event"), scene_event_candidates
+        ) or self._select_scene_event(
+            scene_event_candidates,
+            battle_type="daily",
+            selected_monster=selected_monster,
+            text_parts=text_parts,
+        )
+        return {
+            "battle_type": "daily",
+            "action_target": self._normalize_action_target(parsed.get("action_target")),
+            "selected_teammates": self._resolve_selected_profiles(
+                [
+                    {"target_name": name}
+                    for name in self._normalize_teammate_names(parsed)
+                ],
+                candidates,
+            ),
+            "selected_enemies": selected_monsters,
+            "selected_monster": selected_monster,
+            "scene_event": scene_event,
+        }
 
     def build_teammate_completion_prompt(
         self,
@@ -880,6 +1023,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         logs: list[dict],
         cameo_memories: list[dict] | None,
         candidates: list[dict],
+        scene_event_candidates: list[dict] | None = None,
+        monster_candidates: list[dict] | None = None,
     ) -> str:
         return self.editable_manager.render_prompt(
             "teammate_completion_prompt",
@@ -891,8 +1036,21 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "candidates_json": self._json_dump(
                     self._prompt_protagonist_profiles(candidates)
                 ),
+                "scene_events_json": self._json_dump(scene_event_candidates or []),
+                "monster_candidates_json": self._json_dump(monster_candidates or []),
             },
         )
+
+    @staticmethod
+    def _normalize_action_target(value: object) -> dict[str, str]:
+        if isinstance(value, dict):
+            return {
+                "type": str(value.get("type") or "").strip(),
+                "target": str(value.get("target") or value.get("name") or "").strip(),
+                "reason": str(value.get("reason") or "").strip(),
+            }
+        text = str(value or "").strip()
+        return {"type": "", "target": text, "reason": ""} if text else {}
 
     def _select_public_monster(
         self,
@@ -1090,7 +1248,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 if selected_level not in selectable_levels:
                     selected_level = ""
                 if not selected_level:
-                    selected_level = default_levels[-1] if default_levels else selectable_levels[0]
+                    selected_level = random.choice(selectable_levels)
                 resolved["selected_level"] = selected_level
                 resolved["monster_levels"] = [selected_level]
                 resolved["level_settings"] = self._selected_level_settings(

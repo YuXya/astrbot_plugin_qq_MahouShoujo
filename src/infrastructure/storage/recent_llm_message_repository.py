@@ -46,6 +46,19 @@ class RecentLLMMessageRepository:
             data["records"] = []
             self._write_data(data)
 
+    def mark_latest_error(self, error: str) -> None:
+        if not error:
+            return
+        try:
+            with self._lock:
+                data = self._read_data()
+                if not data["records"]:
+                    return
+                data["records"][-1]["error"] = str(error)
+                self._write_data(data)
+        except Exception as exc:
+            logger.warning(f"鏇存柊鏈€杩?LLM 閿欒澶辫触: {exc}")
+
     def append(
         self,
         *,
