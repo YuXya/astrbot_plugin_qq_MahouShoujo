@@ -502,8 +502,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             else:
                 dice_rate = 55 + round((d20 - 10) * (40 / 9))
                 dice_result = "success"
-            code_rate = round((power_rate + dice_rate) / 2)
-            final_rate = round((code_rate + ai_rate) / 2)
+            code_rate = round((dice_rate * 0.5 + power_rate * 0.2) / 0.7)
+            final_rate = round(dice_rate * 0.5 + power_rate * 0.2 + ai_rate * 0.3)
             outcome = "player_win" if final_rate >= 50 else "player_lose"
 
         closeness = 50 - abs(final_rate - 50)
