@@ -54,7 +54,11 @@ class RecentLLMMessageRepository:
                 data = self._read_data()
                 if not data["records"]:
                     return
-                data["records"][-1]["error"] = str(error)
+                record = data["records"][-1]
+                record["error"] = str(error)
+                raw_response = str(record.get("raw_response") or "")
+                if raw_response:
+                    record["response"] = raw_response
                 self._write_data(data)
         except Exception as exc:
             logger.warning(f"鏇存柊鏈€杩?LLM 閿欒澶辫触: {exc}")
@@ -67,6 +71,7 @@ class RecentLLMMessageRepository:
         prompt: str,
         system_prompt: str | None,
         response: str,
+        raw_response: str = "",
         error: str = "",
     ) -> None:
         record = {
@@ -76,6 +81,7 @@ class RecentLLMMessageRepository:
             "system_prompt": str(system_prompt or ""),
             "prompt": str(prompt or ""),
             "response": str(response or ""),
+            "raw_response": str(raw_response or ""),
             "error": str(error or ""),
         }
         try:

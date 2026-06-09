@@ -112,7 +112,8 @@ async def call_provider_with_retry(
                 provider_id=provider_id,
                 prompt=prompt,
                 system_prompt=system_prompt,
-                response=extract_response_debug_json(response),
+                response=extract_response_text(response),
+                raw_response=extract_response_debug_json(response),
             )
             return response
         except Exception as exc:
