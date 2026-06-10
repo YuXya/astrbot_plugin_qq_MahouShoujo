@@ -2029,18 +2029,18 @@ class SaveWebViewer:
                         <div class="world-entry-grid">
                           <label class="compact-field"><span>ID</span><input data-field="id" type="text" value="${{eventEscapeAttr(normalized.id)}}"></label>
                           <label class="compact-field title-field"><span>事件名</span><input data-field="name" type="text" value="${{eventEscapeAttr(normalized.name)}}"></label>
-                          <label class="compact-field"><span>触发方式</span>
+                          <label class="compact-field"><span>旧版兼容字段（不参与事件筛选）</span>
                             <select data-field="strategy">
-                              <option value="keyword"${{normalized.strategy === "keyword" ? " selected" : ""}}>关键词命中</option>
-                              <option value="always"${{normalized.strategy === "always" ? " selected" : ""}}>总是注入</option>
+                              <option value="keyword"${{normalized.strategy === "keyword" ? " selected" : ""}}>keyword</option>
+                              <option value="always"${{normalized.strategy === "always" ? " selected" : ""}}>always</option>
                             </select>
                           </label>
                           <div class="compact-field level-field"><span>可见等级</span><div class="level-choice-row">${{eventLevelInputs(normalized.visible_levels)}}</div></div>
                         </div>
                         <div class="compact-field level-field"><span>适用指令</span><div class="level-choice-row">${{eventCommandInputs(normalized.allowed_commands)}}</div></div>
                         <div class="compact-field level-field"><span>兼容战斗类型</span><div class="level-choice-row">${{eventBattleTypeInputs(normalized.compatible_battle_types)}}</div></div>
-                        <label class="summary-check" style="margin-top:8px"><input data-field="recursive" type="checkbox"${{normalized.recursive ? " checked" : ""}}> 允许递归命中补充设定</label>
-                        <label class="block-field">关键词（支持中文逗号、英文逗号、顿号或换行分隔）
+                        <label class="summary-check" style="margin-top:8px"><input data-field="recursive" type="checkbox"${{normalized.recursive ? " checked" : ""}}> 旧版递归兼容字段（不参与事件筛选）</label>
+                        <label class="block-field">候选优先匹配关键词（仅用于预筛，最终由子任务选择）
                           <textarea data-field="keys" class="keys-editor" spellcheck="false">${{eventEscapeHtml(normalized.keys.join("\\n"))}}</textarea>
                         </label>
                         <label class="block-field">事件标签（传闻调查、偶遇、求救、巡逻、追踪、误会、地点异常、任务委托、主动袭击等）
@@ -2059,7 +2059,7 @@ class SaveWebViewer:
                         <label class="block-field">场景结尾钩子
                           <textarea data-field="ending_hook" class="entry-content-editor" spellcheck="false" style="height:60px">${{eventEscapeHtml(normalized.ending_hook)}}</textarea>
                         </label>
-                        <label class="block-field">事件设定（当前指令或关键词命中时注入）
+                        <label class="block-field">事件设定（子任务选中后提供给主任务）
                           <textarea data-field="content" class="entry-content-editor" spellcheck="false">${{eventEscapeHtml(normalized.content)}}</textarea>
                         </label>
                       </div>

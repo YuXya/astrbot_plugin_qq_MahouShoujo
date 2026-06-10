@@ -211,10 +211,3 @@ class EventBookEvent:
             twist_hook=self.twist_hook,
             ending_hook=self.ending_hook,
         )
-
-
-@dataclass(frozen=True)
-class EventBookMatchResult:
-    local_entries: list[EventBookEntry]
-    remote_entries: list[EventBookEntry]
-    prompt_text: str

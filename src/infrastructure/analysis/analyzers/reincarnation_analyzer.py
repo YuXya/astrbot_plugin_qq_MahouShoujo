@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from ....domain.models.data_models import ReincarnationCard
 from ....domain.services.reincarnation_domain_service import ReincarnationDomainService
-from ...event_book import EventBookEngine
 from ...world_book import WorldBookEngine
 from .base_analyzer import BaseAnalyzer
 
@@ -23,7 +22,6 @@ class ReincarnationAnalyzer(BaseAnalyzer[ReincarnationCard]):
             editable_manager=self.editable_manager,
             display_name="状态书",
         )
-        self.event_book_engine = EventBookEngine(editable_manager=self.editable_manager)
 
     def get_data_type(self) -> str:
         return "魔法少女转生人物卡"
@@ -52,16 +50,8 @@ class ReincarnationAnalyzer(BaseAnalyzer[ReincarnationCard]):
         status_book_result = self.status_book_engine.build_prompt_text(
             world_book_scan_parts, player_level=1,
         )
-        event_book_result = self.event_book_engine.build_prompt_text(
-            world_book_scan_parts,
-            current_event=event_command,
-            player_level=1,
-        )
         cross_hit_parts: list[str] = []
         for entry in world_book_result.entries + status_book_result.entries:
-            if entry.recursive and entry.content:
-                cross_hit_parts.append(entry.content)
-        for entry in event_book_result.local_entries + event_book_result.remote_entries:
             if entry.recursive and entry.content:
                 cross_hit_parts.append(entry.content)
         if cross_hit_parts:
@@ -72,16 +62,10 @@ class ReincarnationAnalyzer(BaseAnalyzer[ReincarnationCard]):
             status_book_result = self.status_book_engine.build_prompt_text(
                 enriched_scan_parts, player_level=1,
             )
-            event_book_result = self.event_book_engine.build_prompt_text(
-                enriched_scan_parts,
-                current_event=event_command,
-                player_level=1,
-            )
 
         supplement_text = self._join_optional_prompt_parts([
             world_book_result.prompt_text,
             status_book_result.prompt_text,
-            event_book_result.prompt_text,
         ])
 
         return self.editable_manager.render_prompt(
