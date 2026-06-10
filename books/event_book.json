@@ -30,8 +30,7 @@
           ],
           "allowed_commands": [
             "/魔法少女战斗",
-            "/魔法少女日常",
-            "/反派魔女战斗"
+            "/魔法少女日常"
           ],
           "event_tags": [
             "情报调查",
@@ -86,9 +85,7 @@
           ],
           "allowed_commands": [
             "/魔法少女战斗",
-            "/魔法少女日常",
-            "/反派魔女战斗",
-            "/反派魔女日常"
+            "/魔法少女日常"
           ],
           "event_tags": [
             "巡逻",
@@ -143,8 +140,7 @@
           ],
           "allowed_commands": [
             "/魔法少女战斗",
-            "/魔法少女日常",
-            "/反派魔女战斗"
+            "/魔法少女日常"
           ],
           "event_tags": [
             "救援",
@@ -198,9 +194,7 @@
           ],
           "allowed_commands": [
             "/魔法少女战斗",
-            "/魔法少女日常",
-            "/反派魔女战斗",
-            "/反派魔女日常"
+            "/魔法少女日常"
           ],
           "event_tags": [
             "净化",
@@ -254,8 +248,7 @@
             7
           ],
           "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
+            "/魔法少女战斗"
           ],
           "event_tags": [
             "遭遇战",
@@ -309,8 +302,7 @@
           ],
           "allowed_commands": [
             "/魔法少女战斗",
-            "/魔法少女日常",
-            "/反派魔女战斗"
+            "/魔法少女日常"
           ],
           "event_tags": [
             "校园",
@@ -364,8 +356,7 @@
           ],
           "allowed_commands": [
             "/魔法少女战斗",
-            "/魔法少女日常",
-            "/反派魔女战斗"
+            "/魔法少女日常"
           ],
           "event_tags": [
             "商业街",
@@ -418,8 +409,7 @@
             7
           ],
           "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
+            "/魔法少女战斗"
           ],
           "event_tags": [
             "追击",
@@ -471,8 +461,7 @@
             7
           ],
           "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
+            "/魔法少女战斗"
           ],
           "event_tags": [
             "废弃设施",
@@ -526,8 +515,7 @@
           ],
           "allowed_commands": [
             "/魔法少女战斗",
-            "/魔法少女日常",
-            "/反派魔女战斗"
+            "/魔法少女日常"
           ],
           "event_tags": [
             "镜界",
@@ -580,8 +568,7 @@
             7
           ],
           "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
+            "/魔法少女战斗"
           ],
           "event_tags": [
             "交通设施",
@@ -635,8 +622,7 @@
           ],
           "allowed_commands": [
             "/魔法少女战斗",
-            "/魔法少女日常",
-            "/反派魔女战斗"
+            "/魔法少女日常"
           ],
           "event_tags": [
             "自然场地",
@@ -689,8 +675,7 @@
           ],
           "allowed_commands": [
             "/魔法少女战斗",
-            "/魔法少女日常",
-            "/反派魔女战斗"
+            "/魔法少女日常"
           ],
           "event_tags": [
             "医院",
@@ -743,8 +728,7 @@
           ],
           "allowed_commands": [
             "/魔法少女战斗",
-            "/魔法少女日常",
-            "/反派魔女战斗"
+            "/魔法少女日常"
           ],
           "event_tags": [
             "祭典",
@@ -797,9 +781,7 @@
           ],
           "allowed_commands": [
             "/魔法少女战斗",
-            "/魔法少女日常",
-            "/反派魔女战斗",
-            "/反派魔女日常"
+            "/魔法少女日常"
           ],
           "event_tags": [
             "梦境",
@@ -851,8 +833,7 @@
             7
           ],
           "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
+            "/魔法少女战斗"
           ],
           "event_tags": [
             "高处",
@@ -884,7 +865,7 @@
     },
     {
       "id": "character_enemy",
-      "name": "与敌人是魔法少女/反派魔女",
+      "name": "与敌人是魔法少女",
       "events": [
         {
           "id": "direct_challenge_duel",
@@ -910,8 +891,7 @@
             7
           ],
           "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
+            "/魔法少女战斗"
           ],
           "event_tags": [
             "决斗",
@@ -927,13 +907,12 @@
           ],
           "compatible_monster_tags": [],
           "compatible_battle_types": [
-            "villain_witch",
             "magical_girl"
           ],
           "opening_hook": "双方以明确挑战开始战斗，距离、视线和言语挑衅都被拉到极近。",
           "twist_hook": "战斗中可以出现近身压制、武器抵住要害、衣装战损和涩涩羞耻感，要涩涩。",
           "ending_hook": "胜负揭晓后，落败者仍强撑尊严，却掩不住衣装凌乱和被贴身压制后的羞恼，为下次再战留下危险余韵。",
-          "content": "直接挑战决斗用于玩家点名挑战某个魔法少女或反派魔女。事件必须按软色情战斗风格处理：贴身攻防、压制、战损、羞恼、危险涩涩和战后余温。"
+          "content": "直接挑战决斗用于玩家点名挑战某个魔法少女。事件必须按软色情战斗风格处理：贴身攻防、压制、战损、羞恼、危险涩涩和战后余温。"
         },
         {
           "id": "rival_rooftop_chase",
@@ -959,8 +938,7 @@
             7
           ],
           "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
+            "/魔法少女战斗"
           ],
           "event_tags": [
             "宿敌",
@@ -975,7 +953,6 @@
           ],
           "compatible_monster_tags": [],
           "compatible_battle_types": [
-            "villain_witch",
             "magical_girl"
           ],
           "opening_hook": "目标从屋顶边缘回头一笑，故意把追击引向风声强烈的高处。",
@@ -1007,8 +984,7 @@
             7
           ],
           "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
+            "/魔法少女战斗"
           ],
           "event_tags": [
             "误会",
@@ -1024,62 +1000,12 @@
           ],
           "compatible_monster_tags": [],
           "compatible_battle_types": [
-            "villain_witch",
             "magical_girl"
           ],
           "opening_hook": "双方都认为自己是在保护现场，却因为立场和信息差立刻爆发冲突。",
           "twist_hook": "救援对象、旁观者或结界残留会让双方必须压低火力，战斗更容易变成近身制伏。",
           "ending_hook": "误会未必完全解开，但双方都记住了刚才制伏与挣脱时过近的距离，那份尴尬比敌意更难立刻甩开。",
-          "content": "救援误会冲突适合魔法少女与反派魔女因目标冲突而交战。事件必须按软色情战斗风格处理，可带有制伏、被误解的羞恼、战损紧张和救援中的涩涩接触压力。"
-        },
-        {
-          "id": "corruption_probe",
-          "name": "黑化试探",
-          "enabled": true,
-          "recursive": true,
-          "strategy": "keyword",
-          "keys": [
-            "黑化",
-            "试探",
-            "诱导",
-            "污染",
-            "堕落",
-            "动摇"
-          ],
-          "visible_levels": [
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-            7
-          ],
-          "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
-          ],
-          "event_tags": [
-            "黑化试探",
-            "精神压迫",
-            "软色情战斗"
-          ],
-          "location_tags": [
-            "结界",
-            "夜晚",
-            "镜界",
-            "废弃地",
-            "地下空间"
-          ],
-          "compatible_monster_tags": [],
-          "compatible_battle_types": [
-            "villain_witch",
-            "magical_girl"
-          ],
-          "opening_hook": "敌人不急于击倒对手，而是用语言、魔力触碰和心理压迫试探底线。",
-          "twist_hook": "战斗中可以写魔力束缚、贴耳低语、羞耻动摇和战斗服被污染侵蚀，保持涩涩。",
-          "ending_hook": "无论胜负，双方心里都留下危险动摇，像被污染魔力贴着耳畔低语过一样，越想忘记越清晰。",
-          "content": "黑化试探用于人物敌人之间的诱导、试探和精神战。事件必须按软色情战斗风格处理，但停留在涩涩、压迫、羞耻、战损和心理动摇层面。"
+          "content": "救援误会冲突适合魔法少女之间因目标冲突而交战。事件必须按软色情战斗风格处理，可带有制伏、被误解的羞恼、战损紧张和救援中的涩涩接触压力。"
         },
         {
           "id": "public_showdown",
@@ -1105,8 +1031,7 @@
             7
           ],
           "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
+            "/魔法少女战斗"
           ],
           "event_tags": [
             "公开场合",
@@ -1122,7 +1047,6 @@
           ],
           "compatible_monster_tags": [],
           "compatible_battle_types": [
-            "villain_witch",
             "magical_girl"
           ],
           "opening_hook": "敌人在公开场合现身，迫使主角必须在隐藏身份、保护群众和迎战之间取舍。",
@@ -1154,8 +1078,7 @@
             7
           ],
           "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
+            "/魔法少女战斗"
           ],
           "event_tags": [
             "契约",
@@ -1171,7 +1094,6 @@
           ],
           "compatible_monster_tags": [],
           "compatible_battle_types": [
-            "villain_witch",
             "magical_girl"
           ],
           "opening_hook": "一场本该谈条件的会面，因为契约细节和立场冲突变成战斗。",
@@ -1203,8 +1125,7 @@
             7
           ],
           "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
+            "/魔法少女战斗"
           ],
           "event_tags": [
             "镜界",
@@ -1220,7 +1141,6 @@
           ],
           "compatible_monster_tags": [],
           "compatible_battle_types": [
-            "villain_witch",
             "magical_girl"
           ],
           "opening_hook": "双方被拖入镜面结界，倒影把每一次攻防都放大成无法逃避的画面。",
@@ -1252,8 +1172,7 @@
             7
           ],
           "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
+            "/魔法少女战斗"
           ],
           "event_tags": [
             "停战破裂",
@@ -1269,7 +1188,6 @@
           ],
           "compatible_monster_tags": [],
           "compatible_battle_types": [
-            "villain_witch",
             "magical_girl"
           ],
           "opening_hook": "刚刚还并肩处理危机的双方，因为战利品、目标或秘密突然翻脸。",
@@ -1301,8 +1219,7 @@
             7
           ],
           "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
+            "/魔法少女战斗"
           ],
           "event_tags": [
             "伏击",
@@ -1318,7 +1235,6 @@
           ],
           "compatible_monster_tags": [],
           "compatible_battle_types": [
-            "villain_witch",
             "magical_girl"
           ],
           "opening_hook": "敌人早已在撤退路线等待，第一击就瞄准行动能力而非生命。",
@@ -1350,8 +1266,7 @@
             7
           ],
           "allowed_commands": [
-            "/魔法少女战斗",
-            "/反派魔女战斗"
+            "/魔法少女战斗"
           ],
           "event_tags": [
             "训练",
@@ -1367,7 +1282,6 @@
           ],
           "compatible_monster_tags": [],
           "compatible_battle_types": [
-            "villain_witch",
             "magical_girl"
           ],
           "opening_hook": "原本只是试探实力的训练，因为一句挑衅或一次过火反击迅速失控。",

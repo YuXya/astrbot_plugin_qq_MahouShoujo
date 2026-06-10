@@ -53,7 +53,7 @@ class ReincarnationApplicationService:
 
             if avatar_url:
                 card.avatar_url = avatar_url
-            self._ensure_card_faction(card, event_command)
+            self._ensure_card_faction(card)
 
             image_path, _html = await self.card_generator.generate_image_card(
                 card,
@@ -84,16 +84,15 @@ class ReincarnationApplicationService:
             )
 
     @staticmethod
-    def _ensure_card_faction(card: Any, event_command: str) -> None:
+    def _ensure_card_faction(card: Any) -> None:
         if not getattr(card, "info", None):
             return
-        faction = "反派魔女" if "反派魔女" in str(event_command or "") else "魔法少女"
         for item in card.info:
             if isinstance(item, dict) and item.get("path") == "/主角/阵营/身份":
-                item["description"] = str(item.get("description") or faction)
+                item["description"] = "魔法少女"
                 return
         card.info.append({
             "field": "阵营",
             "path": "/主角/阵营/身份",
-            "description": faction,
+            "description": "魔法少女",
         })

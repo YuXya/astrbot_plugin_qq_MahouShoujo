@@ -42,7 +42,6 @@ def _now_date_str() -> str:
 
 
 class PlayerSaveRepository:
-    PLAYER_FACTIONS = {"魔法少女", "反派魔女"}
     SOURCE_FILE_NAMES = {
         "player_data.json",
         "player_data_update.json",
@@ -244,16 +243,12 @@ class PlayerSaveRepository:
         card: ReincarnationCard,
         nickname: str | None = None,
         avatar_url: str | None = None,
-        faction: str = "魔法少女",
     ) -> Path:
         user_dir = self.get_user_dir(group_id, user_id)
         user_dir.mkdir(parents=True, exist_ok=True)
 
-        faction = self._normalize_player_faction(faction)
         protagonist_tree = card.build_protagonist_tree()
-        protagonist_tree.setdefault("主角", {}).setdefault("阵营", {})["身份"] = (
-            faction
-        )
+        protagonist_tree.setdefault("主角", {}).setdefault("阵营", {})["身份"] = "魔法少女"
 
         # 确保等级节点存在
         if "等级" not in protagonist_tree.get("主角", {}):
@@ -284,9 +279,9 @@ class PlayerSaveRepository:
             user_id,
             {
                 "type": "reincarnation",
-                "message": f"完成{faction}转生",
+                "message": "完成魔法少女转生",
                 "created_at": self._now_ms(),
-                "title": f"{faction}转生人物卡",
+                "title": "魔法少女转生人物卡",
                 "target_name": card.target_name,
             },
         )
@@ -339,7 +334,6 @@ class PlayerSaveRepository:
         new_level_exp: int = 0,
         world_day_offset: int | None = None,
         mention_scan_texts: str | list[str] | None = None,
-        identity_transition_faction: str | None = None,
     ) -> None:
         user_dir = self.get_user_dir(group_id, user_id)
         user_dir.mkdir(parents=True, exist_ok=True)
@@ -354,26 +348,6 @@ class PlayerSaveRepository:
         if not player_data:
             player_data = self._create_default_player_data(group_id, user_id)
 
-        if identity_transition_faction is not None:
-            protagonist = player_data.setdefault("主角", {})
-            if not isinstance(protagonist, dict):
-                protagonist = {}
-                player_data["主角"] = protagonist
-            faction_node = protagonist.setdefault("阵营", {})
-            if not isinstance(faction_node, dict):
-                faction_node = {}
-                protagonist["阵营"] = faction_node
-            faction_node["身份"] = self._normalize_player_faction(identity_transition_faction)
-            card.state_snapshot = dict(player_data)
-            self._save_current_player_data(user_dir, player_data)
-            self._append_battle_result_log(
-                group_id,
-                user_id,
-                card,
-                now=now,
-                world_day_offset=world_day_offset,
-                world_date=world_date,
-            )
             self.advance_world_clock(group_id, expected_day_offset=world_day_offset)
             return
 
@@ -1053,38 +1027,6 @@ class PlayerSaveRepository:
             candidates.append(npc)
         return candidates
 
-    def build_city_villain_witch_candidates(
-        self,
-        group_id: str,
-        user_id: str,
-        *,
-        recent_record_count: int = 1,
-    ) -> list[dict[str, Any]]:
-        users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
-        if not users_dir.exists():
-            return []
-
-        current_user = self._safe_id(user_id)
-        candidates: list[dict[str, Any]] = []
-        for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
-            if user_dir.name == current_user:
-                continue
-            npc = self._build_npc_package(
-                user_dir,
-                source="city_villain_witch_candidate",
-                recent_record_count=recent_record_count,
-            )
-            if not npc:
-                continue
-            if str(npc.get("阵营") or "").strip() != "反派魔女":
-                continue
-            public_reputation = self._read_public_reputation(user_dir)
-            if public_reputation:
-                npc["城市风评"] = public_reputation
-                npc["public_reputation"] = public_reputation
-            candidates.append(npc)
-        return candidates
-
     def build_public_monster_candidates(
         self,
         *,
@@ -1441,11 +1383,6 @@ class PlayerSaveRepository:
 
     # ── 内部辅助 ──────────────────────────────────
 
-    @classmethod
-    def _normalize_player_faction(cls, faction: object) -> str:
-        text = str(faction or "").strip()
-        return text if text in cls.PLAYER_FACTIONS else "魔法少女"
-
     def _create_default_player_data(self, group_id: str, user_id: str) -> dict[str, Any]:
         return {
             "schema_version": 2,
@@ -1574,9 +1511,8 @@ class PlayerSaveRepository:
 
         target_name = self._get_nested(protagonist, ["个人信息", "姓名"], user_dir.name)
         magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], "")
-        villain_name = self._get_nested(protagonist, ["个人信息", "反派魔女名"], "")
         faction = self._get_nested(protagonist, ["阵营", "身份"], "魔法少女")
-        role_name = magical_name or villain_name or target_name
+        role_name = magical_name or target_name
         level_node = protagonist.get("等级", {})
         level = level_node.get("等级", 1) if isinstance(level_node, dict) else 1
         battle_count = self._ensure_battle_count(player_data)
@@ -1596,7 +1532,6 @@ class PlayerSaveRepository:
             "年龄": self._get_nested(protagonist, ["个人信息", "年龄"], ""),
             "身份&职业": self._get_nested(protagonist, ["个人信息", "身份&职业"], ""),
             "魔法少女名": magical_name,
-            "反派魔女名": villain_name,
             "武装": self._get_nested(protagonist, ["个人信息", "武装"], ""),
             "变身服": self._get_nested(protagonist, ["个人信息", "变身服"], ""),
             "性格特质": self._get_nested(protagonist, ["个人信息", "性格特质"], ""),
@@ -1996,7 +1931,6 @@ class PlayerSaveRepository:
         for keys in (
             ["个人信息", "姓名"],
             ["个人信息", "魔法少女名"],
-            ["个人信息", "反派魔女名"],
         ):
             name = self._get_nested(protagonist, keys, "").strip()
             if name and name not in names:

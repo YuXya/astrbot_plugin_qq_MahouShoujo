@@ -37,9 +37,7 @@ class BattleDiaryApplicationService:
         event_command: str = "/魔法少女战斗",
         prompt_name: str = "battle_diary_prompt",
         default_action: str = "自由战斗",
-        use_villain_battle_selection: bool = False,
         allow_other_players: bool = True,
-        identity_transition_faction: str | None = None,
     ) -> BattleDiaryExecutionResult:
         try:
             save_data = self.save_repository.load_player_save(group_id, user_id)
@@ -57,18 +55,7 @@ class BattleDiaryApplicationService:
             logs = save_data.get("logs", [])
             cameo_memories = save_data.get("cameo_memories", [])
             selection_context: dict[str, object] | None = None
-            if use_villain_battle_selection:
-                selection_context = await self._select_villain_battle_context(
-                    group_id=group_id,
-                    user_id=user_id,
-                    player_data=player_data,
-                    logs=logs,
-                    cameo_memories=cameo_memories,
-                    action_text=action_text,
-                    umo=umo,
-                )
-                nearby_players = self._context_player_participants(selection_context)
-            elif prompt_name == "battle_diary_prompt":
+            if prompt_name == "battle_diary_prompt":
                 selection_context = await self._select_magical_battle_context(
                     group_id=group_id,
                     user_id=user_id,
@@ -136,7 +123,6 @@ class BattleDiaryApplicationService:
                 card.level_exp_after,
                 world_day_offset=world_day_offset,
                 mention_scan_texts=action_text,
-                identity_transition_faction=identity_transition_faction,
             )
             await self._maybe_summarize_relationships(
                 group_id=group_id,
@@ -324,7 +310,7 @@ class BattleDiaryApplicationService:
             logger.warning(f"daily event context selection failed, fallback to direct mention scan: group={group_id} {exc}")
             return {}
 
-    async def _select_villain_battle_context(
+    async def _select_magical_battle_context(
         self,
         *,
         group_id: str,
@@ -343,44 +329,6 @@ class BattleDiaryApplicationService:
             user_id,
             recent_record_count=recent_record_count,
         )
-        teammate_candidates = self.save_repository.build_city_villain_witch_candidates(
-            group_id,
-            user_id,
-            recent_record_count=recent_record_count,
-        )
-        monster_candidates = self.save_repository.build_public_monster_candidates(
-            player_level=current_level,
-        )
-        return await self.llm_analyzer.select_villain_battle_context(
-            action_text=action_text,
-            player_data=player_data,
-            logs=logs,
-            cameo_memories=cameo_memories,
-            monster_candidates=monster_candidates,
-            magical_girl_candidates=target_candidates,
-            teammate_candidates=teammate_candidates,
-            umo=umo,
-        )
-
-    async def _select_magical_battle_context(
-        self,
-        *,
-        group_id: str,
-        user_id: str,
-        player_data: dict,
-        logs: list[dict],
-        cameo_memories: list[dict],
-        action_text: str,
-        umo: str | None,
-    ) -> dict[str, object]:
-        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
-        current_level = self.domain_service.get_current_level(protagonist)
-        recent_record_count = self.config_manager.get_teammate_recent_record_count()
-        target_candidates = self.save_repository.build_city_villain_witch_candidates(
-            group_id,
-            user_id,
-            recent_record_count=recent_record_count,
-        )
         teammate_candidates = self.save_repository.build_city_magical_girl_candidates(
             group_id,
             user_id,
@@ -394,7 +342,7 @@ class BattleDiaryApplicationService:
             player_data=player_data,
             logs=logs,
             cameo_memories=cameo_memories,
-            villain_witch_candidates=target_candidates,
+            magical_girl_candidates=target_candidates,
             monster_candidates=monster_candidates,
             teammate_candidates=teammate_candidates,
             umo=umo,
@@ -420,9 +368,8 @@ class BattleDiaryApplicationService:
             npc_user_id = str(npc.get("_user_id") or "").strip()
             npc_target_name = str(npc.get("target_name") or "").strip()
             npc_magical_name = str(npc.get("魔法少女名") or "").strip()
-            npc_villain_name = str(npc.get("反派魔女名") or "").strip()
             mention_names = [
-                name for name in (npc_target_name, npc_magical_name, npc_villain_name) if name
+                name for name in (npc_target_name, npc_magical_name) if name
             ]
             if not npc_user_id or not mention_names:
                 continue
@@ -440,12 +387,8 @@ class BattleDiaryApplicationService:
                         "source_name": source_profile.get("姓名", source_target_name),
                         "source_age": source_profile.get("年龄", ""),
                         "source_identity": source_profile.get("身份&职业", ""),
-                        "source_magical_name": (
-                            source_profile.get("魔法少女名", "")
-                            or source_profile.get("反派魔女名", "")
-                        ),
-                        "source_villain_name": source_profile.get("反派魔女名", ""),
-                        "npc_target_name": npc_magical_name or npc_villain_name or npc_target_name,
+                        "source_magical_name": source_profile.get("魔法少女名", ""),
+                        "npc_target_name": npc_magical_name or npc_target_name,
                         "encounter": card.encounter,
                         "result": card.result,
                         "title": card.title,
@@ -590,7 +533,6 @@ class BattleDiaryApplicationService:
             "年龄": str(info.get("年龄") or "").strip(),
             "身份&职业": str(info.get("身份&职业") or "").strip(),
             "魔法少女名": str(info.get("魔法少女名") or "").strip(),
-            "反派魔女名": str(info.get("反派魔女名") or "").strip(),
         }
 
     @staticmethod

@@ -1535,7 +1535,7 @@ class SaveWebViewer:
             <h1>{self._e(title)}</h1>
             <p><a href="{self._url(f'/editable?category={self._e(back_category)}')}">返回{self._e(self._editable_category_title(back_category))}</a></p>
             <p class="muted">{self._e(file_id)}</p>
-            <p class="muted">事件书按 categories 分为 monster_enemy（与敌人是魔物）和 character_enemy（与敌人是魔法少女/反派魔女）；每个分类下的 events 仍通过 allowed_commands 声明可触发指令。</p>
+            <p class="muted">事件书按 categories 分为 monster_enemy（与敌人是魔物）和 character_enemy（与敌人是魔法少女）；每个分类下的 events 仍通过 allowed_commands 声明可触发指令。</p>
             <div class="source-actions">
               <a class="button-link secondary-link" href="{source_url}">编辑源码</a>
               <a class="button-link secondary-link" href="{export_url}">导出 JSON</a>
@@ -1589,17 +1589,11 @@ class SaveWebViewer:
               ];
               const commandOptions = [
                 "/魔法少女转生",
-                "/反派魔女转生",
                 "/魔法少女战斗",
                 "/魔法少女日常",
-                "/魔法少女黑化",
-                "/反派魔女洗白",
-                "/反派魔女战斗",
-                "/反派魔女日常",
               ];
               const battleTypeOptions = [
                 "monster",
-                "villain_witch",
                 "magical_girl",
                 "environment_crisis",
               ];
@@ -1625,7 +1619,7 @@ class SaveWebViewer:
               }});
               const eventDefaultCategories = [
                 {{ id: "monster_enemy", name: "与敌人是魔物", events: [] }},
-                {{ id: "character_enemy", name: "与敌人是魔法少女/反派魔女", events: [] }},
+                {{ id: "character_enemy", name: "与敌人是魔法少女", events: [] }},
               ];
               const eventState = {{
                 version: 3,
@@ -2143,7 +2137,7 @@ class SaveWebViewer:
         book = dict(raw) if isinstance(raw, dict) else {}
         default_categories = [
             {"id": "monster_enemy", "name": "与敌人是魔物", "events": []},
-            {"id": "character_enemy", "name": "与敌人是魔法少女/反派魔女", "events": []},
+            {"id": "character_enemy", "name": "与敌人是魔法少女", "events": []},
         ]
         categories_by_id = {
             item["id"]: {"id": item["id"], "name": item["name"], "events": []}
@@ -3119,8 +3113,6 @@ class SaveWebViewer:
     ) -> web.Response:
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
         city_name = self.repository.get_city_name(group_id)
-        faction = self._get_nested(protagonist, ["阵营", "身份"], "魔法少女") or "魔法少女"
-        is_villain = faction == "反派魔女"
         magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], "")
         class_name = self._rank_display(self._get_nested(protagonist, ["个人信息", "身份&职业"], "未知职阶"))
         color = self._get_nested(protagonist, ["个人信息", "代表色"], "星光色")
@@ -3130,16 +3122,12 @@ class SaveWebViewer:
         familiar = self._get_nested(protagonist, ["个人信息", "使魔伙伴种类"], "")
         familiar_bond = self._get_nested(protagonist, ["个人信息", "使魔伙伴与主角关系"], "")
         display_name = magical_name or title_name
-        page_prefix = "反派魔女" if is_villain else "魔法少女"
+        page_prefix = "魔法少女"
         page_name = f"{page_prefix} {display_name}"
-        shell_class = "faction-villain" if is_villain else "faction-magical"
-        profile_kicker = "Villain Witch Profile" if is_villain else "Mahou Shoujo Profile"
-        emblem = "◆" if is_villain else "✦"
-        hero_copy = (
-            f"{city_name}记录中的反派魔女档案。这里汇总了你的身份、外观、装备、成长进度与最近的行动痕迹。"
-            if is_villain
-            else f"{city_name}记录中的魔法少女档案。这里汇总了你的身份、外观、装备、成长进度与最近的冒险痕迹。"
-        )
+        shell_class = "faction-magical"
+        profile_kicker = "Mahou Shoujo Profile"
+        emblem = "✦"
+        hero_copy = f"{city_name}记录中的魔法少女档案。这里汇总了你的身份、外观、装备、成长进度与最近的冒险痕迹。"
         aria_label = f"{page_prefix}个人档案"
 
         progress_html = self._progress_overview_html(player_data)
@@ -4595,76 +4583,7 @@ class SaveWebViewer:
     .relationship-card-section p {{ margin: 0; color: #4b2447; line-height: 1.65; overflow-wrap: anywhere; }}
     .relationship-tag-row {{ display: flex; flex-wrap: wrap; gap: 8px; padding-top: 14px; border-top: 1px solid rgba(211,91,165,.22); }}
     .relationship-tag-row span {{ min-height: 26px; display: inline-flex; align-items: center; padding: 3px 9px; border: 1px solid rgba(211,91,165,.26); border-radius: 999px; background: rgba(255,255,255,.72); color: #744160; font-size: 12px; font-weight: 900; }}
-    main:has(.villain-monster-shell) {{ width: 100%; max-width: none; height: 100vh; min-height: 0; box-sizing: border-box; padding: 0; overflow: hidden; }}
-    main:has(.villain-monster-shell) .topbar {{ position: absolute; top: 18px; right: 22px; z-index: 6; margin: 0; min-height: 0; }}
-    main:has(.villain-monster-shell) .topbar button {{ border: 1px solid rgba(215, 168, 75, .34); background: rgba(18, 8, 8, .86); box-shadow: 0 12px 28px rgba(0, 0, 0, .42); backdrop-filter: blur(10px); }}
-    .villain-monster-shell {{ --villain-content-width: 1180px; position: relative; width: 100%; height: 100vh; padding: 70px clamp(16px, 4vw, 54px) 42px; box-sizing: border-box; overflow-x: hidden; overflow-y: auto; background: radial-gradient(circle at 14% 16%, rgba(145, 18, 30, .48) 0 8%, transparent 22%), radial-gradient(circle at 84% 18%, rgba(215, 168, 75, .28) 0 9%, transparent 24%), linear-gradient(135deg, #090607 0%, #1a080b 48%, #351018 100%); color: #f7ead2; isolation: isolate; }}
-    .villain-grid {{ position: absolute; inset: -20%; z-index: -2; background-image: linear-gradient(rgba(215,168,75,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(215,168,75,.055) 1px, transparent 1px); background-size: 38px 38px; transform: rotate(-6deg); }}
-    .villain-monster-shell::after {{ content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(215,168,75,.08), transparent 18%, transparent 82%, rgba(145,18,30,.18)); pointer-events: none; }}
-    .villain-monster-head {{ position: relative; width: min(var(--villain-content-width), 100%); margin: 0 auto 14px; padding: 26px 128px 24px; box-sizing: border-box; border: 1px solid rgba(215, 168, 75, .34); border-radius: 8px; background: rgba(18, 8, 8, .78); box-shadow: 0 22px 58px rgba(0,0,0,.42), inset 0 0 0 1px rgba(255,226,160,.08); backdrop-filter: blur(14px); text-align: center; }}
-    .villain-monster-head .player-back-link {{ border-color: rgba(215, 168, 75, .36); background: rgba(215,168,75,.1); color: #f2cf7a; }}
-    .villain-monster-head .player-kicker {{ color: #d7a84b; }}
-    .villain-monster-head h1 {{ margin: 0 0 10px; color: #f6d483; font-size: clamp(31px, 4.8vw, 58px); line-height: 1.05; text-shadow: 0 0 22px rgba(145, 18, 30, .72); overflow-wrap: anywhere; }}
-    .villain-monster-head p:last-of-type {{ max-width: 56em; margin: 0 auto; color: #e6d1a9; line-height: 1.7; }}
-    .villain-monster-head > button {{ margin: 16px auto 0; border: 1px solid rgba(215,168,75,.38); background: linear-gradient(135deg, rgba(127,16,28,.92), rgba(215,168,75,.82)); box-shadow: 0 12px 26px rgba(0,0,0,.3); }}
-    .villain-workbench {{ width: min(var(--villain-content-width), 100%); margin: 0 auto; display: grid; grid-template-columns: minmax(240px, 280px) minmax(0, 1fr); gap: 16px; align-items: start; }}
-    .villain-menu, .villain-editor, .villain-savebar {{ border: 1px solid rgba(215, 168, 75, .24); border-radius: 8px; background: rgba(15, 7, 7, .82); box-shadow: 0 18px 44px rgba(0,0,0,.34), inset 0 0 0 1px rgba(255,226,160,.06); backdrop-filter: blur(12px); }}
-    .villain-menu {{ padding: 14px; align-self: start; }}
-    .villain-menu-head {{ display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }}
-    .villain-menu-head span, .villain-editor-head span {{ color: #d7a84b; font-size: 12px; font-weight: 900; text-transform: uppercase; }}
-    .villain-menu-head button, .villain-savebar button {{ margin-top: 0; border: 1px solid rgba(215,168,75,.28); background: linear-gradient(135deg, #7f101c, #9d1424 52%, #d7a84b); box-shadow: 0 12px 24px rgba(0,0,0,.3); }}
-    .villain-tabs {{ display: grid; gap: 8px; }}
-    .villain-tabs button {{ width: 100%; margin: 0; padding: 10px 11px; border: 1px solid rgba(215,168,75,.18); background: rgba(255,226,160,.07); color: #f7ead2; text-align: left; overflow-wrap: anywhere; }}
-    .villain-tabs button.active {{ border-color: rgba(215,168,75,.68); background: rgba(215,168,75,.16); color: #fff4d6; box-shadow: inset 3px 0 0 #d7a84b; }}
-    .villain-editor {{ min-width: 0; min-height: 420px; padding: 20px; }}
-    .villain-card {{ min-width: 0; padding: 2px; }}
-    .villain-editor-head {{ display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 14px; }}
-    .villain-editor-head h2 {{ margin: 3px 0 0; color: #f6d483; font-size: 24px; overflow-wrap: anywhere; }}
-    .villain-monster-shell .compact-field span, .villain-monster-shell label, .villain-help {{ color: #e6d1a9; }}
-    .villain-monster-shell input[type="text"], .villain-monster-shell textarea, .villain-monster-shell .level-choice-row {{ box-sizing: border-box; border-color: rgba(215,168,75,.24); background: rgba(255,226,160,.08); color: #fff4d6; }}
-    .villain-monster-shell input[type="text"], .villain-monster-shell textarea {{ width: 100%; }}
-    .villain-monster-shell textarea::placeholder, .villain-monster-shell input::placeholder {{ color: rgba(247,234,210,.48); }}
-    .villain-identity-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }}
-    .villain-identity-grid .compact-field {{ min-width: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; }}
-    .villain-level-row {{ min-width: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; align-items: center; margin-top: 12px; }}
-    .villain-level-row > span {{ color: #e6d1a9; font-weight: 800; }}
-    .villain-level-row .level-choice-row {{ width: 100%; min-height: 42px; }}
-    .villain-help {{ margin: 10px 0 0; font-size: 13px; line-height: 1.6; }}
-    .villain-mode-row {{ display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 8px; }}
-    .villain-mode-row button {{ margin: 0; border: 1px solid rgba(215,168,75,.2); background: rgba(255,226,160,.08); color: #f7ead2; }}
-    .villain-mode-row button.active {{ border-color: rgba(215,168,75,.72); background: #7f101c; box-shadow: 0 10px 22px rgba(127,16,28,.28); }}
-    .villain-mode-note {{ padding: 10px 12px; border: 1px solid rgba(215,168,75,.26); border-radius: 8px; background: rgba(215,168,75,.1); color: #f7ead2; font-size: 13px; line-height: 1.6; }}
-    .villain-general-panel, .villain-level-settings {{ margin-top: 12px; }}
-    .villain-general-panel[hidden], .villain-level-settings[hidden] {{ display: none; }}
-    .villain-level-settings {{ display: grid; gap: 10px; }}
-    .villain-level-switcher {{ display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border: 1px solid rgba(215,168,75,.22); border-radius: 8px; background: rgba(255,226,160,.05); }}
-    .villain-level-switcher button {{ min-width: 48px; margin: 0; border: 1px solid rgba(215,168,75,.24); background: rgba(255,226,160,.08); color: #f7ead2; }}
-    .villain-level-switcher button.active {{ border-color: #f6d483; background: #7f101c; color: #fff4d6; box-shadow: 0 8px 18px rgba(127,16,28,.28); }}
-    .villain-level-panel {{ padding: 14px; border: 1px solid rgba(215,168,75,.22); border-radius: 8px; background: rgba(255,226,160,.06); }}
-    .villain-level-panel h3 {{ margin: 0 0 8px; color: #f6d483; font-size: 17px; }}
-    .villain-general-panel textarea, .villain-level-panel textarea {{ resize: vertical; }}
-    .villain-general-panel .villain-brief-editor, .villain-level-panel .villain-brief-editor {{ min-height: 74px; }}
-    .villain-general-panel .villain-content-editor, .villain-level-panel .villain-content-editor {{ min-height: 190px; }}
-    .villain-savebar {{ grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 14px; }}
-    .villain-savebar p, .villain-empty, .villain-empty-editor p {{ margin: 0; color: #e6d1a9; line-height: 1.6; }}
-    .villain-empty-editor {{ min-height: 320px; display: grid; place-content: center; text-align: center; }}
-    .villain-empty-editor h2 {{ margin: 0 0 8px; color: #f6d483; }}
-    .villain-action {{ background: linear-gradient(135deg, #0f0707, #7f101c 55%, #d7a84b); }}
     .player-profile-side {{ gap: 14px; align-content: start; }}
-    .player-detail-shell.faction-villain {{ background: radial-gradient(circle at 14% 16%, rgba(145, 18, 30, .48) 0 8%, transparent 22%), radial-gradient(circle at 84% 18%, rgba(215, 168, 75, .28) 0 9%, transparent 24%), linear-gradient(135deg, #090607 0%, #1a080b 48%, #351018 100%); color: #f7ead2; }}
-    .player-detail-shell.faction-villain::before {{ background-image: linear-gradient(rgba(215,168,75,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(215,168,75,.055) 1px, transparent 1px); background-size: 38px 38px; transform: rotate(-6deg); }}
-    .player-detail-shell.faction-villain::after {{ background: linear-gradient(90deg, rgba(215,168,75,.08), transparent 18%, transparent 82%, rgba(145,18,30,.18)); }}
-    main:has(.player-detail-shell.faction-villain) .topbar button {{ border-color: rgba(215, 168, 75, .34); background: rgba(18, 8, 8, .86); box-shadow: 0 12px 28px rgba(0, 0, 0, .42); }}
-    .player-detail-shell.faction-villain .player-detail-hero, .player-detail-shell.faction-villain .player-profile-card, .player-detail-shell.faction-villain .player-site-section {{ border-color: rgba(215, 168, 75, .3); background: rgba(18, 8, 8, .78); box-shadow: 0 22px 58px rgba(0,0,0,.42), inset 0 0 0 1px rgba(255,226,160,.08); }}
-    .player-detail-shell.faction-villain .player-back-link {{ border-color: rgba(215, 168, 75, .36); background: rgba(215,168,75,.1); color: #f2cf7a; }}
-    .player-detail-shell.faction-villain .player-kicker, .player-detail-shell.faction-villain .profile-card-head span, .player-detail-shell.faction-villain .player-top-item span, .player-detail-shell.faction-villain .player-info-item span, .player-detail-shell.faction-villain .player-state-item span {{ color: #d7a84b; }}
-    .player-detail-shell.faction-villain .player-detail-hero h1, .player-detail-shell.faction-villain .profile-card-head h2 {{ color: #f6d483; text-shadow: 0 0 22px rgba(145, 18, 30, .72); }}
-    .player-detail-shell.faction-villain .player-detail-hero p, .player-detail-shell.faction-villain .log-result, .player-detail-shell.faction-villain .log-action, .player-detail-shell.faction-villain .player-site-empty {{ color: #e6d1a9; }}
-    .player-detail-shell.faction-villain .player-detail-emblem {{ border-color: rgba(215, 168, 75, .46); background: conic-gradient(from 30deg, #7f101c, #d7a84b, #1a080b, #9d1424, #d7a84b); box-shadow: 0 16px 36px rgba(0,0,0,.38), inset 0 0 0 8px rgba(255,226,160,.08); }}
-    .player-detail-shell.faction-villain .player-top-item, .player-detail-shell.faction-villain .player-info-item, .player-detail-shell.faction-villain .player-state-item, .player-detail-shell.faction-villain .log-card, .player-detail-shell.faction-villain .log-card-summary, .player-detail-shell.faction-villain .log-card[open] .log-card-summary, .player-detail-shell.faction-villain .player-site-empty {{ border-color: rgba(215,168,75,.22); background: rgba(255,226,160,.07); box-shadow: none; }}
-    .player-detail-shell.faction-villain .player-top-item strong, .player-detail-shell.faction-villain .player-info-item strong, .player-detail-shell.faction-villain .player-state-item strong, .player-detail-shell.faction-villain .log-card h3 {{ color: #fff; }}
-    .player-detail-shell.faction-villain .player-hero-tags span, .player-detail-shell.faction-villain .tag {{ border-color: rgba(215,168,75,.3); background: rgba(215,168,75,.12); color: #f7ead2; }}
-    .player-detail-shell.faction-villain .player-floating-action, .player-detail-shell.faction-villain .villain-action {{ border-color: rgba(215,168,75,.28); background: linear-gradient(135deg, #7f101c, #9d1424 52%, #d7a84b); box-shadow: 0 12px 24px rgba(0,0,0,.3); }}
     label {{ display: block; margin: 18px 0 8px; font-weight: 700; color: #303846; }}
     input[type="text"] {{ width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #c8d0dc; border-radius: 7px; font: inherit; background: #fbfdff; }}
     input[type="number"] {{ width: 76px; box-sizing: border-box; padding: 7px 9px; border: 1px solid #c8d0dc; border-radius: 7px; font: inherit; background: #fbfdff; }}
@@ -4883,11 +4802,9 @@ class SaveWebViewer:
     @media (max-width: 900px) {{ .detail-grid, .raw-grid {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 960px) {{ .player-detail-layout, .player-profile-triad, .player-split-grid, .player-memory-grid {{ grid-template-columns: 1fr; }} .player-profile-main {{ order: -1; }} .player-side-stack {{ grid-template-rows: auto; }} .player-profile-main .player-info-grid {{ grid-template-columns: 1fr; }} .primary-profile-card {{ grid-row: auto; }} .player-state-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
     @media (max-width: 960px) {{ .relationship-layout {{ grid-template-columns: 1fr; min-height: 0; }} .relationship-card {{ max-height: none; }} }}
-    @media (max-width: 960px) {{ .villain-workbench {{ grid-template-columns: 1fr; }} .villain-menu {{ position: static; }} .villain-tabs {{ grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }} }}
     @media (max-width: 720px) {{ .player-shell {{ padding: 76px 16px 34px; }} .player-hero {{ padding: 6px 74px 0 0; text-align: left; margin-bottom: 22px; }} .player-hero::before {{ width: 60px; height: 60px; font-size: 27px; }} .player-city-section {{ padding: 16px; }} .player-section-head {{ display: block; }} .player-city-card {{ grid-template-columns: 52px 1fr; padding: 15px; }} .city-card-orb {{ width: 46px; height: 46px; }} }}
     @media (max-width: 720px) {{ .player-detail-shell {{ --player-detail-width: 100%; padding: 62px 10px 24px; overflow: auto; }} .player-detail-shell .topbar {{ top: 10px; right: 10px; }} .player-detail-shell .topbar button {{ min-height: 30px; padding: 5px 8px; font-size: 12px; }} .player-detail-hero {{ margin-bottom: 12px; padding: 42px 54px 14px 12px; text-align: left; }} .player-detail-hero h1 {{ margin-bottom: 8px; font-size: clamp(24px, 9vw, 34px); }} .player-detail-hero p {{ font-size: 13px; line-height: 1.55; }} .player-detail-emblem {{ top: 12px; right: 12px; width: 42px; height: 42px; font-size: 21px; box-shadow: 0 10px 22px rgba(188, 80, 166, .2), inset 0 0 0 5px rgba(255,255,255,.48); }} .player-back-link {{ left: 10px; top: 10px; min-height: 28px; padding: 0 9px; font-size: 12px; }} .player-kicker, .player-section-head span, .city-card-label, .profile-card-head span {{ margin-bottom: 4px; font-size: 10px; }} .player-hero-tags {{ justify-content: flex-start; gap: 6px; margin-top: 10px; }} .player-hero-tags span {{ min-height: 22px; padding: 2px 7px; font-size: 11px; }} .player-detail-hero .player-top-grid {{ grid-template-columns: 1fr; gap: 7px; margin-top: 12px; }} .player-detail-hero .player-top-item, .player-top-item {{ min-height: 46px; padding: 8px 10px; }} .player-top-item span {{ font-size: 10px; }} .player-top-item strong {{ margin-top: 3px; font-size: 16px; }} .player-detail-flow, .player-profile-triad, .player-side-stack, .player-info-grid, .player-state-grid, .log-list {{ gap: 8px; }} .player-info-grid, .player-state-grid {{ grid-template-columns: 1fr; }} .player-profile-card, .player-site-section {{ padding: 10px; }} .player-profile-triad .player-profile-card {{ padding: 10px; }} .profile-card-head {{ margin-bottom: 8px; }} .profile-card-head h2, .player-profile-triad .profile-card-head h2 {{ font-size: 17px; }} .player-info-item, .player-state-item, .player-profile-triad .player-info-item {{ min-height: 40px; padding: 7px 8px; }} .player-info-item span, .player-state-item span, .player-profile-triad .player-info-item span {{ font-size: 10px; }} .player-info-item strong, .player-state-item strong, .player-profile-triad .player-info-item strong {{ margin-top: 2px; font-size: 12px; line-height: 1.35; }} .player-site-empty {{ padding: 12px; font-size: 12px; }} .player-memory-row .log-card-summary, .log-card-summary {{ padding: 9px 10px; }} .player-memory-row .log-card-body, .log-card-body {{ padding: 0 10px 10px; }} .log-card h3 {{ font-size: 14px; }} .log-meta, .log-result, .log-action {{ font-size: 12px; line-height: 1.55; }} .progress-list {{ gap: 10px; }} .progress-name {{ font-size: 14px; }} .progress-head {{ gap: 8px; margin-bottom: 5px; }} .progress-name::before {{ width: 12px; height: 12px; border-width: 2px; }} .progress-xp {{ font-size: 12px; }} .player-floating-actions {{ right: 10px; top: 50%; bottom: auto; transform: translateY(-50%); }} .player-floating-action {{ min-width: 48px; min-height: 34px; padding: 0 8px; font-size: 11px; border-radius: 7px; }} }}
     @media (max-width: 720px) {{ .relationship-shell {{ padding: 76px 14px 28px; overflow: auto; }} .relationship-head {{ padding: 58px 18px 20px; }} .relationship-head .player-kicker {{ display: none; }} .relationship-graph-panel {{ min-height: 430px; }} .relationship-graph {{ min-height: 430px; }} .relationship-card {{ padding: 16px; }} }}
-    @media (max-width: 720px) {{ .villain-monster-shell {{ padding: 76px 10px 24px; }} .villain-monster-head {{ padding: 58px 14px 18px; text-align: left; }} .villain-monster-head h1 {{ font-size: clamp(27px, 9vw, 38px); }} .villain-identity-grid {{ grid-template-columns: 1fr; }} .villain-level-row {{ grid-template-columns: 1fr; gap: 6px; }} .villain-savebar {{ display: grid; }} }}
     @media (max-width: 560px) {{ .state-overview-grid {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .progress-list {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .profile-edit-grid {{ grid-template-columns: 1fr; }} }}
@@ -5008,7 +4925,3 @@ class SaveWebViewer:
         if category == "text_completion":
             return "文本补全"
         return "世界背景"
-
-
-
-
