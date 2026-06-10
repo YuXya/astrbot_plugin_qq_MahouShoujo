@@ -362,6 +362,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 selected_monster=parsed.get("selected_enemies") or parsed.get("selected_monster"),
                 scene_event=parsed.get("scene_event"),
                 ai_win_rate=parsed.get("ai_win_rate"),
+                desire_win_rate=parsed.get("desire_win_rate"),
                 teammate_candidates=teammate_candidates,
                 selected_teammates=parsed.get("selected_teammates"),
             )
@@ -380,6 +381,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 selected_monster=parsed.get("selected_enemies") or parsed.get("selected_monster"),
                 scene_event=parsed.get("scene_event"),
                 ai_win_rate=parsed.get("ai_win_rate"),
+                desire_win_rate=parsed.get("desire_win_rate"),
                 teammate_candidates=teammate_candidates,
                 selected_teammates=parsed.get("selected_teammates"),
             )
@@ -407,6 +409,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 enemy_data=targets,
                 battle_kind="magical_girl_vs_villain_witch",
                 ai_win_rate=parsed.get("ai_win_rate"),
+                desire_win_rate=parsed.get("desire_win_rate"),
             ),
         }
 
@@ -525,6 +528,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 selected_monster=parsed.get("selected_enemies") or parsed.get("selected_monster"),
                 scene_event=parsed.get("scene_event"),
                 ai_win_rate=parsed.get("ai_win_rate"),
+                desire_win_rate=parsed.get("desire_win_rate"),
                 teammate_candidates=teammate_candidates,
                 selected_teammates=parsed.get("selected_teammates"),
             )
@@ -543,6 +547,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 selected_monster=parsed.get("selected_enemies") or parsed.get("selected_monster"),
                 scene_event=parsed.get("scene_event"),
                 ai_win_rate=parsed.get("ai_win_rate"),
+                desire_win_rate=parsed.get("desire_win_rate"),
                 teammate_candidates=teammate_candidates,
                 selected_teammates=parsed.get("selected_teammates"),
             )
@@ -570,6 +575,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 enemy_data=targets,
                 battle_kind="villain_witch_vs_magical_girl",
                 ai_win_rate=parsed.get("ai_win_rate"),
+                desire_win_rate=parsed.get("desire_win_rate"),
             ),
         }
 
@@ -823,6 +829,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         selected_monster: object = None,
         scene_event: object = None,
         ai_win_rate: object = None,
+        desire_win_rate: object = None,
         teammate_candidates: list[dict] | None = None,
         selected_teammates: object = None,
     ) -> dict[str, object]:
@@ -872,6 +879,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 enemy_data=resolved_monsters,
                 battle_kind="magical_girl_vs_monster",
                 ai_win_rate=ai_win_rate,
+                desire_win_rate=desire_win_rate,
             ),
         }
 
@@ -886,6 +894,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         selected_monster: object = None,
         scene_event: object = None,
         ai_win_rate: object = None,
+        desire_win_rate: object = None,
         teammate_candidates: list[dict] | None = None,
         selected_teammates: object = None,
     ) -> dict[str, object]:
@@ -935,6 +944,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 enemy_data=resolved_monsters,
                 battle_kind="villain_witch_vs_monster",
                 ai_win_rate=ai_win_rate,
+                desire_win_rate=desire_win_rate,
             ),
         }
 
@@ -945,6 +955,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         battle_kind: str,
         opponent_data: dict | None = None,
         ai_win_rate: object = None,
+        desire_win_rate: object = None,
         force_lose: bool = False,
         force_reason: str = "",
         teammate_data: list[dict] | None = None,
@@ -962,35 +973,17 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             opponent_level = self._team_level(enemies)
         else:
             opponent_level = self._profile_level(opponent_data) if opponent_data else player_level
-        d20 = random.randint(1, 20)
         ai_rate = self._clamp_percent(ai_win_rate, default=50)
+        desire_rate = self._clamp_percent(desire_win_rate, default=50)
+        level_advantage = player_level - opponent_level
+        level_modifier = level_advantage * 12
 
         if force_lose:
             final_rate = 0
-            code_rate = 0
-            dice_result = "forced_failure"
             outcome = "player_lose"
-        elif d20 == 1:
-            final_rate = 0
-            code_rate = 0
-            dice_result = "critical_failure"
-            outcome = "player_lose"
-        elif d20 == 20:
-            final_rate = 100
-            code_rate = 100
-            dice_result = "critical_success"
-            outcome = "player_win"
         else:
-            if d20 < 10:
-                code_rate = 10 + (d20 - 2) * 5
-                dice_result = "failure"
-            else:
-                code_rate = 55 + round((d20 - 10) * (40 / 9))
-                dice_result = "success"
-            level_advantage = player_level - opponent_level
-            level_modifier = level_advantage * 12
             final_rate = self._clamp_percent(
-                round(code_rate * 0.5 + ai_rate * 0.5 + level_modifier)
+                round(desire_rate * 0.5 + ai_rate * 0.5 + level_modifier)
             )
             outcome = "player_win" if final_rate >= 50 else "player_lose"
 
@@ -1007,11 +1000,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         return {
             "player_win_rate": final_rate,
             "outcome": outcome,
-            "d20": d20,
-            "dice_result": dice_result,
-            "code_win_rate": code_rate,
             "ai_win_rate": ai_rate,
-            "level_modifier": level_modifier if not force_lose and d20 not in {1, 20} else 0,
+            "desire_win_rate": desire_rate,
+            "level_modifier": level_modifier if not force_lose else 0,
             "player_level": level_label(player_level),
             "opponent_level": level_label(opponent_level),
             "battle_kind": battle_kind,
