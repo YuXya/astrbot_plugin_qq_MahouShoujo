@@ -27,7 +27,6 @@ class WorldBookEngine:
     def build_prompt_text(
         self,
         text_parts: list[str] | None,
-        player_level: int = 1,
     ) -> WorldBookMatchResult:
         entries = self._load_entries()
         if not entries:
@@ -41,7 +40,6 @@ class WorldBookEngine:
             scan_text,
             activated_ids=activated_ids,
             include_always=True,
-            player_level=player_level,
         )
         recursion_text = self._join_text(
             entry.content for entry in first_round if entry.recursive
@@ -51,12 +49,11 @@ class WorldBookEngine:
             recursion_text,
             activated_ids=activated_ids,
             include_always=False,
-            player_level=player_level,
         )
 
         activated = sorted(
             first_round + second_round,
-            key=lambda item: (min(item.visible_levels), item.id),
+            key=lambda item: item.id,
         )
         return WorldBookMatchResult(
             entries=activated,
@@ -98,7 +95,6 @@ class WorldBookEngine:
         scan_text: str,
         activated_ids: set[str],
         include_always: bool,
-        player_level: int = 1,
     ) -> list[WorldBookEntry]:
         if not scan_text and not include_always:
             return []
@@ -106,9 +102,6 @@ class WorldBookEngine:
         matched: list[WorldBookEntry] = []
         for entry in entries:
             if entry.id in activated_ids or not entry.enabled:
-                continue
-
-            if player_level not in entry.visible_levels:
                 continue
 
             if entry.strategy == "always":

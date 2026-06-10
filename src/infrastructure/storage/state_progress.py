@@ -3,11 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ...shared.levels import level_label
-
-
-PROGRESS_KEYS = {"经验", "熟练度", "proficiency"}
-LEVEL_KEYS = ("等级", "level", "Lv", "lv")
+PROGRESS_KEYS = {"进度"}
 HIDDEN_STATE_KEYS = {
     "schema_version", "group_id", "user_id", "updated_at",
     "nickname", "avatar_url", "created_at",
@@ -17,10 +13,8 @@ HIDDEN_STATE_KEYS = {
 @dataclass(frozen=True)
 class ProgressItem:
     label: str
-    level: int
     value: int
     percent: int
-    is_max: bool = False
 
 
 @dataclass(frozen=True)
@@ -69,27 +63,10 @@ def build_progress_sections(
                 _with_label(
                     collected.item,
                     status_label,
-                    is_max=collected.item.level >= 5,
                 )
             )
 
     return ProgressSections(skill_items[:limit], status_items[:limit])
-
-
-def level_display(state: dict[str, Any]) -> str:
-    """从 player_data 或主角树中提取等级显示。"""
-    protagonist = state.get("主角", state)
-    level_node = protagonist.get("等级", {}) if isinstance(protagonist, dict) else {}
-    level = level_node.get("等级", state.get("level", 1)) if isinstance(level_node, dict) else state.get("level", 1)
-    return level_label(level)
-
-
-def level_exp_percent(state: dict[str, Any]) -> int:
-    """从 player_data 或主角树中提取等级经验百分比。"""
-    protagonist = state.get("主角", state)
-    level_node = protagonist.get("等级", {}) if isinstance(protagonist, dict) else {}
-    exp = level_node.get("经验", state.get("level_exp", 0)) if isinstance(level_node, dict) else state.get("level_exp", 0)
-    return _clamp_progress(exp)
 
 
 def build_state_display_items(state: dict[str, Any], limit: int = 24) -> list[tuple[str, str]]:
@@ -113,8 +90,6 @@ def build_state_display_items(state: dict[str, Any], limit: int = 24) -> list[tu
 
 def state_label(label: str) -> str:
     labels = {
-        "level": "等级",
-        "level_exp": "等级经验",
         "hp": "HP",
         "mp": "MP",
         "inventory": "物品",
@@ -137,15 +112,12 @@ def _collect_progress_items(
         key_text = str(key)
         if key_text in HIDDEN_STATE_KEYS:
             continue
-        if key_text == "level_exp":
-            continue
         child_path = [*path, key_text]
         if key_text in PROGRESS_KEYS:
             items.append(
                 _CollectedProgress(
                     item=ProgressItem(
                         label=_progress_label(path),
-                        level=_progress_level(value),
                         value=_clamp_progress(child),
                         percent=_clamp_progress(child),
                     ),
@@ -171,7 +143,7 @@ def _append_state_item(
             return
         for child_key, child_value in value.items():
             child_label = f"{label}/{child_key}"
-            if _is_progress_leaf(child_label) or str(child_key) in LEVEL_KEYS:
+            if _is_progress_leaf(child_label):
                 continue
             _append_state_item(items, child_label, child_value)
         return
@@ -220,33 +192,22 @@ def _without_protagonist_prefix(parts: tuple[str, ...]) -> tuple[str, ...]:
     return parts[1:] if parts and parts[0] == "主角" else parts
 
 
-def _with_label(item: ProgressItem, label: str, *, is_max: bool = False) -> ProgressItem:
+def _with_label(item: ProgressItem, label: str) -> ProgressItem:
     return ProgressItem(
         label=label,
-        level=item.level,
         value=item.value,
         percent=item.percent,
-        is_max=is_max,
     )
-
-
-def _progress_level(parent: dict[str, Any]) -> int:
-    for key in LEVEL_KEYS:
-        if key in parent:
-            return max(1, _int_value(parent.get(key), 1))
-    return 1
 
 
 def _is_progress_leaf(label: str) -> bool:
     return (
-        label == "level_exp"
-        or label.endswith("/level_exp")
-        or any(label.endswith(f"/{key}") for key in PROGRESS_KEYS)
+        any(label.endswith(f"/{key}") for key in PROGRESS_KEYS)
     )
 
 
 def _clamp_progress(value: object) -> int:
-    return max(0, min(_int_value(value, 0), 99))
+    return max(0, min(_int_value(value, 0), 100))
 
 
 def _int_value(value: object, default: int) -> int:

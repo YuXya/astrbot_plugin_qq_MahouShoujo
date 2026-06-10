@@ -16,7 +16,6 @@ from ...utils.logger import logger
 from ..editable_resources import EditableResourceManager
 from ..storage.state_progress import (
     build_progress_sections,
-    level_display,
 )
 from .templates import HTMLTemplates
 
@@ -83,13 +82,10 @@ class ReportGenerator(ICardGenerator):
             ),
             limit=8,
         )
-        skill_progress_items = [
-            item for item in progress_sections.skill_items
-            if item.label != "等级"
-        ]
+        skill_progress_items = progress_sections.skill_items
         skill_progress_title = self.editable_manager.read_book_display_name(
             "skill_book/default.json",
-            "技能&熟练度",
+            "技能进度",
         )
         status_progress_title = self.editable_manager.read_book_display_name(
             "fetish_book/default.json",
@@ -111,7 +107,6 @@ class ReportGenerator(ICardGenerator):
             skill_progress_items=skill_progress_items,
             status_progress_title=status_progress_title,
             status_progress_items=progress_sections.status_items,
-            level_label=f"{level_display(card.state_snapshot)}级",
             diary_html=self._highlight_diary_quotes(card.diary),
             avatar_url=card.avatar_url,
         )

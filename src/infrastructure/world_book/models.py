@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ...shared.levels import ALL_VISIBLE_LEVELS, normalize_visible_levels
-
-
 @dataclass(frozen=True)
 class WorldBookEntry:
     id: str
@@ -12,10 +9,9 @@ class WorldBookEntry:
     enabled: bool = True
     strategy: str = "keyword"
     keys: list[str] = field(default_factory=list)
-    visible_levels: tuple[int, ...] = ALL_VISIBLE_LEVELS
     recursive: bool = True
     content: str = ""
-    level_descriptions: dict[str, str] = field(default_factory=dict)
+    percentage_descriptions: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, raw: dict, fallback_id: str) -> "WorldBookEntry":
@@ -31,18 +27,13 @@ class WorldBookEntry:
             enabled=bool(raw.get("enabled", True)),
             strategy=str(raw.get("strategy") or "keyword").strip().lower(),
             keys=[str(key).strip() for key in keys if str(key).strip()],
-            visible_levels=normalize_visible_levels(
-                raw.get("visible_levels"),
-                min_level=raw.get("min_level", 1),
-                max_level=raw.get("max_level", 7),
-            ),
             recursive=raw.get("recursive", True) is not False,
             content=str(raw.get("content") or "").strip(),
-            level_descriptions={
-                str(level): str((raw.get("level_descriptions") or {}).get(str(level)) or "").strip()
-                for level in range(1, 6)
+            percentage_descriptions={
+                key: str((raw.get("percentage_descriptions") or {}).get(key) or "").strip()
+                for key in ("0-20", "21-40", "41-60", "61-80", "81-100")
             }
-            if isinstance(raw.get("level_descriptions"), dict)
+            if isinstance(raw.get("percentage_descriptions"), dict)
             else {},
         )
 

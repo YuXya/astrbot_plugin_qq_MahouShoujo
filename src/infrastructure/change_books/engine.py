@@ -21,7 +21,6 @@ class ChangeBookEngine:
     def build_skill_prompt_text(
         self,
         scan_parts: list[str] | None,
-        player_level: int = 1,
     ) -> str:
         book = self._load_book(self.editable_manager.skill_book_path, "技能书")
         entries = self._entries_from_book(book)
@@ -31,7 +30,7 @@ class ChangeBookEngine:
         # 第一轮：扫描原始文本
         first_round = self._match_entries(
             entries, scan_text, activated_ids=activated_ids,
-            include_always=True, player_level=player_level,
+            include_always=True,
         )
         # 第二轮：用第一轮命中条目的内容做递归扫描
         recursion_text = self._join_text(
@@ -39,12 +38,12 @@ class ChangeBookEngine:
         )
         second_round = self._match_entries(
             entries, recursion_text, activated_ids=activated_ids,
-            include_always=False, player_level=player_level,
+            include_always=False,
         ) if recursion_text else []
 
         matched = sorted(
             first_round + second_round,
-            key=lambda item: (min(item.visible_levels), item.id),
+            key=lambda item: item.id,
         )
         if not matched:
             return ""
@@ -67,14 +66,13 @@ class ChangeBookEngine:
     def build_fetish_prompt_text(
         self,
         state: dict[str, Any],
-        player_level: int = 1,
     ) -> str:
         book = self._load_book(self.editable_manager.fetish_book_path, "性癖书")
         entries = self._entries_from_book(book)
         enabled_entries = [
             entry
             for entry in entries
-            if entry.enabled and player_level in entry.visible_levels
+            if entry.enabled
         ]
         if not enabled_entries:
             return ""
@@ -101,10 +99,10 @@ class ChangeBookEngine:
             owned_entries = "\n".join(
                 self._format_owned_status_entry(
                     entry,
-                    self._owned_status_level(state, entry.title or entry.id),
+                    self._owned_status_progress(state, entry.title or entry.id),
                 )
                 for entry in matched
-                if entry.content or entry.level_descriptions
+                if entry.content or entry.percentage_descriptions
             )
         else:
             owned_entries = ""
@@ -130,15 +128,18 @@ class ChangeBookEngine:
         return "\n".join(parts)
 
     @staticmethod
-    def _format_owned_status_entry(entry: WorldBookEntry, level: int) -> str:
+    def _format_owned_status_entry(entry: WorldBookEntry, progress: int) -> str:
         title = entry.title or entry.id
         lines = [f"- 性癖：{title}"]
         if entry.content:
             lines.append(f"  简介：{entry.content}")
-        lines.append(f"  当前等级：{'Lv.Max' if level >= 5 else f'Lv.{level}'}")
-        effect = entry.level_descriptions.get(str(min(max(level, 1), 5)), "")
+        lines.append(f"  当前进度：{progress}%")
+        effect = entry.percentage_descriptions.get(
+            ChangeBookEngine._percentage_range(progress),
+            "",
+        )
         if effect:
-            lines.append(f"  当前等级效果：{effect}")
+            lines.append(f"  当前进度效果：{effect}")
         return "\n".join(lines)
 
     @staticmethod
@@ -149,25 +150,35 @@ class ChangeBookEngine:
         return f"- {title}"
 
     @staticmethod
-    def _owned_status_level(state: dict[str, Any], name: str) -> int:
+    def _owned_status_progress(state: dict[str, Any], name: str) -> int:
         def visit(value: object) -> int | None:
             if not isinstance(value, dict):
                 return None
             for key, child in value.items():
                 if str(key) == name and isinstance(child, dict):
-                    for level_key in ("等级", "level", "Lv", "lv"):
-                        if level_key in child:
-                            try:
-                                return max(1, min(int(float(child.get(level_key) or 1)), 5))
-                            except Exception:
-                                return 1
-                    return 1
+                    try:
+                        return max(0, min(int(float(child.get("进度") or 0)), 100))
+                    except Exception:
+                        return 0
                 found = visit(child)
                 if found is not None:
                     return found
             return None
 
-        return visit(state if isinstance(state, dict) else {}) or 1
+        return visit(state if isinstance(state, dict) else {}) or 0
+
+    @staticmethod
+    def _percentage_range(progress: int) -> str:
+        value = max(0, min(int(progress), 100))
+        if value <= 20:
+            return "0-20"
+        if value <= 40:
+            return "21-40"
+        if value <= 60:
+            return "41-60"
+        if value <= 80:
+            return "61-80"
+        return "81-100"
 
     def _load_book(self, path: Path, label: str) -> dict[str, Any]:
         if not path.exists():
@@ -204,7 +215,6 @@ class ChangeBookEngine:
         entries: list[WorldBookEntry],
         scan_text: str,
         include_always: bool = True,
-        player_level: int = 1,
         activated_ids: set[str] | None = None,
     ) -> list[WorldBookEntry]:
         matched: list[WorldBookEntry] = []
@@ -215,8 +225,6 @@ class ChangeBookEngine:
 
         for entry in entries:
             if entry.id in activated_ids or not entry.enabled:
-                continue
-            if player_level not in entry.visible_levels:
                 continue
             if entry.strategy == "always":
                 if include_always:
@@ -229,7 +237,7 @@ class ChangeBookEngine:
                 matched.append(entry)
                 activated_ids.add(entry.id)
 
-        return sorted(matched, key=lambda item: (min(item.visible_levels), item.id))
+        return sorted(matched, key=lambda item: item.id)
 
     @staticmethod
     def _contains_any_key(text: str, keys: list[str]) -> bool:

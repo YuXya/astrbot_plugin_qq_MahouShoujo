@@ -106,8 +106,6 @@ class BattleDiaryCard:
     diary: str
     encounter: str
     result: str
-    level_change: str
-    level_exp_after: int = 0
     participants: list[str] = field(default_factory=list)
     monster_name: str = ""
     reason: list[str] = field(default_factory=list)
@@ -122,7 +120,6 @@ class BattleDiaryCard:
             f"战斗者：{self.target_name}",
             f"时间：{self.date_label}",
             f"行动：{self.action}",
-            f"等级：{self.level_change}",
             f"日记：{self.diary}",
             f"遭遇：{self.encounter}",
             f"结算：{self.result}",

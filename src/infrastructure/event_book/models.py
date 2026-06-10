@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ...shared.levels import ALL_VISIBLE_LEVELS, normalize_visible_levels
-
-
 @dataclass(frozen=True)
 class EventBookEntry:
     id: str
@@ -14,7 +11,6 @@ class EventBookEntry:
     enabled: bool = True
     strategy: str = "keyword"
     keys: list[str] = field(default_factory=list)
-    visible_levels: tuple[int, ...] = ALL_VISIBLE_LEVELS
     recursive: bool = True
     content: str = ""
     allowed_commands: list[str] = field(default_factory=list)
@@ -49,11 +45,6 @@ class EventBookEntry:
             enabled=bool(raw.get("enabled", True)),
             strategy=str(raw.get("strategy") or "keyword").strip().lower(),
             keys=[str(key).strip() for key in keys if str(key).strip()],
-            visible_levels=normalize_visible_levels(
-                raw.get("visible_levels"),
-                min_level=raw.get("min_level", 1),
-                max_level=raw.get("max_level", 7),
-            ),
             recursive=raw.get("recursive", True) is not False,
             content=str(raw.get("content") or "").strip(),
             allowed_commands=cls._normalize_text_list(raw.get("allowed_commands")),
@@ -95,7 +86,6 @@ class EventBookEvent:
     enabled: bool = True
     strategy: str = "keyword"
     keys: list[str] = field(default_factory=list)
-    visible_levels: tuple[int, ...] = ALL_VISIBLE_LEVELS
     recursive: bool = True
     content: str = ""
     allowed_commands: list[str] = field(default_factory=list)
@@ -152,11 +142,6 @@ class EventBookEvent:
             enabled=bool(raw.get("enabled", True)),
             strategy=str(raw.get("strategy") or "keyword").strip().lower(),
             keys=EventBookEntry._normalize_text_list(raw.get("keys")),
-            visible_levels=normalize_visible_levels(
-                raw.get("visible_levels"),
-                min_level=raw.get("min_level", 1),
-                max_level=raw.get("max_level", 7),
-            ),
             recursive=raw.get("recursive", True) is not False,
             content=str(raw.get("content") or "").strip(),
             allowed_commands=EventBookEntry._normalize_text_list(
@@ -199,7 +184,6 @@ class EventBookEvent:
             enabled=self.enabled,
             strategy=self.strategy,
             keys=self.keys,
-            visible_levels=self.visible_levels,
             recursive=self.recursive,
             content=self.content,
             allowed_commands=self.allowed_commands or ([self.command] if self.command else []),

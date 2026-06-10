@@ -11,7 +11,6 @@ from typing import Any
 from astrbot.api.star import StarTools
 
 from ...domain.models.data_models import BattleDiaryCard, ReincarnationCard
-from ...shared.levels import level_label, normalize_visible_levels
 from ...utils.logger import logger
 from .state_progress import PROGRESS_KEYS
 
@@ -250,9 +249,6 @@ class PlayerSaveRepository:
         protagonist_tree = card.build_protagonist_tree()
         protagonist_tree.setdefault("主角", {}).setdefault("阵营", {})["身份"] = "魔法少女"
 
-        # 确保等级节点存在
-        if "等级" not in protagonist_tree.get("主角", {}):
-            protagonist_tree.setdefault("主角", {})["等级"] = {"等级": 1, "经验": 0}
         self._ensure_battle_count(protagonist_tree)
 
         player_data: dict[str, Any] = {
@@ -330,10 +326,7 @@ class PlayerSaveRepository:
         group_id: str,
         user_id: str,
         card: BattleDiaryCard,
-        new_level: int,
-        new_level_exp: int = 0,
         world_day_offset: int | None = None,
-        mention_scan_texts: str | list[str] | None = None,
     ) -> None:
         user_dir = self.get_user_dir(group_id, user_id)
         user_dir.mkdir(parents=True, exist_ok=True)
@@ -351,12 +344,7 @@ class PlayerSaveRepository:
             self.advance_world_clock(group_id, expected_day_offset=world_day_offset)
             return
 
-        # 更新等级
         protagonist = player_data.setdefault("主角", {})
-        level_node = protagonist.setdefault("等级", {"等级": 1, "经验": 0})
-        level_node["等级"] = max(1, min(int(new_level), 7))
-        level_node["经验"] = max(0, min(int(new_level_exp), 99))
-        protagonist["等级"] = level_node
         self._ensure_battle_count(player_data)
 
         player_data["updated_at"] = _now_date_str()
@@ -377,22 +365,6 @@ class PlayerSaveRepository:
         # 应用队友状态变化
         if teammate_state_changes:
             self._apply_teammate_state_changes(group_id, teammate_state_changes)
-
-        # 应用队友等级经验（纯代码，AI 无需输出）
-        level_exp_delta = self._extract_level_exp_delta(card.update_changes)
-        if level_exp_delta > 0:
-            mentioned_names = self._find_mentioned_teammate_names(
-                group_id,
-                card,
-                mention_scan_texts=mention_scan_texts,
-            )
-            if mentioned_names:
-                self._apply_teammate_level_exp(
-                    group_id,
-                    max(1, min(int(new_level), 7)),
-                    level_exp_delta,
-                    mentioned_names,
-                )
 
         self._increment_participant_teammate_battle_counts(
             group_id,
@@ -435,8 +407,6 @@ class PlayerSaveRepository:
                 "monster_name": card.monster_name,
                 "diary": card.diary,
                 "encounter": card.encounter,
-                "level_change": card.level_change,
-                "level_exp": card.level_exp_after,
                 "result": card.result,
                 "reason": card.reason,
                 "update_changes": card.update_changes,
@@ -768,8 +738,6 @@ class PlayerSaveRepository:
                 target_name = self._get_nested(
                     protagonist, ["个人信息", "姓名"], player_data.get("nickname", "")
                 )
-                level_node = protagonist.get("等级", {})
-                level = level_node.get("等级", 1) if isinstance(level_node, dict) else 1
                 faction = self._get_nested(protagonist, ["阵营", "身份"], "魔法少女")
                 saves.append(
                     {
@@ -778,7 +746,6 @@ class PlayerSaveRepository:
                         "nickname": player_data.get("nickname", ""),
                         "target_name": target_name,
                         "faction": faction,
-                        "level": level,
                         "updated_at": player_data.get("updated_at", ""),
                     }
                 )
@@ -816,7 +783,6 @@ class PlayerSaveRepository:
                     "target_name": str(profile.get("target_name") or user_id),
                     "magical_name": str(profile.get("magical_name") or ""),
                     "faction": str(profile.get("阵营") or "魔法少女"),
-                    "level": profile.get("等级", 1),
                 }
             )
 
@@ -1029,25 +995,19 @@ class PlayerSaveRepository:
 
     def build_public_monster_candidates(
         self,
-        *,
-        player_level: int,
     ) -> list[dict[str, Any]]:
         if self.editable_manager is None:
             return []
         return self._read_monster_candidates_from_path(
             self.editable_manager.monster_book_path,
-            player_level=player_level,
             source="public",
-            include_overleveled=True,
         )
 
     def _read_monster_candidates_from_path(
         self,
         path: Path,
         *,
-        player_level: int,
         source: str,
-        include_overleveled: bool = False,
     ) -> list[dict[str, Any]]:
         raw = self._read_json(path)
         entries = raw.get("entries", []) if isinstance(raw, dict) else []
@@ -1065,9 +1025,7 @@ class PlayerSaveRepository:
             normalized = self._monster_entry_for_selection(
                 entry,
                 fallback_id=str(fallback_id),
-                player_level=player_level,
                 source=source,
-                include_overleveled=include_overleveled,
             )
             if normalized:
                 candidates.append(normalized)
@@ -1078,39 +1036,8 @@ class PlayerSaveRepository:
         entry: dict[str, Any],
         *,
         fallback_id: str,
-        player_level: int,
         source: str,
-        include_overleveled: bool = False,
     ) -> dict[str, Any] | None:
-        visible_levels = normalize_visible_levels(
-            entry.get("visible_levels"),
-            min_level=entry.get("min_level", 1),
-            max_level=entry.get("max_level", 7),
-        )
-        if player_level not in visible_levels:
-            return None
-
-        monster_levels = normalize_visible_levels(
-            entry.get("monster_levels"),
-            min_level=entry.get("min_monster_level", 1),
-            max_level=entry.get("max_monster_level", 7),
-        )
-        default_levels = list(monster_levels)
-        selectable_levels = list(monster_levels) if include_overleveled else default_levels
-        if not selectable_levels:
-            return None
-
-        raw_settings = entry.get("level_settings")
-        level_settings = raw_settings if isinstance(raw_settings, dict) else {}
-        usable_level_settings: dict[str, dict[str, str]] = {}
-        for level in selectable_levels:
-            raw_setting = level_settings.get(str(level), {})
-            if not isinstance(raw_setting, dict):
-                raw_setting = {}
-            usable_level_settings[level_label(level)] = {
-                "content": str(raw_setting.get("content") or "").strip(),
-            }
-
         name = str(entry.get("name") or entry.get("title") or "").strip()
         content = str(entry.get("content") or entry.get("detail") or "").strip()
         if not name and not content:
@@ -1126,12 +1053,8 @@ class PlayerSaveRepository:
             "id": str(entry.get("id") or fallback_id).strip(),
             "name": name,
             "source": source,
-            "visible_levels": [level_label(level) for level in visible_levels],
-            "monster_levels": [level_label(level) for level in selectable_levels],
-            "default_levels": [level_label(level) for level in default_levels],
             "keys": [str(key).strip() for key in keys if str(key).strip()],
             "content": content,
-            "level_settings": usable_level_settings,
             "monster_tags": PlayerSaveRepository._normalize_text_list(entry.get("monster_tags")),
             "opening_hooks": PlayerSaveRepository._normalize_text_list(entry.get("opening_hooks")),
             "preferred_locations": PlayerSaveRepository._normalize_text_list(entry.get("preferred_locations")),
@@ -1393,7 +1316,6 @@ class PlayerSaveRepository:
             "created_at": _now_date_str(),
             "updated_at": _now_date_str(),
             "主角": {
-                "等级": {"等级": 1, "经验": 0},
                 "战斗": {"战斗次数": 0},
             },
         }
@@ -1513,8 +1435,6 @@ class PlayerSaveRepository:
         magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], "")
         faction = self._get_nested(protagonist, ["阵营", "身份"], "魔法少女")
         role_name = magical_name or target_name
-        level_node = protagonist.get("等级", {})
-        level = level_node.get("等级", 1) if isinstance(level_node, dict) else 1
         battle_count = self._ensure_battle_count(player_data)
 
         log_path = user_dir / "daily_memory.jsonl"
@@ -1540,7 +1460,6 @@ class PlayerSaveRepository:
             "相貌特征": self._public_nested_value(protagonist.get("相貌特征")),
             "身材细节": self._public_nested_value(protagonist.get("身材细节")),
             "性器官特征": self._public_nested_value(protagonist.get("性器官特征")),
-            "等级": level,
             "战斗次数": battle_count,
             "最近记录": self._read_recent_battle_summaries(
                 log_path,
@@ -1775,8 +1694,6 @@ class PlayerSaveRepository:
         target_name = self._get_nested(protagonist, ["个人信息", "姓名"], user_dir.name)
         magical_name = self._get_nested(protagonist, ["个人信息", "魔法少女名"], target_name)
         faction = self._get_nested(protagonist, ["阵营", "身份"], "魔法少女")
-        level_node = protagonist.get("等级", {})
-        level = level_node.get("等级", 1) if isinstance(level_node, dict) else 1
         return {
             "resolved": True,
             "user_id": user_dir.name,
@@ -1790,7 +1707,6 @@ class PlayerSaveRepository:
             "核心能力": self._get_nested(protagonist, ["个人信息", "核心能力"], ""),
             "相貌特征": self._public_nested_value(protagonist.get("相貌特征")),
             "身材细节": self._public_nested_value(protagonist.get("身材细节")),
-            "等级": level,
         }
 
     def _existing_relationship_summaries(
@@ -1838,7 +1754,6 @@ class PlayerSaveRepository:
                     "target_name": profile.get("target_name", ""),
                     "magical_name": profile.get("magical_name", ""),
                     "faction": profile.get("阵营", "魔法少女"),
-                    "level": profile.get("等级", 1),
                     "public_reputation": public_reputation,
                 }
             )
@@ -2007,8 +1922,6 @@ class PlayerSaveRepository:
                 teammate_change["path"] = "/" + "/".join(raw_parts[1:])
                 teammate_state_changes.setdefault(first_part, []).append(teammate_change)
                 continue
-            if path in {"/level/经验", "/等级/经验", "/主角/等级/经验"}:
-                continue
             parts = self._split_change_path(path)
             if not parts:
                 continue
@@ -2125,82 +2038,6 @@ class PlayerSaveRepository:
                 names.update(self._player_public_names(protagonist_tree))
         return names
 
-    LEVEL_EXP_PATHS = {"/level/经验", "/等级/经验", "/主角/等级/经验"}
-
-    def _extract_level_exp_delta(self, changes: list[dict[str, Any]]) -> int:
-        if not isinstance(changes, list):
-            return 0
-        delta = 0
-        for change in changes:
-            if not isinstance(change, dict):
-                continue
-            op = str(change.get("op") or "").strip()
-            path = str(change.get("path") or "").strip()
-            if op == "+" and path in self.LEVEL_EXP_PATHS:
-                delta += self._number_value(change.get("value"))
-        return delta
-
-    def _apply_teammate_level_exp(
-        self,
-        group_id: str,
-        main_level: int,
-        level_exp_delta: int,
-        teammate_names: set[str],
-    ) -> None:
-        users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
-        if not users_dir.exists():
-            return
-
-        for name in teammate_names:
-            if not name:
-                continue
-            target_user_dir = self._find_user_dir_by_target_name(users_dir, name)
-            if not target_user_dir:
-                logger.debug(f"未找到队友 {name} 的存档，跳过等级经验")
-                continue
-            player_data = self._load_current_player_data(target_user_dir)
-            if not isinstance(player_data, dict):
-                continue
-            self._remove_economy_state(player_data)
-            self._remove_location_state(player_data)
-
-            protagonist = player_data.get("主角", {})
-            level_node = protagonist.get("等级", {}) if isinstance(protagonist, dict) else {}
-            teammate_level = max(1, min(int(level_node.get("等级", 1) or 1), 7))
-            level_diff = main_level - teammate_level
-
-            if level_diff > 0:
-                adjusted = level_exp_delta * (level_diff + 1)
-            elif level_diff < 0:
-                adjusted = int(level_exp_delta / (abs(level_diff) + 1))
-            else:
-                adjusted = level_exp_delta
-
-            if adjusted <= 0:
-                continue
-
-            current_exp = max(0, min(int(level_node.get("经验", 0) or 0), 99))
-            new_exp = current_exp + adjusted
-            level = teammate_level
-
-            while new_exp >= 100 and level < 7:
-                level += 1
-                new_exp -= 100
-
-            if level >= 7:
-                level = 7
-                new_exp = 0
-
-            if isinstance(protagonist, dict):
-                protagonist["等级"] = {"等级": level, "经验": max(0, min(new_exp, 99))}
-            player_data["updated_at"] = _now_date_str()
-            self._save_current_player_data(target_user_dir, player_data)
-            logger.info(
-                f"已应用队友 {name} 的等级经验: "
-                f"base={level_exp_delta}, adjusted={adjusted}, "
-                f"Lv.{teammate_level}->Lv.{level}"
-            )
-
     def _increment_participant_teammate_battle_counts(
         self,
         group_id: str,
@@ -2240,47 +2077,6 @@ class PlayerSaveRepository:
             self._save_current_player_data(target_user_dir, player_data)
             logger.info(f"已增加队友 {name} 的战斗次数")
 
-    def _find_mentioned_teammate_names(
-        self,
-        group_id: str,
-        card: BattleDiaryCard,
-        mention_scan_texts: str | list[str] | None = None,
-    ) -> set[str]:
-        text_parts = [
-            str(card.action or ""),
-            str(card.encounter or ""),
-            str(card.result or ""),
-        ]
-        if isinstance(card.reason, list):
-            text_parts.extend(str(c) for c in card.reason)
-        if isinstance(mention_scan_texts, list):
-            text_parts.extend(str(item or "") for item in mention_scan_texts)
-        elif mention_scan_texts:
-            text_parts.append(str(mention_scan_texts))
-        mention_text = "\n".join(text_parts)
-        if not mention_text.strip():
-            return set()
-
-        users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
-        if not users_dir.exists():
-            return set()
-
-        protagonist_name = str(card.target_name or "").strip()
-        matched: set[str] = set()
-        for user_dir in sorted(p for p in users_dir.iterdir() if p.is_dir()):
-            player_data = self._load_current_player_data(user_dir)
-            if not isinstance(player_data, dict):
-                continue
-            protagonist_tree = player_data.get("主角", {})
-            names = self._player_public_names(protagonist_tree)
-            primary_name = self._get_nested(protagonist_tree, ["个人信息", "姓名"], "")
-            if not names or primary_name == protagonist_name:
-                continue
-            for name in names:
-                if name in mention_text:
-                    matched.add(name)
-        return matched
-
     def _find_user_dir_by_target_name(
         self,
         users_dir: Path,
@@ -2310,12 +2106,7 @@ class PlayerSaveRepository:
         current = self._number_value(parent.get(key, 0))
         next_value = current + delta
         if key in PROGRESS_KEYS:
-            self._ensure_progress_level(parent)
-            next_value = self._normalize_progress_value(
-                parent,
-                next_value,
-                max_level=5 if self._is_status_progress_path(parts) else None,
-            )
+            next_value = self._normalize_progress_value(next_value)
         parent[key] = next_value
 
     def _apply_sub_change(
@@ -2330,12 +2121,7 @@ class PlayerSaveRepository:
         current = self._number_value(parent.get(key, 0))
         next_value = current - delta
         if key in PROGRESS_KEYS:
-            self._ensure_progress_level(parent)
-            next_value = self._normalize_progress_value(
-                parent,
-                next_value,
-                max_level=5 if self._is_status_progress_path(parts) else None,
-            )
+            next_value = self._normalize_progress_value(next_value)
         parent[key] = max(0, next_value)
 
     def _set_nested_value(
@@ -2351,50 +2137,13 @@ class PlayerSaveRepository:
             return
         parent[key] = value
         if key in PROGRESS_KEYS:
-            self._ensure_progress_level(parent)
-            parent[key] = self._normalize_progress_value(
-                parent,
-                self._number_value(value),
-                max_level=5 if self._is_status_progress_path(parts) else None,
-            )
-
-    @staticmethod
-    def _ensure_progress_level(parent: dict[str, Any]) -> None:
-        for level_key in ("等级", "level", "Lv", "lv"):
-            if level_key in parent:
-                try:
-                    parent[level_key] = max(1, int(float(parent.get(level_key) or 1)))
-                except Exception:
-                    parent[level_key] = 1
-                if level_key != "等级":
-                    parent["等级"] = parent[level_key]
-                    parent.pop(level_key, None)
-                return
-        parent["等级"] = 1
+            parent[key] = self._normalize_progress_value(self._number_value(value))
 
     @staticmethod
     def _normalize_progress_value(
-        parent: dict[str, Any],
         value: int | float,
-        *,
-        max_level: int | None = None,
     ) -> int | float:
-        current_level = max(
-            1,
-            int(PlayerSaveRepository._number_value(parent.get("等级", 1))),
-        )
-        if max_level is not None and current_level >= max_level:
-            parent["等级"] = max_level
-            return 0
-        next_value = max(0, value)
-        while next_value >= 100:
-            current_level += 1
-            parent["等级"] = current_level
-            next_value -= 100
-            if max_level is not None and current_level >= max_level:
-                parent["等级"] = max_level
-                return 0
-        return max(0, min(next_value, 99))
+        return max(0, min(value, 100))
 
     def _normalize_status_progress_in_data(self, player_data: dict[str, Any]) -> bool:
         """规范化 player_data 中主角树下的状态进度。"""
@@ -2411,14 +2160,9 @@ class PlayerSaveRepository:
                 key_text = str(key)
                 child_path = [*path, key_text]
                 if key_text in PROGRESS_KEYS and self._is_status_progress_path(child_path):
-                    before = (value.get("等级"), child)
-                    self._ensure_progress_level(value)
-                    value[key] = self._normalize_progress_value(
-                        value,
-                        self._number_value(child),
-                        max_level=5,
-                    )
-                    if before != (value.get("等级"), value.get(key)):
+                    before = child
+                    value[key] = self._normalize_progress_value(self._number_value(child))
+                    if before != value.get(key):
                         changed = True
                     continue
                 visit(child, child_path)

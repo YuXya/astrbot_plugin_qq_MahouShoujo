@@ -45,10 +45,10 @@ class ReincarnationAnalyzer(BaseAnalyzer[ReincarnationCard]):
         ]
         # --- 世界书、状态书与事件书交叉递归 ---
         world_book_result = self.world_book_engine.build_prompt_text(
-            world_book_scan_parts, player_level=1,
+            world_book_scan_parts,
         )
         status_book_result = self.status_book_engine.build_prompt_text(
-            world_book_scan_parts, player_level=1,
+            world_book_scan_parts,
         )
         cross_hit_parts: list[str] = []
         for entry in world_book_result.entries + status_book_result.entries:
@@ -57,10 +57,10 @@ class ReincarnationAnalyzer(BaseAnalyzer[ReincarnationCard]):
         if cross_hit_parts:
             enriched_scan_parts = world_book_scan_parts + cross_hit_parts
             world_book_result = self.world_book_engine.build_prompt_text(
-                enriched_scan_parts, player_level=1,
+                enriched_scan_parts,
             )
             status_book_result = self.status_book_engine.build_prompt_text(
-                enriched_scan_parts, player_level=1,
+                enriched_scan_parts,
             )
 
         supplement_text = self._join_optional_prompt_parts([

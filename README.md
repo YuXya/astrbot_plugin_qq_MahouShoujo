@@ -22,7 +22,6 @@
 - `/魔法少女日常`：与战斗日记共用存档、队友识别、关系总结和保存流程，但使用独立的日常 Prompt。命令后可写本次日常行动；不写行动时由 LLM 根据当前状态自由生成。
 - `/魔法少女战斗 行动目标`：生成正文前会先选择完整战斗上下文；行动指向玩家战时从本城市魔法少女中选择目标，行动指向普通魔物、异常或污染源时从公共魔物书选择敌人。
 - 公共魔物书是普通魔物敌人图鉴。魔法少女普通魔物战会从公共魔物书选择本次魔物，并使用魔物显形、适合地点、战斗机制和魔物残留来减少公式化开场。
-- 事件书按两大敌人池分组：`monster_enemy`（与敌人是魔物）和 `character_enemy`（与敌人是魔法少女）。玩家明确说魔物时，会先在魔物池中找与公共魔物书兼容的事件，再选择魔物与等级。
 - 每个群拥有独立的公元时间。该群第一次战斗为 `公元2020年4月1日`，之后每次成功保存战斗自动推进一天。
 - `/魔法少女存档删除`：删除当前群自己的魔法少女存档。为避免误删，需要再次发送 `/魔法少女存档删除 确认`；删除时会同步清理同群其他玩家记忆中由你产生的客串记录。
 
@@ -57,7 +56,6 @@ data/plugin_data/astrbot_plugin_qq_MahouShoujo/saves/groups/{group_id}/users/{us
 
 - `index.json`：轻量索引，保存群号和角色名。列表和点名匹配优先读取它。
 - `profile.json`：转生人物卡、昵称等固定档案。
-- `state.json`：等级、经验、HP、MP、背包、技能、任务、flags 等战斗状态。
 - `battle_log.jsonl`：战斗日志。每一行是一条独立 JSON 记录。
 - `cameo_memory.jsonl`：客串记忆。别人日记中明确提到该角色时，会在这里追加一条互动记忆。
 - `world_clock.json`：群级世界时钟，位于群目录中，不属于单个玩家存档。
@@ -90,13 +88,11 @@ data/plugin_data/astrbot_plugin_qq_MahouShoujo/saves/groups/{group_id}/users/{us
   "update": {
     "reason": "状态更新依据",
     "changes": [
-      {"op": "delta", "path": "/主角/等级/经验", "value": 20}
     ]
   }
 }
 ```
 
-当前代码会处理等级、等级经验并追加日志。`update.changes` 还会用于技能、状态等嵌套进度；经验满 100 后自动升级。
 
 ## 世界书、状态书、技能书和性癖书
 
@@ -107,7 +103,6 @@ data/plugin_data/astrbot_plugin_qq_MahouShoujo/saves/groups/{group_id}/users/{us
 - `world_book/default.json`：公共世界设定。
 - `status_book/default.json`：状态相关补充设定。结构、触发方式和注入逻辑与世界书一致。
 - `skill_book/default.json`：技能成长提示和默认 change 路径。
-- `fetish_book/default.json`：性癖成长提示、简单介绍、Lv.1 至 Lv.Max 的分级效果和默认 change 路径。性癖最高 Lv.5；已拥有性癖只会向 AI 注入简介和当前等级效果。"总是注入"的性癖已拥有时每次都会注入，未拥有时会在待开发列表附带简单介绍。
 
 这些资源支持：
 
@@ -124,6 +119,7 @@ data/plugin_data/astrbot_plugin_qq_MahouShoujo/saves/groups/{group_id}/users/{us
 
 - 查看玩家列表。
 - 查看角色档案、状态概览、成长进度。
+- 技能、性癖和其他长期成长统一保存为 `{"进度": 0..100}`；达到 100 后封顶。
 - 查看战斗记录。
 - 查看"其他人与主角的交互"。
 - 管理员删除玩家存档或删除单条战斗日志。

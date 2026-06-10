@@ -346,13 +346,10 @@ class EditableResourceManager:
             ),
             "status_book/default.json": (
                 "状态书文件。结构、触发方式和注入逻辑与世界书一致；条目命中后作为状态相关补充设定注入。"
-                "visible_levels 为可见主角等级，数字 1-7 对应 F、E、D、C、B、A、S；未填写时默认全部可见。"
             ),
             "fetish_book/default.json": (
-                "性癖书文件。条目标题代表全部可开发性癖，content 是简单介绍，level_descriptions 是 Lv.1 到 Lv.Max"
-                " 的分级效果。已拥有性癖只会注入简介和当前等级效果；\u201c总是注入\u201d的已拥有性癖每次都会注入，"
+                " 的百分比区间效果。已拥有性癖只会注入简介和当前进度效果；\u201c总是注入\u201d的已拥有性癖每次都会注入，"
                 "未拥有时会在待开发列表附带简单介绍。"
-                "性癖最高 Lv.5；base_path 是给 AI 输出 update.changes 的路径提示。"
             ),
             "event_book/default.json": (
                 "Event book v3 uses categories: monster_enemy and character_enemy. "
@@ -361,8 +358,6 @@ class EditableResourceManager:
             ),
             "monster_book/default.json": (
                 "魔物书文件。公共魔物书是普通魔物敌人图鉴，普通魔物战会从这里选择本次敌人或异常源。"
-                "每个魔物包含 ID、魔物名、可见等级、魔物等级、关键词、魔物标签、通用设定和开场/地点/机制/结尾钩子；"
-                "每个已选择的魔物等级都可以单独填写等级设定，留空时读取方应回退到通用设定。"
             ),
             self.PROMPT_FILES["reincarnation_prompt"]: (
                 "用于 /魔法少女转生 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
@@ -373,7 +368,6 @@ class EditableResourceManager:
                 "用于 /魔法少女战斗 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
                 "可用变量：{{player_data_update_json}}"
                 "（来自玩家当前人物卡，包含全部属性和状态，用于第一人称人格设定和状态参考）；"
-                "{{player_name}}、{{current_level}}（字母等级 F/E/D/C/B/A/S）、"
                 "{{logs_text}}、{{cameo_memories_text}}、{{current_world_date}}、{{action}}、"
                 "{{supplement_text}}（世界书+状态书+事件书+技能书+性癖书命中的补充设定，未命中时为空）、"
                 "{{teammates_json}}（战斗中为子任务选出的队友 JSON；日常等为命中其他存档角色名时的队友公开字段 JSON；未命中时为空数组）。"

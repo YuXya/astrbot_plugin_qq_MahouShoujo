@@ -109,20 +109,11 @@ class BattleDiaryApplicationService:
             if avatar_url:
                 card.avatar_url = avatar_url
 
-            protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
-            current_level = self.domain_service.get_current_level(protagonist)
-            new_level = self.domain_service.parse_level_after(
-                card.level_change,
-                fallback=current_level,
-            )
             self.save_repository.save_battle_result(
                 group_id,
                 user_id,
                 card,
-                new_level,
-                card.level_exp_after,
                 world_day_offset=world_day_offset,
-                mention_scan_texts=action_text,
             )
             await self._maybe_summarize_relationships(
                 group_id=group_id,
@@ -286,16 +277,13 @@ class BattleDiaryApplicationService:
     ) -> dict[str, object]:
         try:
             protagonist = player_data.get("涓昏", {}) if isinstance(player_data, dict) else {}
-            current_level = self.domain_service.get_current_level(protagonist)
             recent_record_count = self.config_manager.get_teammate_recent_record_count()
             candidates = self.save_repository.build_city_teammate_candidates(
                 group_id,
                 user_id,
                 recent_record_count=recent_record_count,
             )
-            monster_candidates = self.save_repository.build_public_monster_candidates(
-                player_level=current_level,
-            )
+            monster_candidates = self.save_repository.build_public_monster_candidates()
             return await self.llm_analyzer.select_daily_context(
                 action_text=action_text,
                 player_data=player_data,
@@ -322,7 +310,6 @@ class BattleDiaryApplicationService:
         umo: str | None,
     ) -> dict[str, object]:
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
-        current_level = self.domain_service.get_current_level(protagonist)
         recent_record_count = self.config_manager.get_teammate_recent_record_count()
         target_candidates = self.save_repository.build_city_magical_girl_candidates(
             group_id,
@@ -334,9 +321,7 @@ class BattleDiaryApplicationService:
             user_id,
             recent_record_count=recent_record_count,
         )
-        monster_candidates = self.save_repository.build_public_monster_candidates(
-            player_level=current_level,
-        )
+        monster_candidates = self.save_repository.build_public_monster_candidates()
         return await self.llm_analyzer.select_magical_battle_context(
             action_text=action_text,
             player_data=player_data,

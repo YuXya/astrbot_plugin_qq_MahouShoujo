@@ -344,10 +344,6 @@
         <div class="label">魔物</div>
         <div class="value">{{ monster_name }}</div>
       </div>
-      <div class="box">
-        <div class="label">玩家等级</div>
-        <div class="value">{{ level_label }}</div>
-      </div>
     </section>
 
     <section class="section">
@@ -391,7 +387,7 @@
             <div class="progress-name">
               <span>{{ item.label }}</span>
             </div>
-            <div class="progress-xp">{% if item.is_max %}Lv.Max{% else %}Lv.{{ item.level }}{% endif %}</div>
+            <div class="progress-xp">{{ item.percent }}%</div>
           </div>
         </div>
         {% endfor %}
@@ -409,7 +405,7 @@
             <div class="progress-name">
               <span>{{ item.label }}</span>
             </div>
-            <div class="progress-xp">{% if item.is_max %}Lv.Max{% else %}Lv.{{ item.level }}{% endif %}</div>
+            <div class="progress-xp">{{ item.percent }}%</div>
           </div>
         </div>
         {% endfor %}

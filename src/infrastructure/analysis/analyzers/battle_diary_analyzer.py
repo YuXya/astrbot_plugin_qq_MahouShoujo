@@ -5,7 +5,6 @@ import random
 
 from ....domain.models.data_models import BattleDiaryCard, TokenUsage
 from ....domain.services.battle_diary_domain_service import BattleDiaryDomainService
-from ....shared.levels import level_label, parse_level_label
 from ....utils.logger import logger
 from ...change_books import ChangeBookEngine
 from ...event_book import EventBookEngine
@@ -140,7 +139,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         default_action: str = "自由战斗",
     ) -> str:
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
-        current_level = self.domain_service.get_current_level(protagonist)
         action = action_text.strip() or f"玩家没有指定行动，请根据当前状态自由生成一次{default_action}。"
         scan_parts = [
             event_command,
@@ -150,10 +148,10 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         ]
         # --- 世界书与状态书交叉递归 ---
         world_book_result = self.world_book_engine.build_prompt_text(
-            scan_parts, player_level=current_level,
+            scan_parts,
         )
         status_book_result = self.status_book_engine.build_prompt_text(
-            scan_parts, player_level=current_level,
+            scan_parts,
         )
         cross_hit_parts: list[str] = []
         for entry in world_book_result.entries + status_book_result.entries:
@@ -162,10 +160,10 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         if cross_hit_parts:
             enriched_scan_parts = scan_parts + cross_hit_parts
             world_book_result = self.world_book_engine.build_prompt_text(
-                enriched_scan_parts, player_level=current_level,
+                enriched_scan_parts,
             )
             status_book_result = self.status_book_engine.build_prompt_text(
-                enriched_scan_parts, player_level=current_level,
+                enriched_scan_parts,
             )
 
         world_book_text = world_book_result.prompt_text
@@ -176,10 +174,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 status_book_text,
                 self.change_book_engine.build_skill_prompt_text(
                     enriched_scan_parts if cross_hit_parts else scan_parts,
-                    player_level=current_level,
                 ),
                 self.change_book_engine.build_fetish_prompt_text(
-                    protagonist, player_level=current_level,
+                    protagonist,
                 ),
             ]
         )
@@ -212,7 +209,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             {
                 "player_data_update_json": self._json_dump(player_data),
                 "player_name": self._get_nested(protagonist, ["个人信息", "姓名"], "") or "主角",
-                "current_level": level_label(current_level),
                 "logs_text": logs_text,
                 "cameo_memories_text": cameo_memories_text,
                 "action": action,
@@ -254,7 +250,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         umo: str | None = None,
     ) -> dict[str, object]:
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
-        current_level = self.domain_service.get_current_level(protagonist)
         text_parts = [
             action_text,
             self._format_logs(logs),
@@ -272,7 +267,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         scene_event_candidates = self.event_book_engine.build_scene_event_candidates(
             text_parts,
             current_event="/魔法少女战斗",
-            player_level=current_level,
             battle_types=["monster", "magical_girl", "environment_crisis"],
             category_ids=category_ids,
             monster_candidates=event_monster_candidates,
@@ -296,7 +290,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         prompt = self.editable_manager.render_prompt(
             "magical_battle_target_selection_prompt",
             {
-                "current_level": level_label(current_level),
                 "player_data_update_json": self._json_dump(player_data),
                 "action": action_text.strip(),
                 "logs_text": self._format_logs(logs),
@@ -340,7 +333,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 player_data=player_data,
                 monster_candidates=prompt_monster_candidates,
                 scene_event_candidates=scene_event_candidates,
-                current_level=current_level,
                 text_parts=text_parts,
                 teammate_candidates=teammate_candidates,
             )
@@ -351,7 +343,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 player_data=player_data,
                 monster_candidates=prompt_monster_candidates,
                 scene_event_candidates=scene_event_candidates,
-                current_level=current_level,
                 text_parts=text_parts,
                 selected_monster=parsed.get("selected_enemies") or parsed.get("selected_monster"),
                 scene_event=parsed.get("scene_event"),
@@ -370,7 +361,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 player_data=player_data,
                 monster_candidates=prompt_monster_candidates,
                 scene_event_candidates=scene_event_candidates,
-                current_level=current_level,
                 text_parts=text_parts,
                 selected_monster=parsed.get("selected_enemies") or parsed.get("selected_monster"),
                 scene_event=parsed.get("scene_event"),
@@ -650,7 +640,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         player_data: dict,
         monster_candidates: list[dict],
         scene_event_candidates: list[dict],
-        current_level: int,
         text_parts: list[str],
         selected_monster: object = None,
         scene_event: object = None,
@@ -670,12 +659,10 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         resolved_monsters = self._resolve_selected_monsters(
             selected_monster,
             monster_candidates,
-            current_level=current_level,
             action_text="\n".join(text_parts),
         )
         resolved_monster = (resolved_monsters[0] if resolved_monsters else None) or self._select_public_monster(
             monster_candidates,
-            current_level=current_level,
             text_parts=text_parts,
             scene_event=resolved_scene,
         )
@@ -723,28 +710,15 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         enemy_data: list[dict] | None = None,
     ) -> dict[str, object]:
         """Build deterministic battle odds used by the diary prompt."""
-        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
-        player_level = self._team_level([protagonist] + [
-            self._prompt_protagonist_profile(item) or item
-            for item in (teammate_data or [])
-            if isinstance(item, dict)
-        ])
-        enemies = [item for item in (enemy_data or []) if isinstance(item, dict)]
-        if enemies:
-            opponent_level = self._team_level(enemies)
-        else:
-            opponent_level = self._profile_level(opponent_data) if opponent_data else player_level
         ai_rate = self._clamp_percent(ai_win_rate, default=50)
         desire_rate = self._clamp_percent(desire_win_rate, default=50)
-        level_advantage = player_level - opponent_level
-        level_modifier = level_advantage * 12
 
         if force_lose:
             final_rate = 0
             outcome = "player_lose"
         else:
             final_rate = self._clamp_percent(
-                round(desire_rate * 0.5 + ai_rate * 0.5 + level_modifier)
+                round(desire_rate * 0.5 + ai_rate * 0.5)
             )
             outcome = "player_win" if final_rate >= 50 else "player_lose"
 
@@ -763,34 +737,10 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             "outcome": outcome,
             "ai_win_rate": ai_rate,
             "desire_win_rate": desire_rate,
-            "level_modifier": level_modifier if not force_lose else 0,
-            "player_level": level_label(player_level),
-            "opponent_level": level_label(opponent_level),
             "battle_kind": battle_kind,
             "tempo": tempo,
             "force_reason": force_reason,
         }
-
-    def _team_level(self, members: list[dict]) -> int:
-        levels: list[int] = []
-        for item in members:
-            if not isinstance(item, dict):
-                continue
-            if item.get("selected_level"):
-                levels.append(parse_level_label(str(item.get("selected_level") or "")))
-                continue
-            levels.append(self.domain_service.get_current_level(
-                self._prompt_protagonist_profile(item) or item
-            ))
-        if not levels:
-            return 0
-        strongest = max(levels)
-        support_bonus = min(2, max(0, len(levels) - 1))
-        return min(7, strongest + support_bonus)
-
-    def _profile_level(self, item: object) -> int:
-        profile = self._prompt_protagonist_profile(item)
-        return self.domain_service.get_current_level(profile or {})
 
     @staticmethod
     def _clamp_percent(value: object, *, default: int = 50) -> int:
@@ -933,7 +883,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 (value for value in player_data.values() if isinstance(value, dict)),
                 {},
             )
-        current_level = self.domain_service.get_current_level(protagonist)
         text_parts = [
             action_text,
             self._format_logs(logs),
@@ -942,7 +891,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         scene_event_candidates = self.event_book_engine.build_scene_event_candidates(
             text_parts,
             current_event=event_command,
-            player_level=current_level,
             battle_types=["daily", "monster", "environment_crisis"],
             monster_candidates=monster_candidates,
         )
@@ -1016,7 +964,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         selected_monsters = self._resolve_selected_monsters(
             parsed.get("selected_monsters") or parsed.get("selected_enemies"),
             monster_candidates,
-            current_level=current_level,
             action_text="\n".join(text_parts),
         )
         selected_monster = selected_monsters[0] if selected_monsters else None
@@ -1084,7 +1031,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         self,
         candidates: list[dict],
         *,
-        current_level: int,
         text_parts: list[str],
         scene_event: dict | None = None,
     ) -> dict | None:
@@ -1111,7 +1057,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             resolved = self._resolve_selected_monster(
                 {"id": candidate.get("id"), "reason": "玩家行动或公共魔物书匹配"},
                 candidates,
-                current_level=current_level,
                 action_text=scan_text if explicit else "",
             )
             if resolved:
@@ -1243,7 +1188,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         selected: object,
         candidates: list[dict],
         *,
-        current_level: int,
         action_text: str,
     ) -> dict | None:
         if not selected or not isinstance(selected, dict):
@@ -1260,29 +1204,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             ):
                 resolved = dict(candidate)
                 resolved["selection_reason"] = str(selected.get("reason") or "").strip()
-                selected_level = str(selected.get("level") or "").strip()
-                selectable_levels = [
-                    str(level or "").strip()
-                    for level in candidate.get("monster_levels", [])
-                    if str(level or "").strip()
-                ]
-                default_levels = [
-                    str(level or "").strip()
-                    for level in candidate.get("default_levels", [])
-                    if str(level or "").strip()
-                ]
-                if not selectable_levels:
-                    return None
-                if selected_level not in selectable_levels:
-                    selected_level = ""
-                if not selected_level:
-                    selected_level = random.choice(selectable_levels)
-                resolved["selected_level"] = selected_level
-                resolved["monster_levels"] = [selected_level]
-                resolved["level_settings"] = self._selected_level_settings(
-                    resolved.get("level_settings"),
-                    selected_level,
-                )
                 return resolved
         return None
 
@@ -1291,7 +1212,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         selected: object,
         candidates: list[dict],
         *,
-        current_level: int,
         action_text: str,
     ) -> list[dict]:
         selected_items = self._as_list(selected)
@@ -1301,7 +1221,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             monster = self._resolve_selected_monster(
                 item,
                 candidates,
-                current_level=current_level,
                 action_text=action_text,
             )
             if not monster:
@@ -1313,24 +1232,10 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             resolved.append(monster)
         return resolved[:5]
 
-    @staticmethod
-    def _selected_level_settings(
-        level_settings: object,
-        selected_level: str,
-    ) -> dict[str, dict[str, str]]:
-        if not isinstance(level_settings, dict):
-            return {}
-        raw_setting = level_settings.get(selected_level)
-        if not isinstance(raw_setting, dict):
-            return {}
-        content = str(raw_setting.get("content") or "").strip()
-        return {selected_level: {"content": content}} if content else {}
-
     def _resolve_default_monster(
         self,
         candidates: list[dict],
         *,
-        current_level: int,
         action_text: str,
     ) -> dict | None:
         for candidate in candidates:
@@ -1339,7 +1244,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             resolved = self._resolve_selected_monster(
                 {"id": candidate.get("id")},
                 candidates,
-                current_level=current_level,
                 action_text=action_text,
             )
             if resolved:
@@ -1493,14 +1397,11 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             title = BattleDiaryAnalyzer._world_diary_title(item)
             action = item.get("action", "")
             result = item.get("result", "")
-            level = item.get("level_change", "")
             line = f"{index}. {title}"
             if action:
                 line += f"；行动：{action}"
             if result:
                 line += f"；结果：{result}"
-            if level:
-                line += f"；等级：{level}"
             lines.append(line)
         return "\n".join(lines)
 

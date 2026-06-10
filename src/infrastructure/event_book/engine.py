@@ -32,7 +32,6 @@ class EventBookEngine:
         text_parts: list[str] | None,
         *,
         current_event: str,
-        player_level: int = 1,
         battle_types: list[str] | None = None,
         category_ids: list[str] | None = None,
         monster_candidates: list[dict] | None = None,
@@ -60,7 +59,7 @@ class EventBookEngine:
             event_commands = event.allowed_commands or [event.command]
             entries = [event.as_entry()] if event.is_scene_event else event.entries
             for entry in entries:
-                if not entry.enabled or player_level not in entry.visible_levels:
+                if not entry.enabled:
                     continue
                 if not self._entry_command_matches(entry, event_commands, current_event_key):
                     continue
