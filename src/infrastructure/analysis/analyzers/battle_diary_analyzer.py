@@ -187,17 +187,10 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             context_participants if isinstance(context_participants, list) else nearby_players
         )
         selected_targets = self._as_list((selection_context or {}).get("selected_targets"))
-        selected_monster_targets = [
-            target for target in selected_targets
-            if isinstance(target, dict) and not target.get("主角")
-        ]
         selected_player_targets = [
             target for target in selected_targets
             if isinstance(target, dict) and target.get("主角")
         ]
-        first_monster = selected_monster_targets[0] if selected_monster_targets else (
-            (selection_context or {}).get("selected_monster")
-        )
         first_magical = (selection_context or {}).get("target_magical_girl")
         for target in selected_player_targets:
             faction = str(target.get("阵营") or "").strip()
@@ -218,7 +211,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "recent_record_count": teammate_info["recent_record_count"],
                 "participants_json": teammate_info["json"],
                 "selected_targets_json": self._json_dump(selected_targets),
-                "selected_monster_json": self._json_dump(first_monster),
                 "scene_event_json": self._json_dump(
                     (selection_context or {}).get("scene_event")
                 ),
@@ -349,7 +341,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 monster_candidates=prompt_monster_candidates,
                 scene_event_candidates=scene_event_candidates,
                 text_parts=text_parts,
-                selected_monster=selected_target_payload,
+                selected_targets=selected_target_payload,
                 scene_event=parsed.get("scene_event"),
                 ai_win_rate=parsed.get("ai_win_rate"),
                 desire_win_rate=parsed.get("desire_win_rate"),
@@ -363,14 +355,13 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         return {
             "battle_type": "magical_girl",
             "target_magical_girl": targets[0] if targets else None,
-            "selected_monster": None,
             "selected_participants": participants,
             "selected_targets": targets,
             "scene_event": self._resolve_selected_scene_event(
                 parsed.get("scene_event"), scene_event_candidates
             ) or self._select_scene_event(
                 scene_event_candidates,
-                selected_monster=None,
+                selected_target=None,
                 text_parts=text_parts,
             ),
             "battle_odds": self._build_battle_odds_context(
@@ -626,7 +617,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         monster_candidates: list[dict],
         scene_event_candidates: list[dict],
         text_parts: list[str],
-        selected_monster: object = None,
+        selected_targets: object = None,
         scene_event: object = None,
         ai_win_rate: object = None,
         desire_win_rate: object = None,
@@ -637,25 +628,25 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             scene_event, scene_event_candidates
         ) or self._select_scene_event(
             scene_event_candidates,
-            selected_monster=None,
+            selected_target=None,
             text_parts=text_parts,
         )
-        resolved_monsters = self._resolve_selected_monsters(
-            selected_monster,
+        resolved_targets = self._resolve_selected_targets(
+            selected_targets,
             monster_candidates,
             action_text="\n".join(text_parts),
         )
-        resolved_monster = (resolved_monsters[0] if resolved_monsters else None) or self._select_public_monster(
+        primary_target = (resolved_targets[0] if resolved_targets else None) or self._select_public_monster(
             monster_candidates,
             text_parts=text_parts,
             scene_event=resolved_scene,
         )
-        if not resolved_monsters and resolved_monster:
-            resolved_monsters = [resolved_monster]
+        if not resolved_targets and primary_target:
+            resolved_targets = [primary_target]
         if not resolved_scene:
             resolved_scene = self._select_scene_event(
                 scene_event_candidates,
-                selected_monster=resolved_monster,
+                selected_target=primary_target,
                 text_parts=text_parts,
             )
         participants = self._resolve_selected_profiles(
@@ -665,14 +656,13 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         return {
             "battle_type": "monster",
             "target_magical_girl": None,
-            "selected_monster": resolved_monster,
             "selected_participants": participants,
-            "selected_targets": resolved_monsters,
+            "selected_targets": resolved_targets,
             "scene_event": resolved_scene,
             "battle_odds": self._build_battle_odds_context(
                 player_data=player_data,
                 teammate_data=participants,
-                enemy_data=resolved_monsters,
+                enemy_data=resolved_targets,
                 battle_kind="magical_girl_vs_monster",
                 ai_win_rate=ai_win_rate,
                 desire_win_rate=desire_win_rate,
@@ -943,17 +933,17 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             logger.warning(f"daily event context selection JSON parse failed, skipped: {error}")
             parsed = {}
 
-        selected_targets = self._resolve_selected_monsters(
+        selected_targets = self._resolve_selected_targets(
             parsed.get("selected_targets"),
             monster_candidates,
             action_text="\n".join(text_parts),
         )
-        selected_monster = selected_targets[0] if selected_targets else None
+        primary_target = selected_targets[0] if selected_targets else None
         scene_event = self._resolve_selected_scene_event(
             parsed.get("scene_event"), scene_event_candidates
         ) or self._select_scene_event(
             scene_event_candidates,
-            selected_monster=selected_monster,
+            selected_target=primary_target,
             text_parts=text_parts,
         )
         return {
@@ -967,7 +957,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 candidates,
             ),
             "selected_targets": selected_targets,
-            "selected_monster": selected_monster,
             "scene_event": scene_event,
         }
 
@@ -1035,7 +1024,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                     score += 1000
                     explicit = True
             score += self._monster_scene_score(candidate, scene_event, scan_text)
-            resolved = self._resolve_selected_monster(
+            resolved = self._resolve_selected_target(
                 {"id": candidate.get("id"), "reason": "玩家行动或公共魔物书匹配"},
                 candidates,
                 action_text=scan_text if explicit else "",
@@ -1086,7 +1075,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         self,
         candidates: list[dict],
         *,
-        selected_monster: dict | None,
+        selected_target: dict | None,
         text_parts: list[str],
     ) -> dict | None:
         if not candidates:
@@ -1102,11 +1091,11 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             if self._scene_event_explicitly_requested(candidate, action_text)
         ]
         pool = explicit or compatible
-        if selected_monster:
+        if selected_target:
             related = [
                 candidate
                 for candidate in pool
-                if self._scene_monster_score(candidate, selected_monster) > 0
+                if self._scene_target_score(candidate, selected_target) > 0
             ]
             if related:
                 pool = related
@@ -1134,18 +1123,18 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 return resolved
         return None
 
-    def _scene_monster_score(
+    def _scene_target_score(
         self,
         scene_event: dict,
-        selected_monster: dict | None,
+        selected_target: dict | None,
     ) -> int:
-        if not selected_monster:
+        if not selected_target:
             return 0
         compatible = self._text_set(scene_event.get("compatible_monsters"))
-        monster_name = str(selected_monster.get("name") or "").strip()
-        return 20 if monster_name and monster_name in compatible else 0
+        target_name = str(selected_target.get("name") or "").strip()
+        return 20 if target_name and target_name in compatible else 0
 
-    def _resolve_selected_monster(
+    def _resolve_selected_target(
         self,
         selected: object,
         candidates: list[dict],
@@ -1169,7 +1158,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 return resolved
         return None
 
-    def _resolve_selected_monsters(
+    def _resolve_selected_targets(
         self,
         selected: object,
         candidates: list[dict],
@@ -1180,7 +1169,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         resolved: list[dict] = []
         seen: set[str] = set()
         for item in selected_items:
-            monster = self._resolve_selected_monster(
+            monster = self._resolve_selected_target(
                 item,
                 candidates,
                 action_text=action_text,
@@ -1203,7 +1192,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         for candidate in candidates:
             if not isinstance(candidate, dict):
                 continue
-            resolved = self._resolve_selected_monster(
+            resolved = self._resolve_selected_target(
                 {"id": candidate.get("id")},
                 candidates,
                 action_text=action_text,
