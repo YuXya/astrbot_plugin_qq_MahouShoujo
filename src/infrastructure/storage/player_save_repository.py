@@ -1236,11 +1236,9 @@ class PlayerSaveRepository:
             "source": source,
             "keys": [str(key).strip() for key in keys if str(key).strip()],
             "content": content,
-            "monster_tags": PlayerSaveRepository._normalize_text_list(entry.get("monster_tags")),
-            "opening_hooks": PlayerSaveRepository._normalize_text_list(entry.get("opening_hooks")),
-            "preferred_locations": PlayerSaveRepository._normalize_text_list(entry.get("preferred_locations")),
             "battle_gimmicks": PlayerSaveRepository._normalize_text_list(entry.get("battle_gimmicks")),
-            "ending_hooks": PlayerSaveRepository._normalize_text_list(entry.get("ending_hooks")),
+            "victory_ending_hooks": PlayerSaveRepository._normalize_text_list(entry.get("victory_ending_hooks")),
+            "defeat_ending_hooks": PlayerSaveRepository._normalize_text_list(entry.get("defeat_ending_hooks")),
         }
 
     @staticmethod

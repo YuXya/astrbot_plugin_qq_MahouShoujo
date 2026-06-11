@@ -648,8 +648,224 @@ class SaveWebViewer:
         note: str,
         content: str,
     ) -> web.Response:
-        return self._plain_editable_file_response(
-            title, file_id, back_category, note, content
+        try:
+            book = self._normalize_monster_book(self._loads_json_text(content))
+        except Exception as exc:
+            return self._plain_editable_file_response(
+                title,
+                file_id,
+                back_category,
+                note,
+                content,
+                warning=f"魔物书 JSON 解析失败，请先修复源码 JSON：{exc}",
+            )
+
+        book_json = self._json_script_data(book)
+        storage_key = "qq_mahoushoujo:monster_book:open_entries"
+        source_url = self._url(
+            f"/editable/source?id={quote(file_id, safe='')}&category={self._e(back_category)}"
+        )
+        export_url = self._url(f"/editable/export?id={quote(file_id, safe='')}")
+        return self._html_response(
+            title,
+            f"""
+            <h1>{self._e(title)}</h1>
+            <p><a href="{self._url(f'/editable?category={self._e(back_category)}')}">返回{self._e(self._editable_category_title(back_category))}</a></p>
+            <p class="muted">{self._e(file_id)}</p>
+            <div class="source-actions">
+              <a class="button-link secondary-link" href="{source_url}">编辑源码</a>
+              <a class="button-link secondary-link" href="{export_url}">导出 JSON</a>
+              <form class="inline-import-form" method="post" action="{self._url('/editable/import')}" enctype="multipart/form-data">
+                <input type="hidden" name="id" value="{self._e(file_id)}">
+                <input type="hidden" name="category" value="{self._e(back_category)}">
+                <input name="import_file" type="file" accept=".json,application/json">
+                <button class="secondary compact-button" type="submit">导入 JSON</button>
+              </form>
+            </div>
+            <form id="monster-book-form" method="post" action="{self._url('/editable/save')}">
+              <input type="hidden" name="id" value="{self._e(file_id)}">
+              <input type="hidden" name="category" value="{self._e(back_category)}">
+              <input id="monster-book-content" type="hidden" name="content" value="">
+              <label for="note">资源说明 / 注释</label>
+              <textarea id="note" class="note-editor" name="note" spellcheck="false">{self._e(note)}</textarea>
+              <div class="world-book-toolbar">
+                <div>
+                  <h2>魔物列表</h2>
+                  <p class="muted">编辑公共魔物字段：关键词、正文、战斗机制，以及胜利/失败两组结尾表现。</p>
+                </div>
+                <button id="add-monster" type="button">+ 添加魔物</button>
+              </div>
+              <div id="monster-book-entries"></div>
+              <div class="actions">
+                <button type="submit">保存</button>
+              </div>
+            </form>
+            <form method="post" action="{self._url('/editable/reset')}" onsubmit="return confirm('确定恢复为当前代码内置默认内容？旧文件会先自动备份。');">
+              <input type="hidden" name="id" value="{self._e(file_id)}">
+              <input type="hidden" name="category" value="{self._e(back_category)}">
+              <button class="secondary" type="submit">恢复当前默认内容</button>
+            </form>
+            <script>
+              const initialMonsterBook = {book_json};
+              const monsterEntriesEl = document.getElementById("monster-book-entries");
+              const monsterForm = document.getElementById("monster-book-form");
+              const monsterContentInput = document.getElementById("monster-book-content");
+              const addMonsterButton = document.getElementById("add-monster");
+              const monsterStorageKey = "{self._e(storage_key)}";
+              let monsterOpenKeys = new Set();
+
+              const monsterState = {{
+                version: Number(initialMonsterBook.version || 1),
+                base_path: String(initialMonsterBook.base_path || "/魔物图鉴/"),
+                entries: Array.isArray(initialMonsterBook.entries) ? initialMonsterBook.entries : [],
+              }};
+
+              function monsterDefaults(index) {{
+                return {{
+                  id: `monster_${{index + 1}}`,
+                  name: "",
+                  keys: [],
+                  content: "",
+                  battle_gimmicks: [],
+                  victory_ending_hooks: [],
+                  defeat_ending_hooks: [],
+                }};
+              }}
+
+              function monsterSplitList(value) {{
+                const raw = Array.isArray(value) ? value.join("\\n") : String(value || "");
+                return raw.split(/[\\n,，、]/).map((item) => item.trim()).filter(Boolean);
+              }}
+
+              function monsterNormalizeEntry(entry, index) {{
+                return {{
+                  id: String(entry.id || `monster_${{index + 1}}`).trim(),
+                  name: String(entry.name || "").trim(),
+                  keys: monsterSplitList(entry.keys),
+                  content: String(entry.content || ""),
+                  battle_gimmicks: monsterSplitList(entry.battle_gimmicks),
+                  victory_ending_hooks: monsterSplitList(entry.victory_ending_hooks),
+                  defeat_ending_hooks: monsterSplitList(entry.defeat_ending_hooks),
+                }};
+              }}
+
+              function monsterEscapeHtml(value) {{
+                return String(value || "")
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;");
+              }}
+
+              function monsterEscapeAttr(value) {{
+                return monsterEscapeHtml(value).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+              }}
+
+              function monsterEntryKey(entry, index) {{
+                return String(entry.id || entry.name || `monster_${{index + 1}}`).trim();
+              }}
+
+              function monsterLoadOpenState() {{
+                try {{
+                  const raw = localStorage.getItem(monsterStorageKey);
+                  if (raw) monsterOpenKeys = new Set(JSON.parse(raw).map(String));
+                }} catch (error) {{
+                  console.warn("failed to load monster book open state", error);
+                }}
+              }}
+
+              function monsterPersistOpenState() {{
+                try {{
+                  localStorage.setItem(monsterStorageKey, JSON.stringify(Array.from(monsterOpenKeys)));
+                }} catch (error) {{
+                  console.warn("failed to save monster book open state", error);
+                }}
+              }}
+
+              function monsterSyncFromDom() {{
+                monsterState.entries = Array.from(monsterEntriesEl.querySelectorAll(".monster-entry")).map((card, index) => monsterNormalizeEntry({{
+                  id: card.querySelector("[data-field='id']").value,
+                  name: card.querySelector("[data-field='name']").value,
+                  keys: card.querySelector("[data-field='keys']").value,
+                  content: card.querySelector("[data-field='content']").value,
+                  battle_gimmicks: card.querySelector("[data-field='battle_gimmicks']").value,
+                  victory_ending_hooks: card.querySelector("[data-field='victory_ending_hooks']").value,
+                  defeat_ending_hooks: card.querySelector("[data-field='defeat_ending_hooks']").value,
+                }}, index));
+              }}
+
+              function monsterTextarea(name, value, label) {{
+                return `
+                  <div class="block-field">
+                    <label>${{monsterEscapeHtml(label)}}</label>
+                    <textarea data-field="${{monsterEscapeAttr(name)}}" class="entry-content-editor" spellcheck="false">${{monsterEscapeHtml(Array.isArray(value) ? value.join("\\n") : value)}}</textarea>
+                  </div>
+                `;
+              }}
+
+              function monsterRender() {{
+                monsterEntriesEl.innerHTML = "";
+                monsterState.entries = monsterState.entries.map(monsterNormalizeEntry);
+                monsterState.entries.forEach((entry, index) => {{
+                  const key = monsterEntryKey(entry, index);
+                  const card = document.createElement("article");
+                  card.className = "world-entry monster-entry";
+                  card.dataset.entryKey = key;
+                  card.innerHTML = `
+                    <details ${{monsterOpenKeys.has(key) ? "open" : ""}}>
+                      <summary class="world-entry-head">
+                        <span class="entry-title">${{monsterEscapeHtml(entry.name || entry.id || `魔物 ${{index + 1}}`)}}</span>
+                        <span class="tag">${{monsterEscapeHtml(entry.id)}}</span>
+                        <button class="danger compact-button" type="button" data-action="delete">删除</button>
+                      </summary>
+                      <div class="world-entry-body">
+                        <div class="world-entry-grid">
+                          <label class="title-field">ID<input data-field="id" type="text" value="${{monsterEscapeAttr(entry.id)}}" spellcheck="false"></label>
+                          <label class="title-field">名称<input data-field="name" type="text" value="${{monsterEscapeAttr(entry.name)}}" spellcheck="false"></label>
+                        </div>
+                        <div class="block-field">
+                          <label>关键词</label>
+                          <textarea data-field="keys" class="keys-editor" spellcheck="false">${{monsterEscapeHtml(entry.keys.join("\\n"))}}</textarea>
+                        </div>
+                        ${{monsterTextarea("content", entry.content, "正文")}}
+                        ${{monsterTextarea("battle_gimmicks", entry.battle_gimmicks, "战斗机制")}}
+                        ${{monsterTextarea("victory_ending_hooks", entry.victory_ending_hooks, "战斗胜利结尾")}}
+                        ${{monsterTextarea("defeat_ending_hooks", entry.defeat_ending_hooks, "战斗失败结尾")}}
+                      </div>
+                    </details>
+                  `;
+                  card.querySelector("details").addEventListener("toggle", (event) => {{
+                    if (event.currentTarget.open) monsterOpenKeys.add(key);
+                    else monsterOpenKeys.delete(key);
+                    monsterPersistOpenState();
+                  }});
+                  card.querySelector("[data-action='delete']").addEventListener("click", () => {{
+                    monsterSyncFromDom();
+                    monsterState.entries.splice(index, 1);
+                    monsterOpenKeys.delete(key);
+                    monsterRender();
+                  }});
+                  card.addEventListener("input", monsterSyncFromDom);
+                  monsterEntriesEl.appendChild(card);
+                }});
+              }}
+
+              addMonsterButton.addEventListener("click", () => {{
+                monsterSyncFromDom();
+                const entry = monsterDefaults(monsterState.entries.length);
+                monsterState.entries.push(entry);
+                monsterOpenKeys.add(monsterEntryKey(entry, monsterState.entries.length - 1));
+                monsterRender();
+              }});
+
+              monsterForm.addEventListener("submit", () => {{
+                monsterSyncFromDom();
+                monsterContentInput.value = JSON.stringify(monsterState, null, 2);
+              }});
+
+              monsterLoadOpenState();
+              monsterRender();
+            </script>
+            """,
         )
 
     def _event_book_file_response(
@@ -660,9 +876,488 @@ class SaveWebViewer:
         note: str,
         content: str,
     ) -> web.Response:
-        return self._plain_editable_file_response(
-            title, file_id, back_category, note, content
+        try:
+            book = self._normalize_event_book(self._loads_json_text(content))
+        except Exception as exc:
+            return self._plain_editable_file_response(
+                title,
+                file_id,
+                back_category,
+                note,
+                content,
+                warning=f"事件书 JSON 解析失败，请先修复原始 JSON：{exc}",
+            )
+
+        try:
+            monster_book = self._normalize_monster_book(
+                self._loads_json_text(self.editable_manager.read_text("monster_book/default.json"))
+            )
+        except Exception:
+            monster_book = {"version": 1, "entries": []}
+
+        book_json = self._json_script_data(book)
+        monster_book_json = self._json_script_data(monster_book)
+        storage_key = "qq_mahoushoujo:event_book:open_events"
+        source_url = self._url(
+            f"/editable/source?id={quote(file_id, safe='')}&category={self._e(back_category)}"
         )
+        export_url = self._url(f"/editable/export?id={quote(file_id, safe='')}")
+        key_info_export_url = self._url(
+            f"/editable/export/key-info?id={quote(file_id, safe='')}"
+        )
+        return self._html_response(
+            title,
+            f"""
+            <h1>{self._e(title)}</h1>
+            <p><a href="{self._url(f'/editable?category={self._e(back_category)}')}">返回{self._e(self._editable_category_title(back_category))}</a></p>
+            <p class="muted">{self._e(file_id)}</p>
+            <div class="source-actions">
+              <a class="button-link secondary-link" href="{source_url}">编辑源码</a>
+              <a class="button-link secondary-link" href="{export_url}">导出 JSON</a>
+              <a class="button-link secondary-link" href="{key_info_export_url}">导出关键信息 TXT</a>
+              <form class="inline-import-form" method="post" action="{self._url('/editable/import')}" enctype="multipart/form-data">
+                <input type="hidden" name="id" value="{self._e(file_id)}">
+                <input type="hidden" name="category" value="{self._e(back_category)}">
+                <input name="import_file" type="file" accept=".json,application/json">
+                <button class="secondary compact-button" type="submit">导入 JSON</button>
+              </form>
+            </div>
+            <form id="event-book-form" method="post" action="{self._url('/editable/save')}">
+              <input type="hidden" name="id" value="{self._e(file_id)}">
+              <input type="hidden" name="category" value="{self._e(back_category)}">
+              <input id="event-book-content" type="hidden" name="content" value="">
+              <label for="note">资源说明 / 注释</label>
+              <textarea id="note" class="note-editor" name="note" spellcheck="false">{self._e(note)}</textarea>
+              <div class="world-book-toolbar">
+                <div>
+                  <h2>事件列表</h2>
+                  <p class="muted">按分类编辑事件；魔物事件通过魔物名称选择 compatible_monsters。</p>
+                </div>
+                <button id="add-event" type="button">+ 添加事件</button>
+              </div>
+              <div id="event-book-events"></div>
+              <div class="actions">
+                <button type="submit">保存</button>
+              </div>
+            </form>
+            <form method="post" action="{self._url('/editable/reset')}" onsubmit="return confirm('确定恢复为当前代码内置默认内容？旧文件会先自动备份。');">
+              <input type="hidden" name="id" value="{self._e(file_id)}">
+              <input type="hidden" name="category" value="{self._e(back_category)}">
+              <button class="secondary" type="submit">恢复当前默认内容</button>
+            </form>
+            <script>
+              const initialEventBook = {book_json};
+              const eventMonsterBook = {monster_book_json};
+              const eventEntriesEl = document.getElementById("event-book-events");
+              const eventForm = document.getElementById("event-book-form");
+              const eventContentInput = document.getElementById("event-book-content");
+              const addEventButton = document.getElementById("add-event");
+              const eventStorageKey = "{self._e(storage_key)}";
+              const commandOptions = [
+                "/魔法少女转生",
+                "/反派魔女转生",
+                "/魔法少女战斗",
+                "/魔法少女日常",
+                "/魔法少女黑化",
+                "/反派魔女洗白",
+                "/反派魔女战斗",
+                "/反派魔女日常",
+              ];
+              const battleTypeOptions = ["monster", "villain_witch", "magical_girl", "environment_crisis"];
+              const eventDefaultCategories = [
+                {{ id: "monster_enemy", name: "与敌人是魔物", events: [] }},
+                {{ id: "character_enemy", name: "与敌人是魔法少女", events: [] }},
+              ];
+              const eventMonsterOptions = (Array.isArray(eventMonsterBook.entries) ? eventMonsterBook.entries : [])
+                .map((monster, index) => String(monster.name || monster.id || `魔物 ${{index + 1}}`).trim())
+                .filter(Boolean);
+              const eventState = {{
+                version: Number(initialEventBook.version || 3),
+                categories: eventNormalizeCategories(initialEventBook),
+              }};
+              let eventOpenKeys = new Set();
+
+              function eventDefaults(index) {{
+                return {{
+                  id: `event_${{index + 1}}`,
+                  name: "",
+                  enabled: true,
+                  recursive: true,
+                  strategy: "keyword",
+                  keys: [],
+                  allowed_commands: [],
+                  event_tags: [],
+                  location_tags: [],
+                  compatible_monsters: [],
+                  compatible_battle_types: [],
+                  opening_hook: "",
+                  twist_hook: "",
+                  ending_hook: "",
+                  content: "",
+                }};
+              }}
+
+              function eventSplitList(value) {{
+                const raw = Array.isArray(value) ? value.join("\\n") : String(value || "");
+                return raw.split(/[\\n,，、]/).map((item) => item.trim()).filter(Boolean);
+              }}
+
+              function eventNormalizeEntry(entry, index) {{
+                return {{
+                  id: String(entry.id || `event_${{index + 1}}`).trim(),
+                  name: String(entry.name || entry.title || "").trim(),
+                  enabled: entry.enabled !== false,
+                  recursive: entry.recursive !== false,
+                  strategy: entry.strategy === "always" ? "always" : "keyword",
+                  keys: eventSplitList(entry.keys),
+                  allowed_commands: eventSplitList(entry.allowed_commands || entry.command),
+                  event_tags: eventSplitList(entry.event_tags),
+                  location_tags: eventSplitList(entry.location_tags),
+                  compatible_monsters: eventSplitList(entry.compatible_monsters),
+                  compatible_battle_types: eventSplitList(entry.compatible_battle_types),
+                  opening_hook: String(entry.opening_hook || ""),
+                  twist_hook: String(entry.twist_hook || ""),
+                  ending_hook: String(entry.ending_hook || ""),
+                  content: String(entry.content || ""),
+                }};
+              }}
+
+              function eventNormalizeCategories(book) {{
+                const byId = new Map();
+                eventDefaultCategories.forEach((category) => byId.set(category.id, {{ ...category, events: [] }}));
+                const rawCategories = Array.isArray(book.categories) ? book.categories : [];
+                rawCategories.forEach((category, categoryIndex) => {{
+                  if (!category || typeof category !== "object") return;
+                  const id = String(category.id || `category_${{categoryIndex + 1}}`).trim();
+                  if (!id) return;
+                  const existing = byId.get(id) || {{ id, name: id, events: [] }};
+                  existing.name = String(category.name || existing.name || id);
+                  existing.events = Array.isArray(category.events) ? category.events.map(eventNormalizeEntry) : [];
+                  byId.set(id, existing);
+                }});
+                return Array.from(byId.values());
+              }}
+
+              function eventEscapeHtml(value) {{
+                return String(value || "")
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;");
+              }}
+
+              function eventEscapeAttr(value) {{
+                return eventEscapeHtml(value).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+              }}
+
+              function eventEntryKey(category, entry, eventIndex) {{
+                return `${{category.id}}:${{String(entry.id || entry.name || `event_${{eventIndex + 1}}`).trim()}}`;
+              }}
+
+              function eventLoadOpenState() {{
+                try {{
+                  const raw = localStorage.getItem(eventStorageKey);
+                  if (raw) eventOpenKeys = new Set(JSON.parse(raw).map(String));
+                }} catch (error) {{
+                  console.warn("failed to load event book open state", error);
+                }}
+              }}
+
+              function eventPersistOpenState() {{
+                try {{
+                  localStorage.setItem(eventStorageKey, JSON.stringify(Array.from(eventOpenKeys)));
+                }} catch (error) {{
+                  console.warn("failed to save event book open state", error);
+                }}
+              }}
+
+              function eventCheckedList(name, values, options, className = "command-choice") {{
+                const selected = new Set(eventSplitList(values));
+                return options.map((option) => `
+                  <label class="summary-check ${{className}}">
+                    <input data-field="${{eventEscapeAttr(name)}}" type="checkbox" value="${{eventEscapeAttr(option)}}"${{selected.has(option) ? " checked" : ""}}> ${{eventEscapeHtml(option)}}
+                  </label>
+                `).join("");
+              }}
+
+              function eventSyncFromDom() {{
+                eventState.categories = Array.from(eventEntriesEl.querySelectorAll(".event-category")).map((block) => {{
+                  const categoryId = block.dataset.categoryId;
+                  const existing = eventState.categories.find((category) => category.id === categoryId) || {{ id: categoryId, name: categoryId, events: [] }};
+                  return {{
+                    id: categoryId,
+                    name: existing.name,
+                    events: Array.from(block.querySelectorAll(".event-entry")).map((card, index) => eventNormalizeEntry({{
+                      id: card.querySelector("[data-field='id']").value,
+                      name: card.querySelector("[data-field='name']").value,
+                      enabled: card.querySelector("[data-field='enabled']").checked,
+                      recursive: card.querySelector("[data-field='recursive']").checked,
+                      strategy: card.querySelector("[data-field='strategy']").value,
+                      keys: card.querySelector("[data-field='keys']").value,
+                      allowed_commands: Array.from(card.querySelectorAll("[data-field='allowed_command']:checked")).map((input) => input.value),
+                      event_tags: card.querySelector("[data-field='event_tags']").value,
+                      location_tags: card.querySelector("[data-field='location_tags']").value,
+                      compatible_monsters: Array.from(card.querySelectorAll("[data-field='compatible_monster']:checked")).map((input) => input.value),
+                      compatible_battle_types: Array.from(card.querySelectorAll("[data-field='compatible_battle_type']:checked")).map((input) => input.value),
+                      opening_hook: card.querySelector("[data-field='opening_hook']").value,
+                      twist_hook: card.querySelector("[data-field='twist_hook']").value,
+                      ending_hook: card.querySelector("[data-field='ending_hook']").value,
+                      content: card.querySelector("[data-field='content']").value,
+                    }}, index)),
+                  }};
+                }});
+              }}
+
+              function eventTextarea(name, value, label, extraClass = "entry-content-editor") {{
+                return `
+                  <div class="block-field">
+                    <label>${{eventEscapeHtml(label)}}</label>
+                    <textarea data-field="${{eventEscapeAttr(name)}}" class="${{eventEscapeAttr(extraClass)}}" spellcheck="false">${{eventEscapeHtml(Array.isArray(value) ? value.join("\\n") : value)}}</textarea>
+                  </div>
+                `;
+              }}
+
+              function eventRender() {{
+                eventEntriesEl.innerHTML = "";
+                eventState.categories.forEach((category) => {{
+                  const categoryBlock = document.createElement("section");
+                  categoryBlock.className = "region-block event-category";
+                  categoryBlock.dataset.categoryId = category.id;
+                  categoryBlock.innerHTML = `
+                    <details open>
+                      <summary class="world-entry-head region-head">
+                        <span class="entry-title">${{eventEscapeHtml(category.name || category.id)}}</span>
+                        <span class="tag">${{eventEscapeHtml(category.id)}}</span>
+                      </summary>
+                      <div class="region-body">
+                        <div class="region-entries"></div>
+                      </div>
+                    </details>
+                  `;
+                  const list = categoryBlock.querySelector(".region-entries");
+                  category.events = (Array.isArray(category.events) ? category.events : []).map(eventNormalizeEntry);
+                  category.events.forEach((entry, index) => {{
+                    const key = eventEntryKey(category, entry, index);
+                    const isMonsterCategory = category.id === "monster_enemy";
+                    const card = document.createElement("article");
+                    card.className = "world-entry event-entry";
+                    card.dataset.entryKey = key;
+                    card.innerHTML = `
+                      <details ${{eventOpenKeys.has(key) ? "open" : ""}}>
+                        <summary class="world-entry-head">
+                          <span class="entry-title">${{eventEscapeHtml(entry.name || entry.id || `事件 ${{index + 1}}`)}}</span>
+                          <span class="tag">${{eventEscapeHtml(entry.id)}}</span>
+                          <label class="summary-check"><input data-field="enabled" type="checkbox"${{entry.enabled ? " checked" : ""}}> 启用</label>
+                          <button class="danger compact-button" type="button" data-action="delete">删除</button>
+                        </summary>
+                        <div class="world-entry-body">
+                          <div class="world-entry-grid">
+                            <label class="title-field">ID<input data-field="id" type="text" value="${{eventEscapeAttr(entry.id)}}" spellcheck="false"></label>
+                            <label class="title-field">名称<input data-field="name" type="text" value="${{eventEscapeAttr(entry.name)}}" spellcheck="false"></label>
+                            <label class="compact-field"><span>策略</span><select data-field="strategy"><option value="keyword"${{entry.strategy !== "always" ? " selected" : ""}}>keyword</option><option value="always"${{entry.strategy === "always" ? " selected" : ""}}>always</option></select></label>
+                            <label class="summary-check"><input data-field="recursive" type="checkbox"${{entry.recursive ? " checked" : ""}}> 递归关键词</label>
+                          </div>
+                          ${{eventTextarea("keys", entry.keys, "关键词", "keys-editor")}}
+                          <div class="block-field">
+                            <label>适用指令</label>
+                            <div class="log-meta">${{eventCheckedList("allowed_command", entry.allowed_commands, commandOptions)}}</div>
+                          </div>
+                          ${{eventTextarea("event_tags", entry.event_tags, "事件标签", "keys-editor")}}
+                          ${{eventTextarea("location_tags", entry.location_tags, "地点标签", "keys-editor")}}
+                          <div class="block-field">
+                            <label>兼容战斗类型</label>
+                            <div class="log-meta">${{eventCheckedList("compatible_battle_type", entry.compatible_battle_types, battleTypeOptions)}}</div>
+                          </div>
+                          ${{isMonsterCategory ? `
+                            <div class="monster-picker">
+                              <div class="monster-picker-head">
+                                <strong>兼容魔物</strong>
+                                <span class="muted">按魔物名称保存 compatible_monsters</span>
+                              </div>
+                              <div class="monster-picker-options">
+                                ${{eventCheckedList("compatible_monster", entry.compatible_monsters, eventMonsterOptions, "monster-picker-option")}}
+                              </div>
+                            </div>
+                          ` : ""}}
+                          ${{eventTextarea("opening_hook", entry.opening_hook, "开场钩子")}}
+                          ${{eventTextarea("twist_hook", entry.twist_hook, "变奏钩子")}}
+                          ${{eventTextarea("ending_hook", entry.ending_hook, "结尾钩子")}}
+                          ${{eventTextarea("content", entry.content, "正文")}}
+                        </div>
+                      </details>
+                    `;
+                    card.querySelector("details").addEventListener("toggle", (event) => {{
+                      if (event.currentTarget.open) eventOpenKeys.add(key);
+                      else eventOpenKeys.delete(key);
+                      eventPersistOpenState();
+                    }});
+                    card.querySelector("[data-action='delete']").addEventListener("click", () => {{
+                      eventSyncFromDom();
+                      category.events.splice(index, 1);
+                      eventOpenKeys.delete(key);
+                      eventRender();
+                    }});
+                    card.addEventListener("input", eventSyncFromDom);
+                    card.addEventListener("change", eventSyncFromDom);
+                    list.appendChild(card);
+                  }});
+                  eventEntriesEl.appendChild(categoryBlock);
+                }});
+              }}
+
+              addEventButton.addEventListener("click", () => {{
+                eventSyncFromDom();
+                const category = eventState.categories[0] || eventDefaultCategories[0];
+                const entry = eventDefaults(category.events.length);
+                category.events.push(entry);
+                eventOpenKeys.add(eventEntryKey(category, entry, category.events.length - 1));
+                eventRender();
+              }});
+
+              eventForm.addEventListener("submit", () => {{
+                eventSyncFromDom();
+                const output = {{
+                  version: eventState.version,
+                  categories: eventState.categories.map((category) => ({{
+                    id: category.id,
+                    name: category.name,
+                    events: category.events.map((entry) => {{
+                      const clean = eventNormalizeEntry(entry, 0);
+                      if (!clean.compatible_monsters.length) delete clean.compatible_monsters;
+                      return clean;
+                    }}),
+                  }})),
+                }};
+                eventContentInput.value = JSON.stringify(output, null, 2);
+              }});
+
+              eventLoadOpenState();
+              eventRender();
+            </script>
+            """,
+        )
+
+    @classmethod
+    def _normalize_monster_book(cls, raw: object) -> dict[str, object]:
+        if not isinstance(raw, dict):
+            return {"version": 1, "base_path": "/魔物图鉴/", "entries": []}
+        entries: list[dict[str, object]] = []
+        raw_entries = raw.get("entries", [])
+        if not isinstance(raw_entries, list):
+            raw_entries = []
+        for idx, entry in enumerate(raw_entries):
+            if not isinstance(entry, dict):
+                continue
+            name = str(entry.get("name") or entry.get("title") or "").strip()
+            content = str(entry.get("content") or entry.get("detail") or "").strip()
+            if not name and not content:
+                continue
+            entries.append(
+                {
+                    "id": str(entry.get("id") or f"monster_{idx + 1}").strip(),
+                    "name": name,
+                    "keys": cls._normalize_editor_text_list(entry.get("keys")),
+                    "content": content,
+                    "battle_gimmicks": cls._normalize_editor_text_list(entry.get("battle_gimmicks")),
+                    "victory_ending_hooks": cls._normalize_editor_text_list(entry.get("victory_ending_hooks")),
+                    "defeat_ending_hooks": cls._normalize_editor_text_list(entry.get("defeat_ending_hooks")),
+                }
+            )
+        return {
+            "version": int(raw.get("version") or 1),
+            "base_path": str(raw.get("base_path") or "/魔物图鉴/").strip(),
+            "entries": entries,
+        }
+
+    @classmethod
+    def _normalize_event_book(cls, raw: object) -> dict[str, object]:
+        default_categories = [
+            {"id": "monster_enemy", "name": "与敌人是魔物", "events": []},
+            {"id": "character_enemy", "name": "与敌人是魔法少女", "events": []},
+        ]
+        if not isinstance(raw, dict):
+            return {"version": 3, "categories": default_categories}
+
+        categories_by_id: dict[str, dict[str, object]] = {
+            str(category["id"]): dict(category) for category in default_categories
+        }
+        raw_categories = raw.get("categories", [])
+        if not isinstance(raw_categories, list):
+            raw_categories = []
+        for category_idx, raw_category in enumerate(raw_categories):
+            if not isinstance(raw_category, dict):
+                continue
+            category_id = str(raw_category.get("id") or f"category_{category_idx + 1}").strip()
+            if not category_id:
+                continue
+            category = categories_by_id.get(
+                category_id,
+                {"id": category_id, "name": category_id, "events": []},
+            )
+            category["name"] = str(raw_category.get("name") or category.get("name") or category_id).strip()
+            raw_events = raw_category.get("events", [])
+            if not isinstance(raw_events, list):
+                raw_events = []
+            category["events"] = [
+                cls._normalize_event_book_entry(entry, idx)
+                for idx, entry in enumerate(raw_events)
+                if isinstance(entry, dict)
+            ]
+            categories_by_id[category_id] = category
+
+        if isinstance(raw.get("events"), list) and raw["events"]:
+            monster_category = categories_by_id["monster_enemy"]
+            monster_category["events"] = [
+                cls._normalize_event_book_entry(entry, idx)
+                for idx, entry in enumerate(raw["events"])
+                if isinstance(entry, dict)
+            ]
+
+        return {
+            "version": int(raw.get("version") or 3),
+            "categories": list(categories_by_id.values()),
+        }
+
+    @classmethod
+    def _normalize_event_book_entry(cls, entry: dict[str, object], idx: int) -> dict[str, object]:
+        normalized: dict[str, object] = {
+            "id": str(entry.get("id") or f"event_{idx + 1}").strip(),
+            "name": str(entry.get("name") or entry.get("title") or "").strip(),
+            "enabled": entry.get("enabled", True) is not False,
+            "recursive": entry.get("recursive", True) is not False,
+            "strategy": "always" if str(entry.get("strategy") or "").strip().lower() == "always" else "keyword",
+            "keys": cls._normalize_editor_text_list(entry.get("keys")),
+            "allowed_commands": cls._normalize_editor_text_list(entry.get("allowed_commands") or entry.get("command")),
+            "event_tags": cls._normalize_editor_text_list(entry.get("event_tags")),
+            "location_tags": cls._normalize_editor_text_list(entry.get("location_tags")),
+            "compatible_battle_types": cls._normalize_editor_text_list(entry.get("compatible_battle_types")),
+            "opening_hook": str(entry.get("opening_hook") or "").strip(),
+            "twist_hook": str(entry.get("twist_hook") or "").strip(),
+            "ending_hook": str(entry.get("ending_hook") or "").strip(),
+            "content": str(entry.get("content") or "").strip(),
+        }
+        compatible_monsters = cls._normalize_editor_text_list(entry.get("compatible_monsters"))
+        if compatible_monsters:
+            normalized["compatible_monsters"] = compatible_monsters
+        return normalized
+
+    @staticmethod
+    def _normalize_editor_text_list(value: object) -> list[str]:
+        if isinstance(value, list):
+            raw_items = value
+        elif isinstance(value, str):
+            raw_items = re.split(r"[\n,，、]+", value)
+        else:
+            raw_items = []
+        items: list[str] = []
+        for item in raw_items:
+            text = str(item or "").strip()
+            if text and text not in items:
+                items.append(text)
+        return items
+
+    @staticmethod
+    def _loads_json_text(content: str) -> object:
+        return json.loads(str(content or "").lstrip("\ufeff"))
 
     @classmethod
     def _format_book_key_info(cls, raw: object, *, file_id: str = "") -> str:
@@ -765,7 +1460,9 @@ class SaveWebViewer:
             raise web.HTTPBadRequest(text="invalid editable key info export file")
         content = self.editable_manager.read_text(file_id)
         try:
-            key_info = self._format_book_key_info(json.loads(content), file_id=file_id)
+            key_info = self._format_book_key_info(
+                self._loads_json_text(content), file_id=file_id
+            )
         except Exception as exc:
             raise web.HTTPBadRequest(text=f"invalid editable book JSON: {exc}") from exc
 
@@ -817,7 +1514,7 @@ class SaveWebViewer:
 
         try:
             if file_id == "world_book/default.json":
-                json.loads(content)
+                self._loads_json_text(content)
                 self.editable_manager.write_world_book(content)
             elif file_id in {
                 "status_book/default.json",

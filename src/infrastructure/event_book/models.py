@@ -16,7 +16,7 @@ class EventBookEntry:
     allowed_commands: list[str] = field(default_factory=list)
     event_tags: list[str] = field(default_factory=list)
     location_tags: list[str] = field(default_factory=list)
-    compatible_monster_tags: list[str] = field(default_factory=list)
+    compatible_monsters: list[str] = field(default_factory=list)
     compatible_battle_types: list[str] = field(default_factory=list)
     opening_hook: str = ""
     twist_hook: str = ""
@@ -50,9 +50,7 @@ class EventBookEntry:
             allowed_commands=cls._normalize_text_list(raw.get("allowed_commands")),
             event_tags=cls._normalize_text_list(raw.get("event_tags")),
             location_tags=cls._normalize_text_list(raw.get("location_tags")),
-            compatible_monster_tags=cls._normalize_text_list(
-                raw.get("compatible_monster_tags")
-            ),
+            compatible_monsters=cls._normalize_text_list(raw.get("compatible_monsters")),
             compatible_battle_types=cls._normalize_text_list(
                 raw.get("compatible_battle_types")
             ),
@@ -91,7 +89,7 @@ class EventBookEvent:
     allowed_commands: list[str] = field(default_factory=list)
     event_tags: list[str] = field(default_factory=list)
     location_tags: list[str] = field(default_factory=list)
-    compatible_monster_tags: list[str] = field(default_factory=list)
+    compatible_monsters: list[str] = field(default_factory=list)
     compatible_battle_types: list[str] = field(default_factory=list)
     opening_hook: str = ""
     twist_hook: str = ""
@@ -126,7 +124,7 @@ class EventBookEvent:
                 or entry.content
                 or entry.event_tags
                 or entry.location_tags
-                or entry.compatible_monster_tags
+                or entry.compatible_monsters
                 or entry.opening_hook
                 or entry.twist_hook
                 or entry.ending_hook
@@ -149,8 +147,8 @@ class EventBookEvent:
             ),
             event_tags=EventBookEntry._normalize_text_list(raw.get("event_tags")),
             location_tags=EventBookEntry._normalize_text_list(raw.get("location_tags")),
-            compatible_monster_tags=EventBookEntry._normalize_text_list(
-                raw.get("compatible_monster_tags")
+            compatible_monsters=EventBookEntry._normalize_text_list(
+                raw.get("compatible_monsters")
             ),
             compatible_battle_types=EventBookEntry._normalize_text_list(
                 raw.get("compatible_battle_types")
@@ -169,7 +167,7 @@ class EventBookEvent:
             or self.content
             or self.event_tags
             or self.location_tags
-            or self.compatible_monster_tags
+            or self.compatible_monsters
             or self.opening_hook
             or self.twist_hook
             or self.ending_hook
@@ -189,7 +187,7 @@ class EventBookEvent:
             allowed_commands=self.allowed_commands or ([self.command] if self.command else []),
             event_tags=self.event_tags,
             location_tags=self.location_tags,
-            compatible_monster_tags=self.compatible_monster_tags,
+            compatible_monsters=self.compatible_monsters,
             compatible_battle_types=self.compatible_battle_types,
             opening_hook=self.opening_hook,
             twist_hook=self.twist_hook,

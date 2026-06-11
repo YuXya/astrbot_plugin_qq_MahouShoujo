@@ -446,7 +446,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 str(candidate.get("id") or "").strip(),
                 str(candidate.get("name") or "").strip(),
                 *[str(key or "").strip() for key in candidate.get("keys", [])],
-                *[str(tag or "").strip() for tag in candidate.get("monster_tags", [])],
             ]
             if any(value and (value in text or value.casefold() in folded) for value in values):
                 explicit.append(candidate)
@@ -461,23 +460,23 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
     ) -> list[dict]:
         if not scene_events:
             return []
-        monster_tags: set[str] = set()
+        monster_names: set[str] = set()
         for monster in monster_candidates:
             if not isinstance(monster, dict):
                 continue
-            monster_tags.update(self._text_set(monster.get("monster_tags")))
-            monster_tags.update(self._text_set(monster.get("keys")))
-            monster_tags.update(self._text_set(monster.get("preferred_locations")))
+            monster_name = str(monster.get("name") or "").strip()
+            if monster_name:
+                monster_names.add(monster_name)
 
         filtered: list[dict] = []
         for event in scene_events:
             if not isinstance(event, dict):
                 continue
-            compatible_tags = self._text_set(event.get("compatible_monster_tags"))
-            if not compatible_tags:
+            compatible_monsters = self._text_set(event.get("compatible_monsters"))
+            if not compatible_monsters:
                 filtered.append(event)
                 continue
-            if not monster_tags or compatible_tags & monster_tags:
+            if not monster_names or compatible_monsters & monster_names:
                 filtered.append(event)
         return filtered or scene_events
 
@@ -1074,23 +1073,17 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         scan_text: str,
     ) -> int:
         score = 0
-        monster_tags = BattleDiaryAnalyzer._text_set(monster.get("monster_tags"))
-        monster_locations = BattleDiaryAnalyzer._text_set(monster.get("preferred_locations"))
         monster_keys = BattleDiaryAnalyzer._text_set(monster.get("keys"))
         if scan_text:
             folded = scan_text.casefold()
-            for value in monster_tags | monster_locations:
+            for value in monster_keys:
                 if value and (value in scan_text or value.casefold() in folded):
                     score += 8
         if scene_event:
-            compatible = BattleDiaryAnalyzer._text_set(
-                scene_event.get("compatible_monster_tags")
-            )
-            location_tags = BattleDiaryAnalyzer._text_set(scene_event.get("location_tags"))
-            event_tags = BattleDiaryAnalyzer._text_set(scene_event.get("event_tags"))
-            score += len((monster_tags | monster_keys) & compatible) * 20
-            score += len(monster_locations & location_tags) * 12
-            score += len(monster_tags & event_tags) * 8
+            compatible = BattleDiaryAnalyzer._text_set(scene_event.get("compatible_monsters"))
+            monster_name = str(monster.get("name") or "").strip()
+            if monster_name and monster_name in compatible:
+                score += 20
         return score
 
     @staticmethod
@@ -1174,14 +1167,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
     ) -> int:
         if not selected_monster:
             return 0
-        compatible = self._text_set(scene_event.get("compatible_monster_tags"))
-        monster_tags = self._text_set(selected_monster.get("monster_tags"))
-        monster_locations = self._text_set(selected_monster.get("preferred_locations"))
-        location_tags = self._text_set(scene_event.get("location_tags"))
-        return (
-            len(monster_tags & compatible) * 20
-            + len(monster_locations & location_tags) * 12
-        )
+        compatible = self._text_set(scene_event.get("compatible_monsters"))
+        monster_name = str(selected_monster.get("name") or "").strip()
+        return 20 if monster_name and monster_name in compatible else 0
 
     def _resolve_selected_monster(
         self,

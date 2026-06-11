@@ -80,7 +80,7 @@ class EventBookEngine:
                         or ([event.command] if event.command else []),
                         "event_tags": entry.event_tags,
                         "location_tags": entry.location_tags,
-                        "compatible_monster_tags": entry.compatible_monster_tags,
+                        "compatible_monsters": entry.compatible_monsters,
                         "compatible_battle_types": entry.compatible_battle_types,
                         "opening_hook": entry.opening_hook,
                         "twist_hook": entry.twist_hook,
@@ -158,38 +158,6 @@ class EventBookEngine:
             for command in commands
             if command
         )
-
-    @staticmethod
-    def _collect_monster_tags(monsters: list[dict]) -> set[str]:
-        tags: set[str] = set()
-        for monster in monsters:
-            if not isinstance(monster, dict):
-                continue
-            for field in ("monster_tags", "preferred_locations", "keys"):
-                raw = monster.get(field, [])
-                if isinstance(raw, str):
-                    items = [raw]
-                elif isinstance(raw, list):
-                    items = raw
-                else:
-                    items = []
-                for item in items:
-                    text = str(item or "").strip()
-                    if text:
-                        tags.add(text)
-        return tags
-
-    @staticmethod
-    def _tag_overlap_score(text: str, tags: list[str], points: int) -> int:
-        if not text or not tags:
-            return 0
-        folded_text = text.casefold()
-        score = 0
-        for tag in tags:
-            value = str(tag or "").strip()
-            if value and (value in text or value.casefold() in folded_text):
-                score += points
-        return score
 
     @staticmethod
     def _normalize_event_key(value: str) -> str:
