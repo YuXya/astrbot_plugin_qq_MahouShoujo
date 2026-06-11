@@ -16,6 +16,17 @@ from ..utils.llm_utils import (
 from .battle_diary_analyzer import BattleDiaryAnalyzer
 
 
+HIDDEN_CURRENT_VARIABLE_KEYS = {
+    "schema_version",
+    "group_id",
+    "user_id",
+    "nickname",
+    "avatar_url",
+    "created_at",
+    "updated_at",
+}
+
+
 class ActionTurnAnalyzer(BattleDiaryAnalyzer):
     def __init__(
         self,
@@ -236,7 +247,9 @@ class ActionTurnAnalyzer(BattleDiaryAnalyzer):
                     current_world_date=current_world_date,
                 ),
                 "phase_protocol": self._phase_protocol(phase),
-                "current_variables_json": self._json_dump(player_data),
+                "current_variables_json": self._json_dump(
+                    self._visible_current_variables(player_data)
+                ),
                 "variable_api_document": self._variable_api_document(),
                 "backend_event_protocol": self._backend_event_protocol(pending_events),
                 "examples_library": self._examples_library(),
@@ -379,18 +392,23 @@ variable_api:
     - /主角/特质
     - /主角/永久性身体改造
     - /系统状态/待处理事件
-  readonly:
-    - /schema_version
-    - /group_id
-    - /user_id
-    - /created_at
-    - /updated_at
+  readonly: []
   rules:
     - 只根据本轮正文更新变量。
     - 不要把系统数据写进正文。
     - delta 只用于数字。
     - 完成待处理事件后 remove 对应事件 Key。
 """.strip()
+
+    @staticmethod
+    def _visible_current_variables(player_data: dict) -> dict:
+        if not isinstance(player_data, dict):
+            return {}
+        return {
+            key: value
+            for key, value in player_data.items()
+            if str(key) not in HIDDEN_CURRENT_VARIABLE_KEYS
+        }
 
     @staticmethod
     def _backend_event_protocol(pending_events: dict[str, Any]) -> str:
