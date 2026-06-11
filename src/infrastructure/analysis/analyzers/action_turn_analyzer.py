@@ -309,19 +309,61 @@ variable_api:
         return """
 examples_library:
   - scenario: "日常获得物品"
-    patch:
-      - { "op": "insert", "path": "/主角/道具栏/便签", "value": "写着今天的线索" }
-      - { "op": "replace", "path": "/主角/生理状态/当前生理动态", "value": "呼吸平稳" }
+    format: |
+      <UpdateVariable>
+        <Analysis>
+          - 指令与事件：无待处理事件。
+          - 状态检查：本轮是日常探索，阶段保持日常。
+          - 物品/位置/关系变化：正文写到我捡起并收好了便签，因此写入道具栏。
+          - 长期记忆：便签内容只是临时线索，暂不登记世界观备注。
+        </Analysis>
+        <JSONPatch>[
+          { "op": "insert", "path": "/主角/道具栏/便签", "value": "写着今天的线索" },
+          { "op": "replace", "path": "/主角/生理状态/当前生理动态", "value": "呼吸平稳" }
+        ]</JSONPatch>
+      </UpdateVariable>
   - scenario: "战斗损耗"
-    patch:
-      - { "op": "delta", "path": "/主角/核心状态/体力值/当前", "value": -8 }
-      - { "op": "delta", "path": "/主角/技能/闪避/进度", "value": 5 }
+    format: |
+      <UpdateVariable>
+        <Analysis>
+          - 指令与事件：无强制后台事件。
+          - 状态检查：正文中发生了短暂战斗，主角被击中但没有永久伤害。
+          - 物品/位置/关系变化：没有获得或消耗道具。
+          - 长期记忆：因为正文中明确使用闪避脱险，所以增加闪避进度。
+        </Analysis>
+        <JSONPatch>[
+          { "op": "delta", "path": "/主角/核心状态/体力值/当前", "value": -8 },
+          { "op": "replace", "path": "/主角/身体部位状况/手臂", "value": "轻微擦伤" },
+          { "op": "delta", "path": "/主角/技能/闪避/进度", "value": 5 },
+          { "op": "replace", "path": "/进程/阶段", "value": "日常" }
+        ]</JSONPatch>
+      </UpdateVariable>
   - scenario: "事件清理"
-    patch:
-      - { "op": "remove", "path": "/系统状态/待处理事件/线索整理事件" }
+    format: |
+      <UpdateVariable>
+        <Analysis>
+          - 指令与事件：本轮处理了待处理事件“线索整理事件”。
+          - 状态检查：正文照常推进，没有让玩家察觉后台整理。
+          - 物品/位置/关系变化：没有新增道具。
+          - 长期记忆：已将旧线索整理完成，因此移除事件触发器，避免重复执行。
+        </Analysis>
+        <JSONPatch>[
+          { "op": "remove", "path": "/系统状态/待处理事件/线索整理事件" }
+        ]</JSONPatch>
+      </UpdateVariable>
   - scenario: "世界观备注"
-    patch:
-      - { "op": "insert", "path": "/世界/世界观备注/地点_旧校舍", "value": "夜间会出现微弱魔力反应。" }
+    format: |
+      <UpdateVariable>
+        <Analysis>
+          - 指令与事件：无待处理事件。
+          - 状态检查：本轮发现了可复用的地点设定。
+          - 物品/位置/关系变化：没有道具变化，位置线索来自正文。
+          - 长期记忆：旧校舍夜间魔力反应会影响后续剧情，因此登记为世界观备注。
+        </Analysis>
+        <JSONPatch>[
+          { "op": "insert", "path": "/世界/世界观备注/地点_旧校舍", "value": "夜间会出现微弱魔力反应。" }
+        ]</JSONPatch>
+      </UpdateVariable>
 """.strip()
 
     @staticmethod
