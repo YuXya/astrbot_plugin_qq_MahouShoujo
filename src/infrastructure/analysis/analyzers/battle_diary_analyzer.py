@@ -182,27 +182,27 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         )
         cameo_memories_text = self._format_cameo_memories(cameo_memories)
         logs_text = self._format_logs(logs)
-        context_teammates = (selection_context or {}).get("selected_teammates")
+        context_participants = (selection_context or {}).get("selected_participants")
         teammate_info = self._format_teammate_info(
-            context_teammates if isinstance(context_teammates, list) else nearby_players
+            context_participants if isinstance(context_participants, list) else nearby_players
         )
-        selected_enemies = self._as_list((selection_context or {}).get("selected_enemies"))
-        selected_monsters = [
-            enemy for enemy in selected_enemies
-            if isinstance(enemy, dict) and not enemy.get("主角")
+        selected_targets = self._as_list((selection_context or {}).get("selected_targets"))
+        selected_monster_targets = [
+            target for target in selected_targets
+            if isinstance(target, dict) and not target.get("主角")
         ]
-        selected_player_enemies = [
-            enemy for enemy in selected_enemies
-            if isinstance(enemy, dict) and enemy.get("主角")
+        selected_player_targets = [
+            target for target in selected_targets
+            if isinstance(target, dict) and target.get("主角")
         ]
-        first_monster = selected_monsters[0] if selected_monsters else (
+        first_monster = selected_monster_targets[0] if selected_monster_targets else (
             (selection_context or {}).get("selected_monster")
         )
         first_magical = (selection_context or {}).get("target_magical_girl")
-        for enemy in selected_player_enemies:
-            faction = str(enemy.get("阵营") or "").strip()
+        for target in selected_player_targets:
+            faction = str(target.get("阵营") or "").strip()
             if faction == "魔法少女" and first_magical is None:
-                first_magical = enemy
+                first_magical = target
 
         return self.editable_manager.render_prompt(
             prompt_name,
@@ -214,10 +214,10 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "action": action,
                 "current_world_date": current_world_date,
                 "supplement_text": supplement_text,
-                "teammate_count": teammate_info["count"],
+                "participant_count": teammate_info["count"],
                 "recent_record_count": teammate_info["recent_record_count"],
-                "teammates_json": teammate_info["json"],
-                "selected_enemies_json": self._json_dump(selected_enemies),
+                "participants_json": teammate_info["json"],
+                "selected_targets_json": self._json_dump(selected_targets),
                 "selected_monster_json": self._json_dump(first_monster),
                 "scene_event_json": self._json_dump(
                     (selection_context or {}).get("scene_event")
@@ -295,13 +295,15 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "cameo_memories_text": self._format_cameo_memories(cameo_memories),
                 "candidates_json": self._json_dump(
                     {
-                        "teammates": self._prompt_protagonist_profiles(
+                        "participants": self._prompt_protagonist_profiles(
                             teammate_candidates
                         ),
-                        "magical_girls": self._prompt_protagonist_profiles(
-                            magical_girl_candidates
-                        ),
-                        "monsters": prompt_monster_candidates,
+                        "targets": {
+                            "magical_girls": self._prompt_protagonist_profiles(
+                                magical_girl_candidates
+                            ),
+                            "monsters": prompt_monster_candidates,
+                        },
                         "scene_events": scene_event_candidates,
                     }
                 ),
@@ -336,13 +338,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 teammate_candidates=teammate_candidates,
             )
 
-        selected_enemy_payload = (
-            parsed.get("selected_enemies")
-            or parsed.get("target_magical_girl")
-            or parsed.get("selected_monster")
-        )
+        selected_target_payload = parsed.get("selected_targets")
         targets = self._resolve_selected_magical_girls(
-            selected_enemy_payload,
+            selected_target_payload,
             magical_girl_candidates,
         )
         if not targets:
@@ -351,23 +349,23 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 monster_candidates=prompt_monster_candidates,
                 scene_event_candidates=scene_event_candidates,
                 text_parts=text_parts,
-                selected_monster=selected_enemy_payload,
+                selected_monster=selected_target_payload,
                 scene_event=parsed.get("scene_event"),
                 ai_win_rate=parsed.get("ai_win_rate"),
                 desire_win_rate=parsed.get("desire_win_rate"),
                 teammate_candidates=teammate_candidates,
-                selected_teammates=parsed.get("selected_teammates"),
+                selected_participants=parsed.get("selected_participants"),
             )
-        teammates = self._resolve_selected_profiles(
-            parsed.get("selected_teammates"),
+        participants = self._resolve_selected_profiles(
+            parsed.get("selected_participants"),
             teammate_candidates,
         )
         return {
             "battle_type": "magical_girl",
             "target_magical_girl": targets[0] if targets else None,
             "selected_monster": None,
-            "selected_teammates": teammates,
-            "selected_enemies": targets,
+            "selected_participants": participants,
+            "selected_targets": targets,
             "scene_event": self._resolve_selected_scene_event(
                 parsed.get("scene_event"), scene_event_candidates
             ) or self._select_scene_event(
@@ -377,7 +375,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             ),
             "battle_odds": self._build_battle_odds_context(
                 player_data=player_data,
-                teammate_data=teammates,
+                teammate_data=participants,
                 enemy_data=targets,
                 battle_kind="magical_girl_vs_magical_girl",
                 ai_win_rate=parsed.get("ai_win_rate"),
@@ -560,8 +558,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             "寻找",
             "挑战",
             "魔法少女",
-            "敌人",
             "目标",
+            "对象",
             "自由战斗",
         }
         values: set[str] = set()
@@ -633,7 +631,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         ai_win_rate: object = None,
         desire_win_rate: object = None,
         teammate_candidates: list[dict] | None = None,
-        selected_teammates: object = None,
+        selected_participants: object = None,
     ) -> dict[str, object]:
         resolved_scene = self._resolve_selected_scene_event(
             scene_event, scene_event_candidates
@@ -660,20 +658,20 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 selected_monster=resolved_monster,
                 text_parts=text_parts,
             )
-        teammates = self._resolve_selected_profiles(
-            selected_teammates,
+        participants = self._resolve_selected_profiles(
+            selected_participants,
             teammate_candidates or [],
         )
         return {
             "battle_type": "monster",
             "target_magical_girl": None,
             "selected_monster": resolved_monster,
-            "selected_teammates": teammates,
-            "selected_enemies": resolved_monsters,
+            "selected_participants": participants,
+            "selected_targets": resolved_monsters,
             "scene_event": resolved_scene,
             "battle_odds": self._build_battle_odds_context(
                 player_data=player_data,
-                teammate_data=teammates,
+                teammate_data=participants,
                 enemy_data=resolved_monsters,
                 battle_kind="magical_girl_vs_monster",
                 ai_win_rate=ai_win_rate,
@@ -835,7 +833,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             prompt=prompt,
             umo=umo,
             system_prompt=system_prompt,
-            purpose="队友语义识别",
+            purpose="参与对象语义识别",
             provider_id_override=self.config_manager.get_subtask_llm_provider_id(),
         )
         result_text = extract_response_text(response)
@@ -845,9 +843,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         success, parsed, error = parse_json_object_response(result_text)
         if not success or not isinstance(parsed, dict):
             mark_latest_llm_error(f"teammate completion JSON parse failed: {error}")
-            logger.warning(f"队友语义识别 JSON 解析失败，已跳过: {error}")
+            logger.warning(f"参与对象语义识别 JSON 解析失败，已跳过: {error}")
             return []
-        return self._normalize_teammate_names(parsed)
+        return self._normalize_participant_names(parsed)
 
     async def select_daily_context(
         self,
@@ -895,7 +893,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                     "从 scene_events 中选择一个适合本次指令和行动的 scene_event；"
                     "没有合适事件时写 null。\n"
                     "如果本次日常确实需要轻量异常、魔物、污染源或怪异参与，"
-                    "从 monsters 中选择 selected_monsters；普通生活日常不需要魔物时写 []。\n"
+                    "从 monsters 中选择 selected_targets；普通生活日常不需要额外目标时写 []。\n"
                     "只能从候选中选择，不要编造。\n"
                     + self._json_dump(
                         {
@@ -918,7 +916,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                     '    "reason": "判断理由，简短说明"\n'
                     "  }\n"
                     "}\n"
-                    "action_target 必须根据玩家行动、最近记录、候选玩家、候选场景事件和候选魔物判断；不要编造候选外目标。"
+                    "action_target 必须根据玩家行动、最近记录、候选参与对象、候选场景事件和候选目标判断；不要编造候选外目标。"
                 ),
             ]
         )
@@ -945,12 +943,12 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             logger.warning(f"daily event context selection JSON parse failed, skipped: {error}")
             parsed = {}
 
-        selected_monsters = self._resolve_selected_monsters(
-            parsed.get("selected_monsters") or parsed.get("selected_enemies"),
+        selected_targets = self._resolve_selected_monsters(
+            parsed.get("selected_targets"),
             monster_candidates,
             action_text="\n".join(text_parts),
         )
-        selected_monster = selected_monsters[0] if selected_monsters else None
+        selected_monster = selected_targets[0] if selected_targets else None
         scene_event = self._resolve_selected_scene_event(
             parsed.get("scene_event"), scene_event_candidates
         ) or self._select_scene_event(
@@ -961,14 +959,14 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         return {
             "battle_type": "daily",
             "action_target": self._normalize_action_target(parsed.get("action_target")),
-            "selected_teammates": self._resolve_selected_profiles(
+            "selected_participants": self._resolve_selected_profiles(
                 [
                     {"target_name": name}
-                    for name in self._normalize_teammate_names(parsed)
+                    for name in self._normalize_participant_names(parsed)
                 ],
                 candidates,
             ),
-            "selected_enemies": selected_monsters,
+            "selected_targets": selected_targets,
             "selected_monster": selected_monster,
             "scene_event": scene_event,
         }
@@ -1312,8 +1310,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         return [value]
 
     @staticmethod
-    def _normalize_teammate_names(data: dict[str, object]) -> list[str]:
-        raw_names = data.get("names", [])
+    def _normalize_participant_names(data: dict[str, object]) -> list[str]:
+        raw_names = data.get("participant_names", [])
         if not isinstance(raw_names, list):
             raw_names = str(raw_names or "").replace("，", ",").split(",")
         names: list[str] = []

@@ -129,9 +129,9 @@ class ActionTurnAnalyzer(BattleDiaryAnalyzer):
                 self.change_book_engine.build_fetish_prompt_text(protagonist),
             ]
         )
-        context_teammates = (selection_context or {}).get("selected_teammates")
+        context_participants = (selection_context or {}).get("selected_participants")
         teammate_info = self._format_teammate_info(
-            context_teammates if isinstance(context_teammates, list) else nearby_players
+            context_participants if isinstance(context_participants, list) else nearby_players
         )
         return self.editable_manager.render_prompt(
             "action_turn_prompt",
@@ -152,7 +152,7 @@ class ActionTurnAnalyzer(BattleDiaryAnalyzer):
                 "current_world_date": current_world_date,
                 "player_name": self._get_nested(protagonist, ["个人信息", "姓名"], "") or "主角",
                 "supplement_text": supplement_text or "无",
-                "teammates_json": teammate_info["json"],
+                "participants_json": teammate_info["json"],
                 "selection_context_json": self._json_dump(selection_context or {}),
             },
         )

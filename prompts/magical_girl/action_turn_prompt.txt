@@ -9,8 +9,8 @@
 补充设定：
 {{supplement_text}}
 
-队友/相关对象 JSON：
-{{teammates_json}}
+参与对象 JSON：
+{{participants_json}}
 
 上下文选择 JSON：
 {{selection_context_json}}

@@ -828,8 +828,10 @@ class SaveWebViewer:
                         </div>
                         ${{monsterTextarea("content", entry.content, "正文")}}
                         ${{monsterTextarea("battle_gimmicks", entry.battle_gimmicks, "战斗机制")}}
-                        ${{monsterTextarea("victory_ending_hooks", entry.victory_ending_hooks, "战斗胜利结尾")}}
-                        ${{monsterTextarea("defeat_ending_hooks", entry.defeat_ending_hooks, "战斗失败结尾")}}
+                        <div class="monster-ending-grid">
+                          ${{monsterTextarea("victory_ending_hooks", entry.victory_ending_hooks, "战斗胜利结尾")}}
+                          ${{monsterTextarea("defeat_ending_hooks", entry.defeat_ending_hooks, "战斗失败结尾")}}
+                        </div>
                       </div>
                     </details>
                   `;
@@ -971,8 +973,8 @@ class SaveWebViewer:
               const addEventButton = document.getElementById("add-event");
               const eventStorageKey = "{self._e(storage_key)}";
               const eventDefaultCategories = [
-                {{ id: "monster_enemy", name: "与敌人是魔物", events: [] }},
-                {{ id: "character_enemy", name: "与敌人是魔法少女", events: [] }},
+                {{ id: "monster_enemy", name: "目标是魔物", events: [] }},
+                {{ id: "character_enemy", name: "目标是魔法少女", events: [] }},
               ];
               const eventMonsterOptions = (Array.isArray(eventMonsterBook.entries) ? eventMonsterBook.entries : [])
                 .map((monster, index) => String(monster.name || monster.id || `魔物 ${{index + 1}}`).trim())
@@ -1343,8 +1345,8 @@ class SaveWebViewer:
     @classmethod
     def _normalize_event_book(cls, raw: object) -> dict[str, object]:
         default_categories = [
-            {"id": "monster_enemy", "name": "与敌人是魔物", "events": []},
-            {"id": "character_enemy", "name": "与敌人是魔法少女", "events": []},
+            {"id": "monster_enemy", "name": "目标是魔物", "events": []},
+            {"id": "character_enemy", "name": "目标是魔法少女", "events": []},
         ]
         if not isinstance(raw, dict):
             return {"version": 3, "categories": default_categories}
@@ -3536,6 +3538,8 @@ class SaveWebViewer:
     .compact-field span {{ flex: 0 0 auto; color: #3a4350; }}
     .world-entry input[type="text"], .world-entry input[type="number"], .world-entry select {{ width: 100%; min-width: 0; box-sizing: border-box; padding: 6px 8px; border: 1px solid #c8d0dc; border-radius: 7px; font: inherit; background: #fbfdff; }}
     .block-field {{ margin-top: 12px; }}
+    .monster-ending-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }}
+    .monster-ending-grid .block-field {{ margin-top: 12px; }}
     textarea.keys-editor {{ min-height: 48px; font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }}
     textarea.entry-content-editor {{ min-height: 78px; }}
     .monster-picker {{ margin-top: 12px; padding: 10px 12px; border: 1px solid #d9e1eb; border-radius: 8px; background: #f8fafc; }}
@@ -3663,7 +3667,7 @@ class SaveWebViewer:
     @media (max-width: 560px) {{ .state-overview-grid {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .progress-list {{ grid-template-columns: 1fr; }} }}
     @media (max-width: 560px) {{ .profile-edit-grid {{ grid-template-columns: 1fr; }} }}
-    @media (max-width: 720px) {{ .world-entry-grid, .book-config-grid {{ grid-template-columns: 1fr; }} .world-book-toolbar {{ flex-direction: column; }} .world-entry-head {{ flex-wrap: wrap; }} .hero-card {{ align-items: flex-start; }} .log-card-head {{ flex-direction: column; }} }}
+    @media (max-width: 720px) {{ .world-entry-grid, .book-config-grid, .monster-ending-grid {{ grid-template-columns: 1fr; }} .world-book-toolbar {{ flex-direction: column; }} .world-entry-head {{ flex-wrap: wrap; }} .hero-card {{ align-items: flex-start; }} .log-card-head {{ flex-direction: column; }} }}
     pre {{ overflow: auto; padding: 14px; background: #111827; color: #d1e7dd; border-radius: 6px; line-height: 1.45; }}
   </style>
 </head>

@@ -53,7 +53,7 @@ class ActionTurnApplicationService:
                 phase=phase,
                 umo=umo,
             )
-            nearby_players = self._selected_teammates(selection_context)
+            nearby_players = self._selected_participants(selection_context)
             analysis = await self.llm_analyzer.analyze_action_turn(
                 action_text=action_text,
                 player_data=player_data,
@@ -154,6 +154,6 @@ class ActionTurnApplicationService:
         return phase if phase in {"日常", "战斗", "事件"} else "日常"
 
     @staticmethod
-    def _selected_teammates(selection_context: dict[str, object]) -> list[dict]:
-        value = selection_context.get("selected_teammates") if isinstance(selection_context, dict) else []
+    def _selected_participants(selection_context: dict[str, object]) -> list[dict]:
+        value = selection_context.get("selected_participants") if isinstance(selection_context, dict) else []
         return value if isinstance(value, list) else []

@@ -260,7 +260,7 @@ class BattleDiaryApplicationService:
                 recent_record_count=recent_record_count,
             )
         except Exception as exc:
-            logger.warning(f"队友语义识别失败，已回退直接点名扫描: group={group_id} {exc}")
+            logger.warning(f"参与对象语义识别失败，已回退直接点名扫描: group={group_id} {exc}")
             return []
 
     async def _select_daily_context(
@@ -494,7 +494,7 @@ class BattleDiaryApplicationService:
         if not isinstance(selection_context, dict):
             return []
         players: list[dict] = []
-        for key in ("selected_teammates", "selected_enemies"):
+        for key in ("selected_participants", "selected_targets"):
             raw_items = selection_context.get(key)
             if isinstance(raw_items, dict):
                 raw_iter = [raw_items]

@@ -3,7 +3,7 @@
   "categories": [
     {
       "id": "monster_enemy",
-      "name": "与敌人是魔物",
+      "name": "目标是魔物",
       "events": [
         {
           "id": "rumor_investigation",
@@ -172,7 +172,7 @@
     },
     {
       "id": "character_enemy",
-      "name": "与敌人是魔法少女",
+      "name": "目标是魔法少女",
       "events": [
         {
           "id": "direct_challenge_duel",

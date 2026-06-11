@@ -15,8 +15,8 @@ except Exception:
 
 class EventBookEngine:
     DEFAULT_EVENT_CATEGORIES = [
-        {"id": "monster_enemy", "name": "与敌人是魔物"},
-        {"id": "character_enemy", "name": "与敌人是魔法少女"},
+        {"id": "monster_enemy", "name": "目标是魔物"},
+        {"id": "character_enemy", "name": "目标是魔法少女"},
     ]
 
     def __init__(

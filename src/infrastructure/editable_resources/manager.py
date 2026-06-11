@@ -295,7 +295,7 @@ class EditableResourceManager:
             },
             {
                 "id": self.PROMPT_FILES["teammate_completion_prompt"],
-                "label": "队友语义识别 Prompt",
+                "label": "参与对象语义识别 Prompt",
                 "type": "text",
                 "category": "text_completion",
             },
@@ -347,7 +347,7 @@ class EditableResourceManager:
                 "Monster events can list compatible_monsters by public monster name; otherwise the target-selection LLM chooses from the event candidates."
             ),
             "monster_book/default.json": (
-                "魔物书文件。公共魔物书是普通魔物敌人图鉴，普通魔物战会从这里选择本次敌人或异常源。"
+                "魔物书文件。公共魔物书是普通魔物目标图鉴，普通魔物战会从这里选择本次目标或异常源。"
             ),
             self.PROMPT_FILES["reincarnation_prompt"]: (
                 "用于 /魔法少女转生 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
@@ -356,7 +356,7 @@ class EditableResourceManager:
             ),
             self.PROMPT_FILES["magical_battle_target_selection_prompt"]: (
                 "用于 /魔法少女战斗 正文生成前的后台目标判断。使用子任务 LLM Provider，"
-                "选择 scene_event、selected_teammates、selected_enemies，并给出 AI 侧胜率判断。"
+                "选择 scene_event、selected_participants、selected_targets，并给出 AI 侧胜率判断。"
             ),
             self.PROMPT_FILES["action_turn_prompt"]: (
                 "用于 /魔法少女行动 的酒馆式完整回合 Prompt。发给 AI 的 user message "
@@ -369,11 +369,11 @@ class EditableResourceManager:
                 "要求 AI 返回纯 JSON，relationships 数组代表单向关系箭头，public_reputations 数组代表城市风评。"
             ),
             self.PROMPT_FILES["teammate_completion_prompt"]: (
-                "用于日常正文生成前的后台日常事件上下文识别；会判断 action_target、names、scene_event 和 selected_monsters。"
+                "用于日常正文生成前的后台日常事件上下文识别；会判断 action_target、participant_names、scene_event 和 selected_targets。"
                 "可用变量还包括 {{scene_events_json}} 与 {{monster_candidates_json}}。"
-                "用于 /魔法少女战斗 生成前的后台队友语义识别。发给 AI 的 user message 就是这个模板渲染后的结果。"
+                "用于 /魔法少女战斗 生成前的后台参与对象语义识别。发给 AI 的 user message 就是这个模板渲染后的结果。"
                 "可用变量：{{action}}、{{player_data_update_json}}、{{logs_text}}、{{cameo_memories_text}}、{{candidates_json}}。"
-                "要求 AI 返回纯 JSON，names 数组中的每一项是候选玩家名或魔法少女名。"
+                "要求 AI 返回纯 JSON，participant_names 数组中的每一项是候选玩家名或魔法少女名。"
             ),
             self.PROMPT_FILES["default_system_prompt"]: (
                 "用于 /魔法少女转生 和 /魔法少女战斗 的 system message。"
