@@ -32,7 +32,6 @@ class EventBookEngine:
         text_parts: list[str] | None,
         *,
         current_event: str,
-        battle_types: list[str] | None = None,
         category_ids: list[str] | None = None,
         monster_candidates: list[dict] | None = None,
         limit: int = 8,
@@ -42,11 +41,6 @@ class EventBookEngine:
             return []
 
         current_event_key = self._normalize_event_key(current_event)
-        allowed_battle_types = {
-            str(item or "").strip()
-            for item in (battle_types or [])
-            if str(item or "").strip()
-        }
         allowed_category_ids = {
             str(item or "").strip()
             for item in (category_ids or [])
@@ -63,9 +57,6 @@ class EventBookEngine:
                     continue
                 if not self._entry_command_matches(entry, event_commands, current_event_key):
                     continue
-                if allowed_battle_types and entry.compatible_battle_types:
-                    if not allowed_battle_types.intersection(entry.compatible_battle_types):
-                        continue
 
                 candidates.append(
                     {
@@ -78,10 +69,8 @@ class EventBookEngine:
                         "allowed_commands": entry.allowed_commands
                         or event.allowed_commands
                         or ([event.command] if event.command else []),
-                        "event_tags": entry.event_tags,
                         "location_tags": entry.location_tags,
                         "compatible_monsters": entry.compatible_monsters,
-                        "compatible_battle_types": entry.compatible_battle_types,
                         "opening_hook": entry.opening_hook,
                         "twist_hook": entry.twist_hook,
                         "ending_hook": entry.ending_hook,
@@ -153,6 +142,8 @@ class EventBookEngine:
         current_event_key: str,
     ) -> bool:
         commands = entry.allowed_commands or event_commands
+        if not any(command for command in commands):
+            return True
         return any(
             EventBookEngine._normalize_event_key(command) == current_event_key
             for command in commands

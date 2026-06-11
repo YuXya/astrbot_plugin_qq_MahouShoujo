@@ -922,6 +922,23 @@ class SaveWebViewer:
                 <button class="secondary compact-button" type="submit">导入 JSON</button>
               </form>
             </div>
+            <div id="event-monster-picker-modal" class="monster-modal" hidden>
+              <div class="monster-modal-backdrop" data-action="close-event-monster-picker"></div>
+              <section class="monster-modal-panel" role="dialog" aria-modal="true" aria-labelledby="event-monster-picker-title">
+                <div class="monster-modal-head">
+                  <div>
+                    <span>Monster Picker</span>
+                    <h2 id="event-monster-picker-title">选择兼容魔物</h2>
+                  </div>
+                  <button class="secondary compact-button" type="button" data-action="close-event-monster-picker">关闭</button>
+                </div>
+                <div class="monster-choice-grid" id="event-monster-picker-options"></div>
+                <div class="monster-modal-actions">
+                  <button class="secondary" type="button" data-action="close-event-monster-picker">取消</button>
+                  <button type="button" data-action="confirm-event-monster-picker">确定</button>
+                </div>
+              </section>
+            </div>
             <form id="event-book-form" method="post" action="{self._url('/editable/save')}">
               <input type="hidden" name="id" value="{self._e(file_id)}">
               <input type="hidden" name="category" value="{self._e(back_category)}">
@@ -953,17 +970,6 @@ class SaveWebViewer:
               const eventContentInput = document.getElementById("event-book-content");
               const addEventButton = document.getElementById("add-event");
               const eventStorageKey = "{self._e(storage_key)}";
-              const commandOptions = [
-                "/魔法少女转生",
-                "/反派魔女转生",
-                "/魔法少女战斗",
-                "/魔法少女日常",
-                "/魔法少女黑化",
-                "/反派魔女洗白",
-                "/反派魔女战斗",
-                "/反派魔女日常",
-              ];
-              const battleTypeOptions = ["monster", "villain_witch", "magical_girl", "environment_crisis"];
               const eventDefaultCategories = [
                 {{ id: "monster_enemy", name: "与敌人是魔物", events: [] }},
                 {{ id: "character_enemy", name: "与敌人是魔法少女", events: [] }},
@@ -971,6 +977,8 @@ class SaveWebViewer:
               const eventMonsterOptions = (Array.isArray(eventMonsterBook.entries) ? eventMonsterBook.entries : [])
                 .map((monster, index) => String(monster.name || monster.id || `魔物 ${{index + 1}}`).trim())
                 .filter(Boolean);
+              let activeMonsterPickerCard = null;
+              let activeMonsterPickerSelection = new Set();
               const eventState = {{
                 version: Number(initialEventBook.version || 3),
                 categories: eventNormalizeCategories(initialEventBook),
@@ -985,11 +993,8 @@ class SaveWebViewer:
                   recursive: true,
                   strategy: "keyword",
                   keys: [],
-                  allowed_commands: [],
-                  event_tags: [],
                   location_tags: [],
                   compatible_monsters: [],
-                  compatible_battle_types: [],
                   opening_hook: "",
                   twist_hook: "",
                   ending_hook: "",
@@ -1010,11 +1015,8 @@ class SaveWebViewer:
                   recursive: entry.recursive !== false,
                   strategy: entry.strategy === "always" ? "always" : "keyword",
                   keys: eventSplitList(entry.keys),
-                  allowed_commands: eventSplitList(entry.allowed_commands || entry.command),
-                  event_tags: eventSplitList(entry.event_tags),
                   location_tags: eventSplitList(entry.location_tags),
                   compatible_monsters: eventSplitList(entry.compatible_monsters),
-                  compatible_battle_types: eventSplitList(entry.compatible_battle_types),
                   opening_hook: String(entry.opening_hook || ""),
                   twist_hook: String(entry.twist_hook || ""),
                   ending_hook: String(entry.ending_hook || ""),
@@ -1070,13 +1072,63 @@ class SaveWebViewer:
                 }}
               }}
 
-              function eventCheckedList(name, values, options, className = "command-choice") {{
-                const selected = new Set(eventSplitList(values));
-                return options.map((option) => `
-                  <label class="summary-check ${{className}}">
-                    <input data-field="${{eventEscapeAttr(name)}}" type="checkbox" value="${{eventEscapeAttr(option)}}"${{selected.has(option) ? " checked" : ""}}> ${{eventEscapeHtml(option)}}
-                  </label>
-                `).join("");
+              function eventMonsterChipHtml(name) {{
+                return `
+                  <span class="monster-selected-chip" data-monster-name="${{eventEscapeAttr(name)}}">
+                    <span>${{eventEscapeHtml(name)}}</span>
+                    <button type="button" data-action="remove-compatible-monster" aria-label="移除 ${{eventEscapeAttr(name)}}">×</button>
+                  </span>
+                `;
+              }}
+
+              function eventSelectedMonsterListHtml(values) {{
+                const selected = eventSplitList(values);
+                if (!selected.length) {{
+                  return '<span class="muted">未选择魔物</span>';
+                }}
+                return selected.map(eventMonsterChipHtml).join("");
+              }}
+
+              function eventSetCardMonsters(card, names) {{
+                const clean = Array.from(new Set(names.map((name) => String(name || "").trim()).filter(Boolean)));
+                card.dataset.compatibleMonsters = JSON.stringify(clean);
+                const list = card.querySelector("[data-role='compatible-monster-list']");
+                if (list) {{
+                  list.innerHTML = eventSelectedMonsterListHtml(clean);
+                }}
+              }}
+
+              function eventGetCardMonsters(card) {{
+                try {{
+                  const parsed = JSON.parse(card.dataset.compatibleMonsters || "[]");
+                  return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
+                }} catch (error) {{
+                  return [];
+                }}
+              }}
+
+              function eventOpenMonsterPicker(card) {{
+                activeMonsterPickerCard = card;
+                activeMonsterPickerSelection = new Set(eventGetCardMonsters(card));
+                eventRenderMonsterPickerModal();
+                document.getElementById("event-monster-picker-modal").hidden = false;
+              }}
+
+              function eventCloseMonsterPicker() {{
+                document.getElementById("event-monster-picker-modal").hidden = true;
+                activeMonsterPickerCard = null;
+                activeMonsterPickerSelection = new Set();
+              }}
+
+              function eventRenderMonsterPickerModal() {{
+                const options = document.getElementById("event-monster-picker-options");
+                if (!options) return;
+                options.innerHTML = eventMonsterOptions.map((name) => `
+                  <button class="monster-choice-card${{activeMonsterPickerSelection.has(name) ? " selected" : ""}}" type="button" data-monster-name="${{eventEscapeAttr(name)}}">
+                    <span class="monster-choice-check">${{activeMonsterPickerSelection.has(name) ? "✓" : ""}}</span>
+                    <strong>${{eventEscapeHtml(name)}}</strong>
+                  </button>
+                `).join("") || '<p class="muted empty-state">当前魔物书没有可选择的魔物。</p>';
               }}
 
               function eventSyncFromDom() {{
@@ -1093,11 +1145,8 @@ class SaveWebViewer:
                       recursive: card.querySelector("[data-field='recursive']").checked,
                       strategy: card.querySelector("[data-field='strategy']").value,
                       keys: card.querySelector("[data-field='keys']").value,
-                      allowed_commands: Array.from(card.querySelectorAll("[data-field='allowed_command']:checked")).map((input) => input.value),
-                      event_tags: card.querySelector("[data-field='event_tags']").value,
                       location_tags: card.querySelector("[data-field='location_tags']").value,
-                      compatible_monsters: Array.from(card.querySelectorAll("[data-field='compatible_monster']:checked")).map((input) => input.value),
-                      compatible_battle_types: Array.from(card.querySelectorAll("[data-field='compatible_battle_type']:checked")).map((input) => input.value),
+                      compatible_monsters: eventGetCardMonsters(card),
                       opening_hook: card.querySelector("[data-field='opening_hook']").value,
                       twist_hook: card.querySelector("[data-field='twist_hook']").value,
                       ending_hook: card.querySelector("[data-field='ending_hook']").value,
@@ -1157,25 +1206,14 @@ class SaveWebViewer:
                             <label class="summary-check"><input data-field="recursive" type="checkbox"${{entry.recursive ? " checked" : ""}}> 递归关键词</label>
                           </div>
                           ${{eventTextarea("keys", entry.keys, "关键词", "keys-editor")}}
-                          <div class="block-field">
-                            <label>适用指令</label>
-                            <div class="log-meta">${{eventCheckedList("allowed_command", entry.allowed_commands, commandOptions)}}</div>
-                          </div>
-                          ${{eventTextarea("event_tags", entry.event_tags, "事件标签", "keys-editor")}}
                           ${{eventTextarea("location_tags", entry.location_tags, "地点标签", "keys-editor")}}
-                          <div class="block-field">
-                            <label>兼容战斗类型</label>
-                            <div class="log-meta">${{eventCheckedList("compatible_battle_type", entry.compatible_battle_types, battleTypeOptions)}}</div>
-                          </div>
                           ${{isMonsterCategory ? `
                             <div class="monster-picker">
                               <div class="monster-picker-head">
                                 <strong>兼容魔物</strong>
-                                <span class="muted">按魔物名称保存 compatible_monsters</span>
+                                <button class="compact-button secondary monster-add-button" type="button" data-action="open-compatible-monster-picker">+</button>
                               </div>
-                              <div class="monster-picker-options">
-                                ${{eventCheckedList("compatible_monster", entry.compatible_monsters, eventMonsterOptions, "monster-picker-option")}}
-                              </div>
+                              <div class="monster-selected-list" data-role="compatible-monster-list">${{eventSelectedMonsterListHtml(entry.compatible_monsters)}}</div>
                             </div>
                           ` : ""}}
                           ${{eventTextarea("opening_hook", entry.opening_hook, "开场钩子")}}
@@ -1185,6 +1223,7 @@ class SaveWebViewer:
                         </div>
                       </details>
                     `;
+                    eventSetCardMonsters(card, entry.compatible_monsters);
                     card.querySelector("details").addEventListener("toggle", (event) => {{
                       if (event.currentTarget.open) eventOpenKeys.add(key);
                       else eventOpenKeys.delete(key);
@@ -1195,6 +1234,18 @@ class SaveWebViewer:
                       category.events.splice(index, 1);
                       eventOpenKeys.delete(key);
                       eventRender();
+                    }});
+                    const openMonsterPickerButton = card.querySelector("[data-action='open-compatible-monster-picker']");
+                    if (openMonsterPickerButton) {{
+                      openMonsterPickerButton.addEventListener("click", () => eventOpenMonsterPicker(card));
+                    }}
+                    card.addEventListener("click", (event) => {{
+                      const removeButton = event.target.closest("[data-action='remove-compatible-monster']");
+                      if (!removeButton) return;
+                      const chip = removeButton.closest("[data-monster-name]");
+                      const name = chip ? chip.dataset.monsterName : "";
+                      eventSetCardMonsters(card, eventGetCardMonsters(card).filter((item) => item !== name));
+                      eventSyncFromDom();
                     }});
                     card.addEventListener("input", eventSyncFromDom);
                     card.addEventListener("change", eventSyncFromDom);
@@ -1211,6 +1262,27 @@ class SaveWebViewer:
                 category.events.push(entry);
                 eventOpenKeys.add(eventEntryKey(category, entry, category.events.length - 1));
                 eventRender();
+              }});
+
+              document.getElementById("event-monster-picker-options").addEventListener("click", (event) => {{
+                const option = event.target.closest("[data-monster-name]");
+                if (!option) return;
+                const name = option.dataset.monsterName;
+                if (activeMonsterPickerSelection.has(name)) activeMonsterPickerSelection.delete(name);
+                else activeMonsterPickerSelection.add(name);
+                eventRenderMonsterPickerModal();
+              }});
+
+              document.querySelectorAll("[data-action='close-event-monster-picker']").forEach((button) => {{
+                button.addEventListener("click", eventCloseMonsterPicker);
+              }});
+
+              document.querySelector("[data-action='confirm-event-monster-picker']").addEventListener("click", () => {{
+                if (activeMonsterPickerCard) {{
+                  eventSetCardMonsters(activeMonsterPickerCard, Array.from(activeMonsterPickerSelection));
+                  eventSyncFromDom();
+                }}
+                eventCloseMonsterPicker();
               }});
 
               eventForm.addEventListener("submit", () => {{
@@ -1326,10 +1398,7 @@ class SaveWebViewer:
             "recursive": entry.get("recursive", True) is not False,
             "strategy": "always" if str(entry.get("strategy") or "").strip().lower() == "always" else "keyword",
             "keys": cls._normalize_editor_text_list(entry.get("keys")),
-            "allowed_commands": cls._normalize_editor_text_list(entry.get("allowed_commands") or entry.get("command")),
-            "event_tags": cls._normalize_editor_text_list(entry.get("event_tags")),
             "location_tags": cls._normalize_editor_text_list(entry.get("location_tags")),
-            "compatible_battle_types": cls._normalize_editor_text_list(entry.get("compatible_battle_types")),
             "opening_hook": str(entry.get("opening_hook") or "").strip(),
             "twist_hook": str(entry.get("twist_hook") or "").strip(),
             "ending_hook": str(entry.get("ending_hook") or "").strip(),
@@ -3475,6 +3544,7 @@ class SaveWebViewer:
     .monster-selected-chip {{ display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border: 1px solid #c8d6e5; border-radius: 999px; background: #fff; color: #263241; font-size: 13px; font-weight: 800; }}
     .monster-selected-chip button {{ width: 22px; height: 22px; min-height: 0; display: inline-grid; place-items: center; margin: 0; padding: 0; border-radius: 50%; border: 1px solid #d9e1eb; background: #eef4fa; color: #536172; line-height: 1; }}
     .monster-selected-chip button:hover {{ background: #ffe7e3; color: #b42318; border-color: #f0b8b0; }}
+    .monster-add-button {{ width: 30px; min-height: 30px; display: inline-grid; place-items: center; margin: 0; padding: 0; border-radius: 999px; font-size: 18px; line-height: 1; }}
     .monster-unmatched-tags {{ display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; padding: 7px 9px; border: 1px dashed #d3b969; border-radius: 8px; background: #fff9df; color: #6f5410; font-size: 13px; }}
     .monster-unmatched-tags code {{ padding: 2px 5px; border-radius: 5px; background: rgba(111,84,16,.1); }}
     .monster-picker-add, .monster-advanced-tags {{ margin-top: 10px; }}
@@ -3493,10 +3563,17 @@ class SaveWebViewer:
     .monster-modal[hidden] {{ display: none; }}
     .monster-modal {{ position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 24px; }}
     .monster-modal-backdrop {{ position: absolute; inset: 0; background: rgba(15, 23, 42, .54); backdrop-filter: blur(4px); }}
-    .monster-modal-panel {{ position: relative; width: min(980px, 100%); max-height: min(760px, calc(100vh - 48px)); display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid #d9e1eb; border-radius: 8px; background: #fff; box-shadow: 0 24px 70px rgba(15, 23, 42, .32); }}
+    .monster-modal-panel {{ position: relative; width: min(980px, 100%); max-height: min(760px, calc(100vh - 48px)); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; border: 1px solid #d9e1eb; border-radius: 8px; background: #fff; box-shadow: 0 24px 70px rgba(15, 23, 42, .32); }}
     .monster-modal-head {{ display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #e5ebf2; background: #f8fafc; }}
     .monster-modal-head span {{ display: block; color: #68707d; font-size: 12px; font-weight: 900; text-transform: uppercase; }}
     .monster-modal-head h2 {{ margin: 2px 0 0; color: #172033; }}
+    .monster-modal-actions {{ display: flex; justify-content: flex-end; gap: 10px; padding: 12px 16px; border-top: 1px solid #e5ebf2; background: #f8fafc; }}
+    .monster-choice-grid {{ max-height: min(560px, calc(100vh - 190px)); display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; overflow: auto; padding: 16px; align-content: start; }}
+    .monster-choice-card {{ min-height: 74px; display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: center; margin: 0; padding: 12px; border: 1px solid #d8e0eb; border-radius: 8px; background: #fff; color: #263241; text-align: left; box-shadow: 0 5px 14px rgba(31, 41, 55, .05); }}
+    .monster-choice-card:hover {{ border-color: #8ab5e6; background: #f6faff; transform: translateY(-1px); }}
+    .monster-choice-card.selected {{ border-color: #1f6feb; background: #eef6ff; box-shadow: 0 0 0 3px rgba(31, 111, 235, .12); }}
+    .monster-choice-check {{ width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid #c8d6e5; border-radius: 6px; background: #f8fafc; color: #1f6feb; font-weight: 900; }}
+    .monster-choice-card.selected .monster-choice-check {{ background: #1f6feb; border-color: #1f6feb; color: #fff; }}
     .delete-modal[hidden] {{ display: none; }}
     .delete-modal {{ position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; padding: 24px; }}
     .delete-modal-backdrop {{ position: absolute; inset: 0; background: rgba(15, 23, 42, .54); backdrop-filter: blur(4px); }}

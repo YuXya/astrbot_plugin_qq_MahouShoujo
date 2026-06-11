@@ -267,7 +267,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         scene_event_candidates = self.event_book_engine.build_scene_event_candidates(
             text_parts,
             current_event="/魔法少女战斗",
-            battle_types=["monster", "magical_girl", "environment_crisis"],
             category_ids=category_ids,
             monster_candidates=event_monster_candidates,
             limit=80,
@@ -337,23 +336,13 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 teammate_candidates=teammate_candidates,
             )
 
-        battle_type = str(parsed.get("battle_type") or "").strip()
-        if battle_type != "magical_girl":
-            return self._magical_monster_context(
-                player_data=player_data,
-                monster_candidates=prompt_monster_candidates,
-                scene_event_candidates=scene_event_candidates,
-                text_parts=text_parts,
-                selected_monster=parsed.get("selected_enemies") or parsed.get("selected_monster"),
-                scene_event=parsed.get("scene_event"),
-                ai_win_rate=parsed.get("ai_win_rate"),
-                desire_win_rate=parsed.get("desire_win_rate"),
-                teammate_candidates=teammate_candidates,
-                selected_teammates=parsed.get("selected_teammates"),
-            )
-
+        selected_enemy_payload = (
+            parsed.get("selected_enemies")
+            or parsed.get("target_magical_girl")
+            or parsed.get("selected_monster")
+        )
         targets = self._resolve_selected_magical_girls(
-            parsed.get("selected_enemies") or parsed.get("target_magical_girl"),
+            selected_enemy_payload,
             magical_girl_candidates,
         )
         if not targets:
@@ -362,7 +351,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 monster_candidates=prompt_monster_candidates,
                 scene_event_candidates=scene_event_candidates,
                 text_parts=text_parts,
-                selected_monster=parsed.get("selected_enemies") or parsed.get("selected_monster"),
+                selected_monster=selected_enemy_payload,
                 scene_event=parsed.get("scene_event"),
                 ai_win_rate=parsed.get("ai_win_rate"),
                 desire_win_rate=parsed.get("desire_win_rate"),
@@ -383,7 +372,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 parsed.get("scene_event"), scene_event_candidates
             ) or self._select_scene_event(
                 scene_event_candidates,
-                battle_type="magical_girl",
                 selected_monster=None,
                 text_parts=text_parts,
             ),
@@ -577,7 +565,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             "自由战斗",
         }
         values: set[str] = set()
-        for field in ("keys", "event_tags", "location_tags"):
+        for field in ("keys",):
             values.update(self._text_set(candidate.get(field)))
         for value in values:
             token = str(value or "").strip()
@@ -651,7 +639,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             scene_event, scene_event_candidates
         ) or self._select_scene_event(
             scene_event_candidates,
-            battle_type="monster",
             selected_monster=None,
             text_parts=text_parts,
         )
@@ -670,7 +657,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         if not resolved_scene:
             resolved_scene = self._select_scene_event(
                 scene_event_candidates,
-                battle_type="monster",
                 selected_monster=resolved_monster,
                 text_parts=text_parts,
             )
@@ -890,7 +876,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         scene_event_candidates = self.event_book_engine.build_scene_event_candidates(
             text_parts,
             current_event=event_command,
-            battle_types=["daily", "monster", "environment_crisis"],
             monster_candidates=monster_candidates,
         )
         prompt = self.build_teammate_completion_prompt(
@@ -970,7 +955,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             parsed.get("scene_event"), scene_event_candidates
         ) or self._select_scene_event(
             scene_event_candidates,
-            battle_type="daily",
             selected_monster=selected_monster,
             text_parts=text_parts,
         )
@@ -1104,21 +1088,13 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         self,
         candidates: list[dict],
         *,
-        battle_type: str,
         selected_monster: dict | None,
         text_parts: list[str],
     ) -> dict | None:
         if not candidates:
             return None
         action_text = str(text_parts[0] if text_parts else "")
-        compatible: list[dict] = []
-        for candidate in candidates:
-            if not isinstance(candidate, dict):
-                continue
-            compatible_types = self._text_set(candidate.get("compatible_battle_types"))
-            if compatible_types and battle_type not in compatible_types:
-                continue
-            compatible.append(candidate)
+        compatible = [candidate for candidate in candidates if isinstance(candidate, dict)]
         if not compatible:
             return None
 

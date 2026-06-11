@@ -19,25 +19,12 @@
             "都市传说",
             "怪谈"
           ],
-          "allowed_commands": [
-            "/魔法少女战斗",
-            "/魔法少女日常"
-          ],
-          "event_tags": [
-            "情报调查",
-            "都市传说",
-            "怪谈"
-          ],
           "location_tags": [
             "城市",
             "学校",
             "商业街",
             "夜晚",
             "巷道"
-          ],
-          "compatible_battle_types": [
-            "monster",
-            "environment_crisis"
           ],
           "opening_hook": "主角追查最近扩散的怪谈传闻，发现传闻背后有魔物借由人群恐惧成形。",
           "twist_hook": "传闻会随着旁观者的想象改变魔物能力，战场气氛越紧张，魔物越容易变强。",
@@ -63,25 +50,12 @@
             "例行巡逻",
             "巡街"
           ],
-          "allowed_commands": [
-            "/魔法少女战斗",
-            "/魔法少女日常"
-          ],
-          "event_tags": [
-            "巡逻",
-            "异常处理",
-            "遭遇"
-          ],
           "location_tags": [
             "城市",
             "公园",
             "街区",
             "河岸",
             "废弃地"
-          ],
-          "compatible_battle_types": [
-            "monster",
-            "environment_crisis"
           ],
           "opening_hook": "例行巡逻中，熟悉的街景忽然出现不合常理的污染痕迹。",
           "twist_hook": "异常源会主动避开视线，迫使主角在移动中判断真正的魔物位置。",
@@ -108,24 +82,12 @@
             "救命",
             "信号"
           ],
-          "allowed_commands": [
-            "/魔法少女战斗",
-            "/魔法少女日常"
-          ],
-          "event_tags": [
-            "救援",
-            "人质",
-            "紧急事件"
-          ],
           "location_tags": [
             "居民区",
             "学校",
             "商场",
             "医院",
             "车站"
-          ],
-          "compatible_battle_types": [
-            "monster"
           ],
           "opening_hook": "求救信号断断续续传来，现场却看不到明显的受害者。",
           "twist_hook": "魔物模仿求救声吸引猎物，真正的被困者被藏在污染结界边缘。",
@@ -152,25 +114,12 @@
             "净化污染",
             "异常污染"
           ],
-          "allowed_commands": [
-            "/魔法少女战斗",
-            "/魔法少女日常"
-          ],
-          "event_tags": [
-            "净化",
-            "污染源",
-            "环境危机"
-          ],
           "location_tags": [
             "下水道",
             "废弃工厂",
             "河岸",
             "地下空间",
             "城市边缘"
-          ],
-          "compatible_battle_types": [
-            "monster",
-            "environment_crisis"
           ],
           "opening_hook": "污染源像一颗脉动的核心扎在场地深处，不断向外释放魔力污渍。",
           "twist_hook": "污染会缠住衣摆、武器或影子，制造行动受限和判断延迟。",
@@ -197,23 +146,12 @@
             "遇到",
             "撞见"
           ],
-          "allowed_commands": [
-            "/魔法少女战斗"
-          ],
-          "event_tags": [
-            "遭遇战",
-            "突发",
-            "随机事件"
-          ],
           "location_tags": [
             "城市",
             "街道",
             "公园",
             "学校",
             "郊区"
-          ],
-          "compatible_battle_types": [
-            "monster"
           ],
           "opening_hook": "一次看似普通的经过突然被魔物撕开日常边界。",
           "twist_hook": "魔物并不是孤立出现，附近环境也被轻微污染，随时可能干扰战斗。",
@@ -250,23 +188,12 @@
             "正面对决",
             "宣战"
           ],
-          "allowed_commands": [
-            "/魔法少女战斗"
-          ],
-          "event_tags": [
-            "决斗",
-            "正面对决",
-            "软色情战斗"
-          ],
           "location_tags": [
             "屋顶",
             "学校",
             "公园",
             "废弃地",
             "结界"
-          ],
-          "compatible_battle_types": [
-            "magical_girl"
           ],
           "opening_hook": "双方以明确挑战开始战斗，距离、视线和言语挑衅都被拉到极近。",
           "twist_hook": "战斗中可以出现近身压制、武器抵住要害、衣装战损和涩涩羞耻感，要涩涩。",
@@ -287,23 +214,12 @@
             "抢人",
             "保护"
           ],
-          "allowed_commands": [
-            "/魔法少女战斗"
-          ],
-          "event_tags": [
-            "误会",
-            "救援",
-            "冲突"
-          ],
           "location_tags": [
             "城市",
             "学校",
             "医院",
             "居民区",
             "结界"
-          ],
-          "compatible_battle_types": [
-            "magical_girl"
           ],
           "opening_hook": "双方都认为自己是在保护现场，却因为立场和信息差立刻爆发冲突。",
           "twist_hook": "救援对象、旁观者或结界残留会让双方必须压低火力，战斗更容易变成近身制伏。",
@@ -324,23 +240,12 @@
             "失控",
             "比试"
           ],
-          "allowed_commands": [
-            "/魔法少女战斗"
-          ],
-          "event_tags": [
-            "训练",
-            "切磋",
-            "失控"
-          ],
           "location_tags": [
             "训练场",
             "学校",
             "结界",
             "屋顶",
             "公园"
-          ],
-          "compatible_battle_types": [
-            "magical_girl"
           ],
           "opening_hook": "原本只是试探实力的训练，因为一句挑衅或一次过火反击迅速失控。",
           "twist_hook": "双方都不想先认输，制伏动作和贴身攻防逐渐越过普通切磋的距离。",

@@ -344,7 +344,7 @@ class EditableResourceManager:
             "event_book/default.json": (
                 "Event book v3 uses categories: monster_enemy and character_enemy. "
                 "Each category has an events list; allowed_commands declares usable commands. "
-                "When player text explicitly asks for monsters, monster_enemy events are filtered by compatible public monster tags first."
+                "Monster events can list compatible_monsters by public monster name; otherwise the target-selection LLM chooses from the event candidates."
             ),
             "monster_book/default.json": (
                 "魔物书文件。公共魔物书是普通魔物敌人图鉴，普通魔物战会从这里选择本次敌人或异常源。"
@@ -356,7 +356,7 @@ class EditableResourceManager:
             ),
             self.PROMPT_FILES["magical_battle_target_selection_prompt"]: (
                 "用于 /魔法少女战斗 正文生成前的后台目标判断。使用子任务 LLM Provider，"
-                "选择 battle_type、scene_event、selected_teammates、selected_enemies，并给出 AI 侧胜率判断。"
+                "选择 scene_event、selected_teammates、selected_enemies，并给出 AI 侧胜率判断。"
             ),
             self.PROMPT_FILES["action_turn_prompt"]: (
                 "用于 /魔法少女行动 的酒馆式完整回合 Prompt。发给 AI 的 user message "

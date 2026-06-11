@@ -14,10 +14,8 @@ class EventBookEntry:
     recursive: bool = True
     content: str = ""
     allowed_commands: list[str] = field(default_factory=list)
-    event_tags: list[str] = field(default_factory=list)
     location_tags: list[str] = field(default_factory=list)
     compatible_monsters: list[str] = field(default_factory=list)
-    compatible_battle_types: list[str] = field(default_factory=list)
     opening_hook: str = ""
     twist_hook: str = ""
     ending_hook: str = ""
@@ -48,12 +46,8 @@ class EventBookEntry:
             recursive=raw.get("recursive", True) is not False,
             content=str(raw.get("content") or "").strip(),
             allowed_commands=cls._normalize_text_list(raw.get("allowed_commands")),
-            event_tags=cls._normalize_text_list(raw.get("event_tags")),
             location_tags=cls._normalize_text_list(raw.get("location_tags")),
             compatible_monsters=cls._normalize_text_list(raw.get("compatible_monsters")),
-            compatible_battle_types=cls._normalize_text_list(
-                raw.get("compatible_battle_types")
-            ),
             opening_hook=str(raw.get("opening_hook") or "").strip(),
             twist_hook=str(raw.get("twist_hook") or "").strip(),
             ending_hook=str(raw.get("ending_hook") or "").strip(),
@@ -87,10 +81,8 @@ class EventBookEvent:
     recursive: bool = True
     content: str = ""
     allowed_commands: list[str] = field(default_factory=list)
-    event_tags: list[str] = field(default_factory=list)
     location_tags: list[str] = field(default_factory=list)
     compatible_monsters: list[str] = field(default_factory=list)
-    compatible_battle_types: list[str] = field(default_factory=list)
     opening_hook: str = ""
     twist_hook: str = ""
     ending_hook: str = ""
@@ -122,7 +114,6 @@ class EventBookEvent:
             if entry.id and (
                 entry.title
                 or entry.content
-                or entry.event_tags
                 or entry.location_tags
                 or entry.compatible_monsters
                 or entry.opening_hook
@@ -145,13 +136,9 @@ class EventBookEvent:
             allowed_commands=EventBookEntry._normalize_text_list(
                 raw.get("allowed_commands")
             ),
-            event_tags=EventBookEntry._normalize_text_list(raw.get("event_tags")),
             location_tags=EventBookEntry._normalize_text_list(raw.get("location_tags")),
             compatible_monsters=EventBookEntry._normalize_text_list(
                 raw.get("compatible_monsters")
-            ),
-            compatible_battle_types=EventBookEntry._normalize_text_list(
-                raw.get("compatible_battle_types")
             ),
             opening_hook=str(raw.get("opening_hook") or "").strip(),
             twist_hook=str(raw.get("twist_hook") or "").strip(),
@@ -165,7 +152,6 @@ class EventBookEvent:
             self.allowed_commands
             or self.keys
             or self.content
-            or self.event_tags
             or self.location_tags
             or self.compatible_monsters
             or self.opening_hook
@@ -185,10 +171,8 @@ class EventBookEvent:
             recursive=self.recursive,
             content=self.content,
             allowed_commands=self.allowed_commands or ([self.command] if self.command else []),
-            event_tags=self.event_tags,
             location_tags=self.location_tags,
             compatible_monsters=self.compatible_monsters,
-            compatible_battle_types=self.compatible_battle_types,
             opening_hook=self.opening_hook,
             twist_hook=self.twist_hook,
             ending_hook=self.ending_hook,
