@@ -65,6 +65,9 @@ class ActionTurnApplicationService:
                 current_world_date=current_world_date,
             )
             result = analysis.result
+            result.phase = phase
+            result.action = action_text
+            result.date_label = current_world_date
             if avatar_url:
                 result.avatar_url = avatar_url
 
