@@ -105,7 +105,14 @@ async def call_provider_with_retry(
             if system_prompt:
                 kwargs["system_prompt"] = system_prompt
             if effective_messages:
-                kwargs = {"chat_provider_id": provider_id, "messages": effective_messages}
+                kwargs = {
+                    "chat_provider_id": provider_id,
+                    "contexts": effective_messages,
+                }
+                if system_prompt and not any(
+                    item.get("role") == "system" for item in effective_messages
+                ):
+                    kwargs["system_prompt"] = system_prompt
 
             logger.info(
                 f"[LLM] 调用 Provider={provider_id}, attempt={attempt}, prompt_len={len(prompt)}, messages={len(effective_messages)}"
@@ -116,7 +123,7 @@ async def call_provider_with_retry(
                 if not effective_messages:
                     raise
                 logger.warning(
-                    f"LLM Provider 不支持 messages 参数，回退到 prompt/system_prompt: {exc}"
+                    f"LLM Provider 不支持 contexts 参数，回退到 prompt/system_prompt: {exc}"
                 )
                 fallback_kwargs = {"chat_provider_id": provider_id, "prompt": prompt}
                 if system_prompt:

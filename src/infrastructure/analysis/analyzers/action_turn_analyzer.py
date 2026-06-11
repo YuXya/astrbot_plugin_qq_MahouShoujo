@@ -55,7 +55,7 @@ class ActionTurnAnalyzer(BattleDiaryAnalyzer):
             selection_context=selection_context,
             current_world_date=current_world_date,
         )
-        system_prompt = self._action_system_prompt()
+        system_prompt = self.editable_manager.get_prompt("default_system_prompt")
         messages = self._build_action_messages(prompt, system_prompt)
         if self.config_manager.get_debug_mode():
             self._save_debug_file("action_turn_prompt", prompt)
