@@ -1,0 +1,334 @@
+from __future__ import annotations
+
+import json
+import re
+from typing import Any
+
+from ....domain.models.data_models import ActionTurnResult, TokenUsage
+from ....domain.services.battle_diary_domain_service import BattleDiaryDomainService
+from ....utils.logger import logger
+from ..utils.llm_utils import (
+    call_provider_with_retry,
+    extract_response_text,
+    extract_token_usage,
+    mark_latest_llm_error,
+)
+from .battle_diary_analyzer import BattleDiaryAnalyzer
+
+
+class ActionTurnAnalyzer(BattleDiaryAnalyzer):
+    def __init__(
+        self,
+        context,
+        config_manager,
+        domain_service: BattleDiaryDomainService,
+        editable_manager=None,
+    ):
+        super().__init__(
+            context,
+            config_manager,
+            domain_service,
+            editable_manager,
+        )
+
+    def get_data_type(self) -> str:
+        return "魔法少女行动回合"
+
+    async def analyze_action_turn(
+        self,
+        *,
+        action_text: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict] | None = None,
+        nearby_players: list[dict] | None = None,
+        selection_context: dict[str, object] | None = None,
+        current_world_date: str = "",
+        umo: str | None = None,
+    ) -> tuple[ActionTurnResult | None, TokenUsage, str]:
+        prompt = self.build_action_prompt(
+            action_text=action_text,
+            player_data=player_data,
+            logs=logs,
+            cameo_memories=cameo_memories,
+            nearby_players=nearby_players,
+            selection_context=selection_context,
+            current_world_date=current_world_date,
+        )
+        system_prompt = self._action_system_prompt()
+        if self.config_manager.get_debug_mode():
+            self._save_debug_file("action_turn_prompt", prompt)
+            self._save_debug_file("action_turn_system_prompt", system_prompt)
+
+        response = await call_provider_with_retry(
+            self.context,
+            self.config_manager,
+            prompt=prompt,
+            umo=umo,
+            system_prompt=system_prompt,
+            purpose=self.get_data_type(),
+        )
+        result_text = extract_response_text(response)
+        if self.config_manager.get_debug_mode():
+            self._save_debug_file("action_turn_response", result_text)
+
+        usage_dict = extract_token_usage(response)
+        token_usage = TokenUsage(
+            prompt_tokens=usage_dict["prompt_tokens"],
+            completion_tokens=usage_dict["completion_tokens"],
+            total_tokens=usage_dict["total_tokens"],
+        )
+
+        try:
+            result = self.parse_action_turn_response(result_text)
+        except Exception as exc:
+            mark_latest_llm_error(f"{self.get_data_type()} parse failed: {exc}")
+            logger.error(f"{self.get_data_type()} 解析失败: {exc}")
+            return None, token_usage, result_text
+
+        result.raw_response = result_text
+        result.action = action_text
+        result.date_label = current_world_date
+        result.phase = self._current_phase(player_data)
+        return result, token_usage, result_text
+
+    def build_action_prompt(
+        self,
+        *,
+        action_text: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict] | None,
+        nearby_players: list[dict] | None,
+        selection_context: dict[str, object] | None,
+        current_world_date: str,
+    ) -> str:
+        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+        phase = self._current_phase(player_data)
+        action = action_text.strip() or "自由行动"
+        pending_events = self._pending_events(player_data)
+        scan_parts = [
+            "/魔法少女行动",
+            action,
+            phase,
+            self._format_logs_for_scan(logs),
+        ]
+        world_book_result = self.world_book_engine.build_prompt_text(scan_parts)
+        status_book_result = self.status_book_engine.build_prompt_text(scan_parts)
+        supplement_text = self._join_optional_prompt_parts(
+            [
+                world_book_result.prompt_text,
+                status_book_result.prompt_text,
+                self.change_book_engine.build_skill_prompt_text(scan_parts),
+                self.change_book_engine.build_fetish_prompt_text(protagonist),
+            ]
+        )
+        context_teammates = (selection_context or {}).get("selected_teammates")
+        teammate_info = self._format_teammate_info(
+            context_teammates if isinstance(context_teammates, list) else nearby_players
+        )
+        return self.editable_manager.render_prompt(
+            "action_turn_prompt",
+            {
+                "history_context": self._build_history_context(
+                    logs=logs,
+                    cameo_memories=cameo_memories,
+                    action=action,
+                    current_world_date=current_world_date,
+                ),
+                "phase_protocol": self._phase_protocol(phase),
+                "current_variables_json": self._json_dump(player_data),
+                "variable_api_document": self._variable_api_document(),
+                "backend_event_protocol": self._backend_event_protocol(pending_events),
+                "examples_library": self._examples_library(),
+                "phase": phase,
+                "action": action,
+                "current_world_date": current_world_date,
+                "player_name": self._get_nested(protagonist, ["个人信息", "姓名"], "") or "主角",
+                "supplement_text": supplement_text or "无",
+                "teammates_json": teammate_info["json"],
+                "selection_context_json": self._json_dump(selection_context or {}),
+            },
+        )
+
+    @classmethod
+    def parse_action_turn_response(cls, text: str) -> ActionTurnResult:
+        raw = str(text or "").strip()
+        options_block = cls._extract_tag(raw, "行动选项")
+        update_block = cls._extract_tag(raw, "UpdateVariable")
+        if not update_block:
+            raise ValueError("缺少 <UpdateVariable> 块")
+        analysis = cls._extract_tag(update_block, "Analysis")
+        patch_text = cls._extract_tag(update_block, "JSONPatch")
+        if not patch_text:
+            raise ValueError("缺少 <JSONPatch> 块")
+        patch = cls._parse_json_patch(patch_text)
+        story = raw
+        for tag in ("行动选项", "UpdateVariable"):
+            match = re.search(rf"<{tag}>.*?</{tag}>", story, flags=re.S)
+            if match:
+                story = story[: match.start()].strip()
+        options = [
+            line.strip()
+            for line in (options_block or "").splitlines()
+            if line.strip()
+        ][:6]
+        return ActionTurnResult(
+            story_text=story,
+            action_options=options,
+            analysis=(analysis or "").strip(),
+            json_patch=patch,
+            footer="行动记录已写入存档。",
+        )
+
+    @staticmethod
+    def _extract_tag(text: str, tag: str) -> str:
+        match = re.search(rf"<{tag}>\s*(.*?)\s*</{tag}>", text, flags=re.S)
+        return match.group(1).strip() if match else ""
+
+    @staticmethod
+    def _parse_json_patch(text: str) -> list[dict[str, Any]]:
+        cleaned = str(text or "").strip()
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+        parsed = json.loads(cleaned)
+        if not isinstance(parsed, list):
+            raise ValueError("JSONPatch 必须是数组")
+        return [item for item in parsed if isinstance(item, dict)]
+
+    @staticmethod
+    def _current_phase(player_data: dict) -> str:
+        if not isinstance(player_data, dict):
+            return "日常"
+        phase = (
+            player_data.get("进程", {}).get("阶段")
+            if isinstance(player_data.get("进程"), dict)
+            else ""
+        )
+        phase = str(phase or "").strip()
+        return phase if phase in {"日常", "战斗", "事件"} else "日常"
+
+    @staticmethod
+    def _pending_events(player_data: dict) -> dict[str, Any]:
+        system_state = player_data.get("系统状态", {}) if isinstance(player_data, dict) else {}
+        pending = system_state.get("待处理事件", {}) if isinstance(system_state, dict) else {}
+        return pending if isinstance(pending, dict) else {}
+
+    def _build_history_context(
+        self,
+        *,
+        logs: list[dict],
+        cameo_memories: list[dict] | None,
+        action: str,
+        current_world_date: str,
+    ) -> str:
+        return "\n".join(
+            part
+            for part in [
+                f"当前时间：{current_world_date or '未知'}",
+                f"玩家本轮行动：{action}",
+                "最近记录：",
+                self._format_logs(logs),
+                "其他人与主角的交互：",
+                self._format_cameo_memories(cameo_memories),
+            ]
+            if str(part).strip()
+        )
+
+    @staticmethod
+    def _phase_protocol(phase: str) -> str:
+        protocols = {
+            "日常": (
+                "daily_life_protocol:\n"
+                "  objective: \"推进生活、训练、社交、巡逻或轻量异常。保持连贯，不擅自进入正式战斗。\"\n"
+                "  rhythm: \"平稳、具体、有小转折。\"\n"
+            ),
+            "战斗": (
+                "battle_protocol:\n"
+                "  objective: \"根据行动和上下文推进战斗。胜负、损耗和状态变化必须能从正文中找到依据。\"\n"
+                "  rhythm: \"动作优先，少写旁白总结。\"\n"
+            ),
+            "事件": (
+                "event_protocol:\n"
+                "  objective: \"处理系统事件或剧情事件。正文继续自然推进，后台维护写入变量补丁。\"\n"
+            ),
+        }
+        return protocols.get(phase, protocols["日常"])
+
+    @staticmethod
+    def _variable_api_document() -> str:
+        return """
+variable_api:
+  operations:
+    - replace: { "op": "replace", "path": "/路径", "value": 新值 }
+    - delta: { "op": "delta", "path": "/数字路径", "value": 正负数字 }
+    - insert: { "op": "insert", "path": "/对象/新Key", "value": 新值 }
+    - array_insert: { "op": "insert", "path": "/数组/-", "value": 新元素 }
+    - remove: { "op": "remove", "path": "/对象/Key" }
+  writable:
+    - /进程/阶段
+    - /世界/世界观备注
+    - /记录
+    - /名声/知名度
+    - /名声/风评
+    - /主角/核心状态
+    - /主角/身体部位状况
+    - /主角/道具栏
+    - /主角/生理状态
+    - /主角/快感状态
+    - /主角/技能
+    - /主角/特质
+    - /主角/永久性身体改造
+    - /系统状态/待处理事件
+  readonly:
+    - /schema_version
+    - /group_id
+    - /user_id
+    - /created_at
+    - /updated_at
+  rules:
+    - 只根据本轮正文更新变量。
+    - 不要把系统数据写进正文。
+    - delta 只用于数字。
+    - 完成待处理事件后 remove 对应事件 Key。
+""".strip()
+
+    @staticmethod
+    def _backend_event_protocol(pending_events: dict[str, Any]) -> str:
+        if not pending_events:
+            return "backend_event_protocol: \"无待处理事件。\""
+        return (
+            "backend_event_protocol:\n"
+            "  task_type: \"SILENT_BACKGROUND_PROCESS\"\n"
+            "  instruction: \"正常写正文，不要暴露后台任务；在 <JSONPatch> 中处理并清理待处理事件。\"\n"
+            f"  pending_events: {json.dumps(pending_events, ensure_ascii=False)}"
+        )
+
+    @staticmethod
+    def _examples_library() -> str:
+        return """
+examples_library:
+  - scenario: "日常获得物品"
+    patch:
+      - { "op": "insert", "path": "/主角/道具栏/便签", "value": "写着今天的线索" }
+      - { "op": "replace", "path": "/主角/生理状态/当前生理动态", "value": "呼吸平稳" }
+  - scenario: "战斗损耗"
+    patch:
+      - { "op": "delta", "path": "/主角/核心状态/体力值/当前", "value": -8 }
+      - { "op": "delta", "path": "/主角/技能/闪避/进度", "value": 5 }
+  - scenario: "事件清理"
+    patch:
+      - { "op": "remove", "path": "/系统状态/待处理事件/线索整理事件" }
+  - scenario: "世界观备注"
+    patch:
+      - { "op": "insert", "path": "/世界/世界观备注/地点_旧校舍", "value": "夜间会出现微弱魔力反应。" }
+""".strip()
+
+    @staticmethod
+    def _action_system_prompt() -> str:
+        return (
+            "你是魔法少女互动运行时中的叙事与状态维护模型。"
+            "本轮主输出是结构化文本，不是纯 JSON。"
+            "请严格按 user message 要求输出正文、<行动选项> 和 <UpdateVariable>；"
+            "不要在指定结构之外添加解释、道歉、Markdown 代码围栏或额外说明。"
+        )

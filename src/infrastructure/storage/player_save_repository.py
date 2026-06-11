@@ -10,7 +10,7 @@ from typing import Any
 
 from astrbot.api.star import StarTools
 
-from ...domain.models.data_models import BattleDiaryCard, ReincarnationCard
+from ...domain.models.data_models import ActionTurnResult, BattleDiaryCard, ReincarnationCard
 from ...utils.logger import logger
 from .state_progress import PROGRESS_KEYS
 
@@ -259,6 +259,11 @@ class PlayerSaveRepository:
             "avatar_url": avatar_url or "",
             "created_at": _now_date_str(),
             "updated_at": _now_date_str(),
+            "进程": {"阶段": "日常"},
+            "系统状态": {"待处理事件": {}},
+            "世界": {},
+            "记录": {},
+            "名声": {"知名度": 0, "风评": 0},
         }
         player_data.update(protagonist_tree)
 
@@ -412,6 +417,205 @@ class PlayerSaveRepository:
                 "update_changes": card.update_changes,
             },
         )
+
+    # ── 魔法少女行动回合 ─────────────────────────────────────────────
+
+    def ensure_action_runtime_state(
+        self,
+        group_id: str,
+        user_id: str,
+        player_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        user_dir = self.get_user_dir(group_id, user_id)
+        data = player_data if isinstance(player_data, dict) else self._load_current_player_data(user_dir)
+        if not isinstance(data, dict):
+            data = self._create_default_player_data(group_id, user_id)
+        data.setdefault("进程", {}).setdefault("阶段", "日常")
+        data.setdefault("系统状态", {}).setdefault("待处理事件", {})
+        data.setdefault("世界", {})
+        data.setdefault("记录", {})
+        data.setdefault("名声", {}).setdefault("知名度", 0)
+        data.setdefault("名声", {}).setdefault("风评", 0)
+        data.setdefault("主角", {})
+        if data["进程"].get("阶段") not in {"日常", "战斗", "事件"}:
+            data["进程"]["阶段"] = "日常"
+        self._save_current_player_data(user_dir, data)
+        return data
+
+    def save_action_turn_result(
+        self,
+        *,
+        group_id: str,
+        user_id: str,
+        result: ActionTurnResult,
+        world_day_offset: int | None = None,
+    ) -> dict[str, Any]:
+        user_dir = self.get_user_dir(group_id, user_id)
+        user_dir.mkdir(parents=True, exist_ok=True)
+        now = self._now_ms()
+        if world_day_offset is None:
+            world_day_offset = self.get_current_world_day_offset(group_id)
+        world_day_offset = max(0, int(world_day_offset))
+        world_date = self.format_world_date(world_day_offset)
+        result.date_label = world_date
+
+        player_data = self.ensure_action_runtime_state(group_id, user_id)
+        player_data["updated_at"] = _now_date_str()
+        applied_patch = self.apply_json_patch(player_data, result.json_patch)
+        self._ensure_battle_count(player_data)
+        result.state_snapshot = dict(player_data)
+        self._save_current_player_data(user_dir, player_data)
+
+        self.append_log(
+            group_id,
+            user_id,
+            {
+                "type": "action_turn",
+                "created_at": now,
+                "title": result.title,
+                "phase": result.phase,
+                "date_label": world_date,
+                "world_day_offset": world_day_offset,
+                "world_date": world_date,
+                "action": result.action,
+                "story_text": result.story_text,
+                "action_options": result.action_options,
+                "analysis": result.analysis,
+                "json_patch": applied_patch,
+            },
+        )
+        self.advance_world_clock(group_id, expected_day_offset=world_day_offset)
+        return player_data
+
+    def apply_json_patch(
+        self,
+        state: dict[str, Any],
+        patch: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        if not isinstance(patch, list):
+            raise ValueError("JSONPatch 必须是数组")
+        applied: list[dict[str, Any]] = []
+        for raw_op in patch:
+            if not isinstance(raw_op, dict):
+                raise ValueError("JSONPatch 项必须是对象")
+            op = str(raw_op.get("op") or "").strip()
+            path = str(raw_op.get("path") or "").strip()
+            if op not in {"replace", "delta", "insert", "remove"}:
+                raise ValueError(f"非法 JSONPatch op: {op}")
+            if not path.startswith("/") or path == "/":
+                raise ValueError(f"非法 JSONPatch path: {path}")
+            self._reject_readonly_patch_path(path)
+            if op == "remove":
+                self._patch_remove(state, path)
+                applied.append({"op": op, "path": path})
+                continue
+            if "value" not in raw_op:
+                raise ValueError(f"{op} 操作缺少 value: {path}")
+            value = raw_op.get("value")
+            if op == "replace":
+                self._patch_set(state, path, value)
+            elif op == "insert":
+                self._patch_insert(state, path, value)
+            elif op == "delta":
+                if not isinstance(value, (int, float)):
+                    raise ValueError(f"delta value 必须是数字: {path}")
+                self._patch_delta(state, path, value)
+            applied.append({"op": op, "path": path, "value": value})
+        return applied
+
+    @staticmethod
+    def _reject_readonly_patch_path(path: str) -> None:
+        readonly_prefixes = {
+            "/schema_version",
+            "/group_id",
+            "/user_id",
+            "/created_at",
+            "/updated_at",
+            "/nickname",
+            "/avatar_url",
+            "/世界/日期",
+        }
+        if any(path == prefix or path.startswith(prefix + "/") for prefix in readonly_prefixes):
+            raise ValueError(f"禁止修改只读字段: {path}")
+
+    @classmethod
+    def _patch_set(cls, state: dict[str, Any], path: str, value: Any) -> None:
+        parent, key = cls._patch_parent(state, path, create=True)
+        if isinstance(parent, list):
+            if key == "-":
+                parent.append(value)
+                return
+            parent[int(key)] = value
+            return
+        parent[key] = value
+
+    @classmethod
+    def _patch_insert(cls, state: dict[str, Any], path: str, value: Any) -> None:
+        parent, key = cls._patch_parent(state, path, create=True)
+        if isinstance(parent, list):
+            if key == "-":
+                parent.append(value)
+            else:
+                parent.insert(int(key), value)
+            return
+        parent[key] = value
+
+    @classmethod
+    def _patch_delta(cls, state: dict[str, Any], path: str, value: int | float) -> None:
+        parent, key = cls._patch_parent(state, path, create=True)
+        if isinstance(parent, list):
+            index = int(key)
+            current = parent[index] if index < len(parent) else 0
+            parent[index] = cls._numeric_value(current) + value
+            return
+        parent[key] = cls._numeric_value(parent.get(key, 0)) + value
+
+    @classmethod
+    def _patch_remove(cls, state: dict[str, Any], path: str) -> None:
+        parent, key = cls._patch_parent(state, path, create=False)
+        if isinstance(parent, list):
+            del parent[int(key)]
+            return
+        parent.pop(key, None)
+
+    @classmethod
+    def _patch_parent(
+        cls,
+        state: dict[str, Any],
+        path: str,
+        *,
+        create: bool,
+    ) -> tuple[dict[str, Any] | list[Any], str]:
+        parts = cls._patch_parts(path)
+        current: dict[str, Any] | list[Any] = state
+        for index, part in enumerate(parts[:-1]):
+            next_part = parts[index + 1]
+            if isinstance(current, list):
+                current = current[int(part)]
+                continue
+            if part not in current or not isinstance(current.get(part), (dict, list)):
+                if not create:
+                    return {}, parts[-1]
+                current[part] = [] if next_part == "-" or next_part.isdigit() else {}
+            current = current[part]
+        return current, parts[-1]
+
+    @staticmethod
+    def _patch_parts(path: str) -> list[str]:
+        return [
+            part.replace("~1", "/").replace("~0", "~")
+            for part in path.strip("/").split("/")
+            if part
+        ]
+
+    @staticmethod
+    def _numeric_value(value: Any) -> int | float:
+        if isinstance(value, (int, float)):
+            return value
+        try:
+            return float(value)
+        except Exception:
+            return 0
 
     # ── 日志压缩 ──────────────────────────────────
 

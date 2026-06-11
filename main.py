@@ -11,16 +11,16 @@ from astrbot.api.star import Context, Star
 from .src.application.services.reincarnation_application_service import (
     ReincarnationApplicationService,
 )
-from .src.application.services.battle_diary_application_service import (
-    BattleDiaryApplicationService,
+from .src.application.services.action_turn_application_service import (
+    ActionTurnApplicationService,
 )
 from .src.domain.services.battle_diary_domain_service import (
     BattleDiaryDomainService,
 )
 from .src.domain.services.reincarnation_domain_service import ReincarnationDomainService
 from .src.infrastructure.analysis.llm_reincarnation_analyzer import LLMReincarnationAnalyzer
-from .src.infrastructure.analysis.llm_battle_diary_analyzer import (
-    LLMBattleDiaryAnalyzer,
+from .src.infrastructure.analysis.llm_action_turn_analyzer import (
+    LLMActionTurnAnalyzer,
 )
 from .src.infrastructure.analysis.llm_player_relationship_analyzer import (
     LLMPlayerRelationshipAnalyzer,
@@ -62,11 +62,11 @@ class QQMahouShoujo(Star):
     diary_domain_service: BattleDiaryDomainService
     editable_manager: EditableResourceManager
     llm_analyzer: LLMReincarnationAnalyzer
-    diary_llm_analyzer: LLMBattleDiaryAnalyzer
+    action_turn_llm_analyzer: LLMActionTurnAnalyzer
     relationship_llm_analyzer: LLMPlayerRelationshipAnalyzer
     report_generator: ReportGenerator
     reincarnation_service: ReincarnationApplicationService
-    diary_service: BattleDiaryApplicationService
+    action_turn_service: ActionTurnApplicationService
     avatar_service: QQAvatarService
     message_sender: MessageSender
     save_repository: PlayerSaveRepository
@@ -86,7 +86,7 @@ class QQMahouShoujo(Star):
             self.domain_service,
             self.editable_manager,
         )
-        self.diary_llm_analyzer = LLMBattleDiaryAnalyzer(
+        self.action_turn_llm_analyzer = LLMActionTurnAnalyzer(
             context,
             self.config_manager,
             self.diary_domain_service,
@@ -109,13 +109,11 @@ class QQMahouShoujo(Star):
         self.save_repository = PlayerSaveRepository(
             editable_manager=self.editable_manager,
         )
-        self.diary_service = BattleDiaryApplicationService(
+        self.action_turn_service = ActionTurnApplicationService(
             self.config_manager,
-            self.diary_domain_service,
-            self.diary_llm_analyzer,
-            self.report_generator,
+            self.action_turn_llm_analyzer,
             self.save_repository,
-            self.relationship_llm_analyzer,
+            self.report_generator,
         )
         self.player_queue = PlayerTaskQueue()
         self.web_viewer = SaveWebViewer(
@@ -160,8 +158,7 @@ class QQMahouShoujo(Star):
                     "魔法少女指令",
                     "",
                     "/魔法少女转生：创建魔法少女角色档案。",
-                    "/魔法少女战斗：生成一次战斗日记，可追加行动。",
-                    "/魔法少女日常：生成一次日常日记，可追加行动。",
+                    "/魔法少女行动：进行一次酒馆式行动回合，可追加行动。",
                     "/魔法少女存档删除 确认：删除当前群自己的存档。",
                     "",
                     f"角色档案面板：{self._build_player_profile_panel_url()}",
@@ -354,12 +351,12 @@ class QQMahouShoujo(Star):
             fallback_text=result.text,
         )
 
-    @filter.command("魔法少女战斗")
-    async def battle_diary(
+    @filter.command("魔法少女行动")
+    async def action_turn(
         self,
         event: AstrMessageEvent,
     ) -> AsyncGenerator:
-        """根据玩家存档生成一次完整的魔法少女战斗日记卡。用法：/魔法少女战斗"""
+        """根据玩家存档运行一次魔法少女行动回合。用法：/魔法少女行动 去学校看看"""
         event.should_call_llm(True)
 
         if not self._is_group_event_allowed(event):
@@ -367,7 +364,7 @@ class QQMahouShoujo(Star):
 
         group_id = self._get_group_id_from_event(event)
         if not group_id:
-            yield event.plain_result("请在群聊中使用 /魔法少女战斗。")
+            yield event.plain_result("请在群聊中使用 /魔法少女行动。")
             return
 
         user_id = self._get_sender_id_from_event(event)
@@ -380,78 +377,21 @@ class QQMahouShoujo(Star):
 
         async with self.player_queue.lock_for(group_id, user_id):
             async with self.player_queue.group_lock_for(group_id):
-                async for result in self._run_battle_diary(
-                    event,
-                    group_id,
-                    user_id,
-                    command_name="魔法少女战斗",
-                    event_command="/魔法少女战斗",
-                    prompt_name="battle_diary_prompt",
-                    default_action="自由战斗",
-                    action_label="战斗",
-                    card_label="战斗日记卡",
-                ):
+                async for result in self._run_action_turn(event, group_id, user_id):
                     yield result
 
-    @filter.command("魔法少女日常")
-    async def daily_diary(
-        self,
-        event: AstrMessageEvent,
-    ) -> AsyncGenerator:
-        """根据玩家存档生成一次完整的魔法少女日常日记卡。用法：/魔法少女日常"""
-        event.should_call_llm(True)
-
-        if not self._is_group_event_allowed(event):
-            return
-
-        group_id = self._get_group_id_from_event(event)
-        if not group_id:
-            yield event.plain_result("请在群聊中使用 /魔法少女日常。")
-            return
-
-        user_id = self._get_sender_id_from_event(event)
-        if not user_id:
-            yield event.plain_result("没有拿到你的 QQ 号，暂时不能读取玩家存档。")
-            return
-
-        if await self.player_queue.is_locked(group_id, user_id):
-            yield event.plain_result("你的上一条魔法少女请求还在处理，已经进入队列，马上轮到你。")
-
-        async with self.player_queue.lock_for(group_id, user_id):
-            async with self.player_queue.group_lock_for(group_id):
-                async for result in self._run_battle_diary(
-                    event,
-                    group_id,
-                    user_id,
-                    command_name="魔法少女日常",
-                    event_command="/魔法少女日常",
-                    prompt_name="daily_diary_prompt",
-                    default_action="自由日常",
-                    action_label="日常",
-                    card_label="日常日记卡",
-                ):
-                    yield result
-
-    async def _run_battle_diary(
+    async def _run_action_turn(
         self,
         event: AstrMessageEvent,
         group_id: str,
         user_id: str,
-        *,
-        command_name: str = "魔法少女战斗",
-        event_command: str = "/魔法少女战斗",
-        prompt_name: str = "battle_diary_prompt",
-        default_action: str = "自由战斗",
-        action_label: str = "战斗",
-        card_label: str = "战斗日记卡",
-        allow_other_players: bool = True,
     ) -> AsyncGenerator:
         save_data = self.save_repository.load_player_save(group_id, user_id)
         if not save_data:
             yield event.plain_result("还没有你的魔法少女转生存档，请先使用 /魔法少女转生 建档。")
             return
 
-        action_text = self._extract_command_tail(event, command_name)
+        action_text = self._extract_command_tail(event, "魔法少女行动")
         nickname = self._get_sender_name_from_event(event)
         avatar_url = self.avatar_service.build_avatar_url(user_id)
         umo = getattr(event, "unified_msg_origin", None)
@@ -459,10 +399,10 @@ class QQMahouShoujo(Star):
             platform_id = self._get_platform_id_from_event(event)
             umo = f"{platform_id}:GroupMessage:{group_id}"
 
-        display_action = action_text or default_action
-        yield event.plain_result(f"正在记录本次{action_label}：{display_action}，准备生成{card_label}...")
+        display_action = action_text or "自由行动"
+        yield event.plain_result(f"正在推进本次魔法少女行动：{display_action}，准备生成回合记录...")
 
-        result = await self.diary_service.execute_diary(
+        result = await self.action_turn_service.execute_action_turn(
             group_id=group_id,
             user_id=user_id,
             nickname=nickname,
@@ -470,19 +410,15 @@ class QQMahouShoujo(Star):
             umo=umo,
             html_render_func=self.html_render,
             avatar_url=avatar_url,
-            event_command=event_command,
-            prompt_name=prompt_name,
-            default_action=default_action,
-            allow_other_players=allow_other_players,
         )
 
         if result.error:
-            logger.warning(f"{event_command} 日记流程结束但存在错误: {result.error}")
+            logger.warning(f"/魔法少女行动 流程结束但存在错误: {result.error}")
 
         yield await self.message_sender.send_image_or_text(
             event,
             result.image_path,
-            result.card,
+            None,
             fallback_text=result.text,
         )
 

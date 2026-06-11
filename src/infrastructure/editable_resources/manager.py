@@ -14,16 +14,13 @@ from . import defaults
 class EditableResourceManager:
     LEGACY_PROMPT_FILES = {
         "prompts/reincarnation_prompt.txt": "prompts/magical_girl/reincarnation_prompt.txt",
-        "prompts/battle_diary_prompt.txt": "prompts/magical_girl/battle_diary_prompt.txt",
         "prompts/battle_target_selection_prompt.txt": "prompts/magical_girl/battle_target_selection_prompt.txt",
-        "prompts/daily_diary_prompt.txt": "prompts/magical_girl/daily_diary_prompt.txt",
     }
 
     PROMPT_FILES = {
         "reincarnation_prompt": "prompts/magical_girl/reincarnation_prompt.txt",
-        "battle_diary_prompt": "prompts/magical_girl/battle_diary_prompt.txt",
         "magical_battle_target_selection_prompt": "prompts/magical_girl/battle_target_selection_prompt.txt",
-        "daily_diary_prompt": "prompts/magical_girl/daily_diary_prompt.txt",
+        "action_turn_prompt": "prompts/magical_girl/action_turn_prompt.txt",
         "relationship_summary_prompt": "prompts/relationship_summary_prompt.txt",
         "teammate_completion_prompt": "prompts/teammate_completion_prompt.txt",
         "default_system_prompt": "prompts/default_system_prompt.txt",
@@ -279,20 +276,14 @@ class EditableResourceManager:
                 "category": "text_completion",
             },
             {
-                "id": self.PROMPT_FILES["battle_diary_prompt"],
-                "label": "战斗日记 Prompt",
-                "type": "text",
-                "category": "text_completion",
-            },
-            {
                 "id": self.PROMPT_FILES["magical_battle_target_selection_prompt"],
                 "label": "魔法少女战斗目标判断 Prompt",
                 "type": "text",
                 "category": "text_completion",
             },
             {
-                "id": self.PROMPT_FILES["daily_diary_prompt"],
-                "label": "日常日记 Prompt",
+                "id": self.PROMPT_FILES["action_turn_prompt"],
+                "label": "魔法少女行动 Prompt",
                 "type": "text",
                 "category": "text_completion",
             },
@@ -325,9 +316,8 @@ class EditableResourceManager:
             "event_book/default.json": defaults.EVENT_BOOK_DEFAULT,
             "monster_book/default.json": defaults.MONSTER_BOOK_DEFAULT,
             self.PROMPT_FILES["reincarnation_prompt"]: defaults.REINCARNATION_PROMPT,
-            self.PROMPT_FILES["battle_diary_prompt"]: defaults.BATTLE_DIARY_PROMPT,
             self.PROMPT_FILES["magical_battle_target_selection_prompt"]: defaults.MAGICAL_BATTLE_TARGET_SELECTION_PROMPT,
-            self.PROMPT_FILES["daily_diary_prompt"]: defaults.DAILY_DIARY_PROMPT,
+            self.PROMPT_FILES["action_turn_prompt"]: defaults.ACTION_TURN_PROMPT,
             self.PROMPT_FILES["relationship_summary_prompt"]: defaults.RELATIONSHIP_SUMMARY_PROMPT,
             self.PROMPT_FILES["teammate_completion_prompt"]: defaults.TEAMMATE_COMPLETION_PROMPT,
             self.PROMPT_FILES["default_system_prompt"]: defaults.DEFAULT_SYSTEM_PROMPT,
@@ -364,21 +354,13 @@ class EditableResourceManager:
                 "可用变量：{{theme}}（触发命令+玩家偏好）、{{player_text}}（目标群友昵称或ID）、"
                 "{{supplement_text}}（世界书+状态书+事件书命中的补充设定，未命中时为空）。"
             ),
-            self.PROMPT_FILES["battle_diary_prompt"]: (
-                "用于 /魔法少女战斗 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
-                "可用变量：{{player_data_update_json}}"
-                "（来自玩家当前人物卡，包含全部属性和状态，用于第一人称人格设定和状态参考）；"
-                "{{logs_text}}、{{cameo_memories_text}}、{{current_world_date}}、{{action}}、"
-                "{{supplement_text}}（世界书+状态书+事件书+技能书+性癖书命中的补充设定，未命中时为空）、"
-                "{{teammates_json}}（战斗中为子任务选出的队友 JSON；日常等为命中其他存档角色名时的队友公开字段 JSON；未命中时为空数组）。"
-            ),
             self.PROMPT_FILES["magical_battle_target_selection_prompt"]: (
                 "用于 /魔法少女战斗 正文生成前的后台目标判断。使用子任务 LLM Provider，"
                 "选择 battle_type、scene_event、selected_teammates、selected_enemies，并给出 AI 侧胜率判断。"
             ),
-            self.PROMPT_FILES["daily_diary_prompt"]: (
-                "用于 /魔法少女日常 的完整 Prompt。变量与战斗日记 Prompt 相同，"
-                "发给 AI 的 user message 就是这个模板渲染后的结果；要求仍返回兼容日记卡的纯 JSON。"
+            self.PROMPT_FILES["action_turn_prompt"]: (
+                "用于 /魔法少女行动 的酒馆式完整回合 Prompt。发给 AI 的 user message "
+                "按历史上下文、阶段协议、变量快照、行动选项、变量 API、后台事件、示例库和 master_protocol 拼接。"
             ),
             self.PROMPT_FILES["relationship_summary_prompt"]: (
                 "用于多人 /魔法少女战斗 结束后的后台人物关系总结。发给 AI 的 user message 就是这个模板渲染后的结果。"

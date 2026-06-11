@@ -156,3 +156,51 @@ class BattleDiaryExecutionResult:
     text: str = ""
     error: str | None = None
     raw_response: str = ""
+
+
+@dataclass
+class PatchOperation:
+    op: str
+    path: str
+    value: Any = None
+
+
+@dataclass
+class ActionTurnResult:
+    story_text: str
+    action_options: list[str] = field(default_factory=list)
+    analysis: str = ""
+    json_patch: list[dict[str, Any]] = field(default_factory=list)
+    raw_response: str = ""
+    state_snapshot: dict[str, Any] = field(default_factory=dict)
+    phase: str = "日常"
+    action: str = ""
+    date_label: str = ""
+    title: str = "魔法少女行动"
+    footer: str = ""
+    avatar_url: str = ""
+
+    def to_text(self) -> str:
+        parts = [self.story_text.strip()]
+        if self.action_options:
+            parts.extend(["", "【行动选项】", *self.action_options])
+        if self.footer:
+            parts.extend(["", self.footer])
+        return "\n".join(part for part in parts if part is not None).strip()
+
+
+@dataclass
+class ActionTurnAnalysisResult:
+    result: ActionTurnResult
+    token_usage: TokenUsage = field(default_factory=TokenUsage)
+    raw_response: str = ""
+
+
+@dataclass
+class ActionTurnExecutionResult:
+    success: bool
+    result: ActionTurnResult | None = None
+    image_path: str | None = None
+    text: str = ""
+    error: str | None = None
+    raw_response: str = ""

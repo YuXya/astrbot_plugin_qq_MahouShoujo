@@ -10,7 +10,7 @@ from typing import Any
 
 from astrbot.api.star import StarTools
 
-from ...domain.models.data_models import BattleDiaryCard, ReincarnationCard
+from ...domain.models.data_models import ActionTurnResult, BattleDiaryCard, ReincarnationCard
 from ...domain.repositories.card_repository import ICardGenerator
 from ...utils.logger import logger
 from ..editable_resources import EditableResourceManager
@@ -136,6 +136,90 @@ class ReportGenerator(ICardGenerator):
                     logger.warning(f"战斗日记 HTML 转图片失败，尝试下一轮策略: {exc}")
 
         return None, html_content
+
+    async def generate_action_turn_image_card(
+        self,
+        result: ActionTurnResult,
+        html_render_func: Any,
+    ) -> tuple[str | None, str | None]:
+        html_content = self._render_action_turn_html(result)
+        async with self._render_semaphore:
+            for image_options in self.config_manager.get_t2i_rendering_strategies():
+                options = dict(image_options)
+                if options.get("type") == "png":
+                    options.pop("quality", None)
+                try:
+                    image_data = await html_render_func(
+                        html_content,
+                        {},
+                        False,
+                        options,
+                    )
+                    image_path = self._persist_image(
+                        image_data,
+                        options.get("type", "png"),
+                        prefix="action_turn",
+                    )
+                    if image_path:
+                        return image_path, html_content
+                except Exception as exc:
+                    logger.warning(f"行动回合 HTML 转图片失败，尝试下一轮策略: {exc}")
+        return None, html_content
+
+    def _render_action_turn_html(self, result: ActionTurnResult) -> str:
+        options = "".join(
+            f"<li>{html_lib.escape(str(option))}</li>"
+            for option in result.action_options
+        )
+        patch_items = "".join(
+            "<li>"
+            + html_lib.escape(
+                f"{item.get('op', '')} {item.get('path', '')}"
+            )
+            + "</li>"
+            for item in result.json_patch[:8]
+            if isinstance(item, dict)
+        )
+        return f"""<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+body {{
+  margin: 0;
+  padding: 32px;
+  background: #f6f1ff;
+  color: #241827;
+  font-family: "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+}}
+.card {{
+  max-width: 820px;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid #eadff4;
+  border-radius: 8px;
+  padding: 28px;
+  box-shadow: 0 18px 40px rgba(36, 24, 39, .12);
+}}
+h1 {{ margin: 0 0 8px; font-size: 28px; }}
+.meta {{ color: #75647d; margin-bottom: 22px; }}
+.story {{ white-space: pre-wrap; line-height: 1.85; font-size: 17px; }}
+h2 {{ font-size: 18px; margin-top: 24px; }}
+li {{ margin: 6px 0; }}
+</style>
+</head>
+<body>
+  <article class="card">
+    <h1>{html_lib.escape(result.title or "魔法少女行动")}</h1>
+    <div class="meta">阶段：{html_lib.escape(result.phase)}　时间：{html_lib.escape(result.date_label)}</div>
+    <section class="story">{html_lib.escape(result.story_text)}</section>
+    <h2>行动选项</h2>
+    <ul>{options}</ul>
+    <h2>变量更新</h2>
+    <ul>{patch_items}</ul>
+  </article>
+</body>
+</html>"""
 
     @staticmethod
     def _highlight_diary_quotes(text: object) -> str:
