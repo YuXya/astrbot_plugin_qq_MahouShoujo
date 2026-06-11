@@ -479,21 +479,11 @@ examples_library:
         prompt: str,
         system_prompt: str,
     ) -> list[dict[str, str]]:
-        return [
-            {
-                "role": "system",
-                "content": f"SYSTEM INSTRUCTION: {system_prompt}",
-            },
-            {
-                "role": "user",
-                "content": "=<role>user",
-            },
-            {
-                "role": "assistant",
-                "content": prompt,
-            },
-            {
-                "role": "user",
-                "content": "",
-            },
-        ]
+        messages: list[dict[str, str]] = []
+        system_text = str(system_prompt or "").strip()
+        prompt_text = str(prompt or "").strip()
+        if system_text:
+            messages.append({"role": "system", "content": system_text})
+        if prompt_text:
+            messages.append({"role": "user", "content": prompt_text})
+        return messages

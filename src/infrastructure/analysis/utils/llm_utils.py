@@ -88,6 +88,7 @@ async def call_provider_with_retry(
     retries = max(1, config_manager.get_llm_retries())
     backoff = max(1, config_manager.get_llm_backoff())
     last_exc: Exception | None = None
+    effective_messages = _normalize_messages(messages)
 
     for attempt in range(1, retries + 1):
         try:
@@ -103,16 +104,16 @@ async def call_provider_with_retry(
             kwargs = {"chat_provider_id": provider_id, "prompt": prompt}
             if system_prompt:
                 kwargs["system_prompt"] = system_prompt
-            if messages:
-                kwargs = {"chat_provider_id": provider_id, "messages": messages}
+            if effective_messages:
+                kwargs = {"chat_provider_id": provider_id, "messages": effective_messages}
 
             logger.info(
-                f"[LLM] 调用 Provider={provider_id}, attempt={attempt}, prompt_len={len(prompt)}, messages={bool(messages)}"
+                f"[LLM] 调用 Provider={provider_id}, attempt={attempt}, prompt_len={len(prompt)}, messages={len(effective_messages)}"
             )
             try:
                 response = await context.llm_generate(**kwargs)
             except TypeError as exc:
-                if not messages:
+                if not effective_messages:
                     raise
                 logger.warning(
                     f"LLM Provider 不支持 messages 参数，回退到 prompt/system_prompt: {exc}"
@@ -124,7 +125,7 @@ async def call_provider_with_retry(
             _recent_llm_message_repository().append(
                 purpose=purpose,
                 provider_id=provider_id,
-                prompt=_format_prompt_record(prompt, messages),
+                prompt=_format_prompt_record(prompt, effective_messages),
                 system_prompt=system_prompt,
                 response=extract_response_text(response),
                 raw_response=extract_response_debug_json(response),
@@ -140,12 +141,27 @@ async def call_provider_with_retry(
     _recent_llm_message_repository().append(
         purpose=purpose,
         provider_id=provider_id if "provider_id" in locals() else "",
-        prompt=_format_prompt_record(prompt, messages),
+        prompt=_format_prompt_record(prompt, effective_messages),
         system_prompt=system_prompt,
         response="",
         error=format_exception_detail(last_exc),
     )
     return None
+
+
+def _normalize_messages(
+    messages: list[dict[str, str]] | None = None,
+) -> list[dict[str, str]]:
+    normalized: list[dict[str, str]] = []
+    for item in messages or []:
+        if not isinstance(item, dict):
+            continue
+        content = str(item.get("content") or "").strip()
+        if not content:
+            continue
+        role = str(item.get("role") or "user").strip() or "user"
+        normalized.append({"role": role, "content": content})
+    return normalized
 
 
 def _format_prompt_record(
