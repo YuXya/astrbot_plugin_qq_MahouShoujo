@@ -43,7 +43,7 @@ class LLMActionTurnAnalyzer:
             current_world_date=current_world_date,
         )
         if result is None:
-            raise ValueError("LLM 响应无法解析为魔法少女行动回合")
+            raise ValueError("AI 回复为空或缺少变量更新块，已重试仍失败")
         return ActionTurnAnalysisResult(
             result=result,
             token_usage=usage,

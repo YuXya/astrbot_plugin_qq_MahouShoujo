@@ -206,6 +206,15 @@ class SaveWebViewer:
             purpose = self._e(record.get("purpose") or "文本补全")
             provider_id = self._e(record.get("provider_id") or "未知")
             error = str(record.get("error") or "")
+            raw_response = str(record.get("raw_response") or "")
+            raw_response_html = (
+                f"""
+                    <h2>AI 原始响应对象</h2>
+                    <pre>{self._llm_record_pre(raw_response)}</pre>
+                """
+                if raw_response
+                else ""
+            )
             error_html = (
                 f'<p class="error">错误：{self._e(error)}</p>'
                 if error
@@ -229,11 +238,12 @@ class SaveWebViewer:
                   <div class="log-card-body">
                     {error_html}
                     <h2>System Prompt</h2>
-                    <pre>{self._e(record.get("system_prompt") or "（无）")}</pre>
+                    <pre>{self._llm_record_pre(record.get("system_prompt") or "（无）")}</pre>
                     <h2>发送给 AI 的完整消息</h2>
-                    <pre>{self._e(record.get("prompt") or "")}</pre>
-                    <h2>AI 原始回复</h2>
-                    <pre>{self._e(record.get("response") or "（无回复）")}</pre>
+                    <pre>{self._llm_record_pre(record.get("prompt") or "")}</pre>
+                    <h2>AI 文本回复</h2>
+                    <pre>{self._llm_record_pre(record.get("response") or "（无回复）")}</pre>
+                    {raw_response_html}
                   </div>
                 </details>
                 """
@@ -3679,6 +3689,9 @@ class SaveWebViewer:
     @staticmethod
     def _e(value: object) -> str:
         return html.escape(str(value or ""), quote=True)
+
+    def _llm_record_pre(self, value: object) -> str:
+        return self._e(value).replace("\\n", "\n")
 
     def _e_json(self, value: Any) -> str:
         import json

@@ -88,15 +88,108 @@ class ActionTurnAnalyzer(BattleDiaryAnalyzer):
         try:
             result = self.parse_action_turn_response(result_text)
         except Exception as exc:
-            mark_latest_llm_error(f"{self.get_data_type()} parse failed: {exc}")
-            logger.error(f"{self.get_data_type()} 解析失败: {exc}")
-            return None, token_usage, result_text
+            logger.warning(f"{self.get_data_type()} 解析失败，准备重试修复格式: {exc}")
+            repair_text, repair_usage = await self._retry_action_turn_format(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                bad_response=result_text,
+                parse_error=exc,
+                umo=umo,
+            )
+            token_usage = self._merge_token_usage(token_usage, repair_usage)
+            if self.config_manager.get_debug_mode():
+                self._save_debug_file("action_turn_repair_response", repair_text)
+            try:
+                result = self.parse_action_turn_response(repair_text)
+            except Exception as repair_exc:
+                error = (
+                    f"{self.get_data_type()} parse failed after repair retry: "
+                    f"{repair_exc}; first_error={exc}"
+                )
+                mark_latest_llm_error(error)
+                logger.error(f"{self.get_data_type()} 解析重试后仍失败: {repair_exc}")
+                return None, token_usage, repair_text or result_text
+            result_text = repair_text
 
         result.raw_response = result_text
         result.action = action_text
         result.date_label = current_world_date
         result.phase = self._current_phase(player_data)
         return result, token_usage, result_text
+
+    async def _retry_action_turn_format(
+        self,
+        *,
+        prompt: str,
+        system_prompt: str,
+        bad_response: str,
+        parse_error: Exception,
+        umo: str | None,
+    ) -> tuple[str, TokenUsage]:
+        repair_prompt = self._build_action_repair_prompt(
+            prompt=prompt,
+            bad_response=bad_response,
+            parse_error=parse_error,
+        )
+        repair_messages = self._build_action_messages(repair_prompt, system_prompt)
+        response = await call_provider_with_retry(
+            self.context,
+            self.config_manager,
+            prompt=repair_prompt,
+            umo=umo,
+            system_prompt=system_prompt,
+            messages=repair_messages,
+            purpose=f"{self.get_data_type()}格式修复",
+        )
+        usage_dict = extract_token_usage(response)
+        return (
+            extract_response_text(response),
+            TokenUsage(
+                prompt_tokens=usage_dict["prompt_tokens"],
+                completion_tokens=usage_dict["completion_tokens"],
+                total_tokens=usage_dict["total_tokens"],
+            ),
+        )
+
+    @staticmethod
+    def _merge_token_usage(left: TokenUsage, right: TokenUsage) -> TokenUsage:
+        return TokenUsage(
+            prompt_tokens=left.prompt_tokens + right.prompt_tokens,
+            completion_tokens=left.completion_tokens + right.completion_tokens,
+            total_tokens=left.total_tokens + right.total_tokens,
+        )
+
+    @staticmethod
+    def _build_action_repair_prompt(
+        *,
+        prompt: str,
+        bad_response: str,
+        parse_error: Exception,
+    ) -> str:
+        response_text = str(bad_response or "").strip()
+        if response_text:
+            response_part = (
+                "上一次回复如下，请保留其中已经发生的剧情事实，并修复为合规格式：\n"
+                f"{response_text}"
+            )
+        else:
+            response_part = "上一次回复为空，请重新生成完整的行动回合输出。"
+        return "\n\n".join(
+            [
+                prompt,
+                "【格式修复重试】",
+                f"上一次解析错误：{parse_error}",
+                response_part,
+                (
+                    "请只输出最终可解析内容，不要解释原因。输出必须按顺序包含：\n"
+                    "1. 故事正文\n"
+                    "2. <行动选项>...</行动选项>\n"
+                    "3. <UpdateVariable><Analysis>...</Analysis>"
+                    "<JSONPatch>[...]</JSONPatch></UpdateVariable>\n"
+                    "如果本轮没有需要变更的变量，<JSONPatch> 也必须输出合法的空数组 []。"
+                ),
+            ]
+        )
 
     def build_action_prompt(
         self,

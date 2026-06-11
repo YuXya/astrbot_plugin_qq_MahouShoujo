@@ -56,9 +56,6 @@ class RecentLLMMessageRepository:
                     return
                 record = data["records"][-1]
                 record["error"] = str(error)
-                raw_response = str(record.get("raw_response") or "")
-                if raw_response:
-                    record["response"] = raw_response
                 self._write_data(data)
         except Exception as exc:
             logger.warning(f"鏇存柊鏈€杩?LLM 閿欒澶辫触: {exc}")
