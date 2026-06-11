@@ -42,7 +42,6 @@ class ActionTurnApplicationService:
             world_day_offset = self.save_repository.get_current_world_day_offset(group_id)
             current_world_date = self.save_repository.format_world_date(world_day_offset)
             player_data = save_data.get("player_data", {})
-            self.save_repository.ensure_action_runtime_state(group_id, user_id, player_data)
             phase = self._current_phase(player_data)
             selection_context = await self._select_context(
                 group_id=group_id,

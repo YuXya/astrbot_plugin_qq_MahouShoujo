@@ -270,10 +270,7 @@ class PlayerSaveRepository:
         player_data_path = user_dir / "player_data.json"
         self._atomic_write_json(player_data_path, player_data)
 
-        # 转生会重置基础人物卡；实时状态只同步覆盖主角树，保留其他顶层词条。
-        update_data = self._read_json(user_dir / "player_data_update.json") or dict(player_data)
-        update_data["主角"] = player_data["主角"]
-        self._atomic_write_json(user_dir / "player_data_update.json", update_data)
+        self._atomic_write_json(user_dir / "player_data_update.json", dict(player_data))
 
         self.append_log(
             group_id,
@@ -420,28 +417,6 @@ class PlayerSaveRepository:
 
     # ── 魔法少女行动回合 ─────────────────────────────────────────────
 
-    def ensure_action_runtime_state(
-        self,
-        group_id: str,
-        user_id: str,
-        player_data: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        user_dir = self.get_user_dir(group_id, user_id)
-        data = player_data if isinstance(player_data, dict) else self._load_current_player_data(user_dir)
-        if not isinstance(data, dict):
-            data = self._create_default_player_data(group_id, user_id)
-        data.setdefault("进程", {}).setdefault("阶段", "日常")
-        data.setdefault("系统状态", {}).setdefault("待处理事件", {})
-        data.setdefault("世界", {})
-        data.setdefault("记录", {})
-        data.setdefault("名声", {}).setdefault("知名度", 0)
-        data.setdefault("名声", {}).setdefault("风评", 0)
-        data.setdefault("主角", {})
-        if data["进程"].get("阶段") not in {"日常", "战斗", "事件"}:
-            data["进程"]["阶段"] = "日常"
-        self._save_current_player_data(user_dir, data)
-        return data
-
     def save_action_turn_result(
         self,
         *,
@@ -459,7 +434,9 @@ class PlayerSaveRepository:
         world_date = self.format_world_date(world_day_offset)
         result.date_label = world_date
 
-        player_data = self.ensure_action_runtime_state(group_id, user_id)
+        player_data = self._load_current_player_data(user_dir)
+        if not isinstance(player_data, dict) or not player_data:
+            raise ValueError("还没有你的魔法少女转生存档，请先使用 /魔法少女转生 建档。")
         player_data["updated_at"] = _now_date_str()
         applied_patch = self.apply_json_patch(player_data, result.json_patch)
         self._ensure_battle_count(player_data)
