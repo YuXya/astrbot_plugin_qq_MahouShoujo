@@ -81,6 +81,7 @@ async def call_provider_with_retry(
     prompt: str,
     umo: str | None = None,
     system_prompt: str | None = None,
+    messages: list[dict[str, str]] | None = None,
     purpose: str = "文本补全",
     provider_id_override: str | None = None,
 ):
@@ -102,15 +103,28 @@ async def call_provider_with_retry(
             kwargs = {"chat_provider_id": provider_id, "prompt": prompt}
             if system_prompt:
                 kwargs["system_prompt"] = system_prompt
+            if messages:
+                kwargs = {"chat_provider_id": provider_id, "messages": messages}
 
             logger.info(
-                f"[LLM] 调用 Provider={provider_id}, attempt={attempt}, prompt_len={len(prompt)}"
+                f"[LLM] 调用 Provider={provider_id}, attempt={attempt}, prompt_len={len(prompt)}, messages={bool(messages)}"
             )
-            response = await context.llm_generate(**kwargs)
+            try:
+                response = await context.llm_generate(**kwargs)
+            except TypeError as exc:
+                if not messages:
+                    raise
+                logger.warning(
+                    f"LLM Provider 不支持 messages 参数，回退到 prompt/system_prompt: {exc}"
+                )
+                fallback_kwargs = {"chat_provider_id": provider_id, "prompt": prompt}
+                if system_prompt:
+                    fallback_kwargs["system_prompt"] = system_prompt
+                response = await context.llm_generate(**fallback_kwargs)
             _recent_llm_message_repository().append(
                 purpose=purpose,
                 provider_id=provider_id,
-                prompt=prompt,
+                prompt=_format_prompt_record(prompt, messages),
                 system_prompt=system_prompt,
                 response=extract_response_text(response),
                 raw_response=extract_response_debug_json(response),
@@ -126,12 +140,28 @@ async def call_provider_with_retry(
     _recent_llm_message_repository().append(
         purpose=purpose,
         provider_id=provider_id if "provider_id" in locals() else "",
-        prompt=prompt,
+        prompt=_format_prompt_record(prompt, messages),
         system_prompt=system_prompt,
         response="",
         error=format_exception_detail(last_exc),
     )
     return None
+
+
+def _format_prompt_record(
+    prompt: str,
+    messages: list[dict[str, str]] | None = None,
+) -> str:
+    if not messages:
+        return prompt
+    return json.dumps(
+        {
+            "messages": messages,
+            "fallback_prompt": prompt,
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
 
 
 def extract_response_text(response) -> str:

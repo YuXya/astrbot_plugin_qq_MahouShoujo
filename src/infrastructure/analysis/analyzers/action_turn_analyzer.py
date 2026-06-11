@@ -56,9 +56,14 @@ class ActionTurnAnalyzer(BattleDiaryAnalyzer):
             current_world_date=current_world_date,
         )
         system_prompt = self._action_system_prompt()
+        messages = self._build_action_messages(prompt, system_prompt)
         if self.config_manager.get_debug_mode():
             self._save_debug_file("action_turn_prompt", prompt)
             self._save_debug_file("action_turn_system_prompt", system_prompt)
+            self._save_debug_file(
+                "action_turn_messages",
+                json.dumps(messages, ensure_ascii=False, indent=2),
+            )
 
         response = await call_provider_with_retry(
             self.context,
@@ -66,6 +71,7 @@ class ActionTurnAnalyzer(BattleDiaryAnalyzer):
             prompt=prompt,
             umo=umo,
             system_prompt=system_prompt,
+            messages=messages,
             purpose=self.get_data_type(),
         )
         result_text = extract_response_text(response)
@@ -374,3 +380,27 @@ examples_library:
             "请严格按 user message 要求输出正文、<行动选项> 和 <UpdateVariable>；"
             "不要在指定结构之外添加解释、道歉、Markdown 代码围栏或额外说明。"
         )
+
+    @staticmethod
+    def _build_action_messages(
+        prompt: str,
+        system_prompt: str,
+    ) -> list[dict[str, str]]:
+        return [
+            {
+                "role": "system",
+                "content": f"SYSTEM INSTRUCTION: {system_prompt}",
+            },
+            {
+                "role": "user",
+                "content": "=<role>user",
+            },
+            {
+                "role": "assistant",
+                "content": prompt,
+            },
+            {
+                "role": "user",
+                "content": "",
+            },
+        ]
