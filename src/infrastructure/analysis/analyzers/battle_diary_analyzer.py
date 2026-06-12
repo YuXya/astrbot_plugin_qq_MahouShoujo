@@ -908,6 +908,11 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                     "}\n"
                     "action_target 必须根据玩家行动、最近记录、候选参与对象、候选场景事件和候选目标判断；不要编造候选外目标。"
                 ),
+                (
+                    "如果选择了 scene_event，还必须输出 ai_win_rate 和 desire_win_rate，"
+                    "两者均为 0-100 的整数。ai_win_rate 表示客观成功可能，"
+                    "desire_win_rate 表示主角本轮想成功的意愿；未选择事件时可省略。"
+                ),
             ]
         )
         system_prompt = self.editable_manager.get_prompt("default_system_prompt")
@@ -946,19 +951,30 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             selected_target=primary_target,
             text_parts=text_parts,
         )
-        return {
+        participants = self._resolve_selected_profiles(
+            [
+                {"target_name": name}
+                for name in self._normalize_participant_names(parsed)
+            ],
+            candidates,
+        )
+        context = {
             "battle_type": "daily",
             "action_target": self._normalize_action_target(parsed.get("action_target")),
-            "selected_participants": self._resolve_selected_profiles(
-                [
-                    {"target_name": name}
-                    for name in self._normalize_participant_names(parsed)
-                ],
-                candidates,
-            ),
+            "selected_participants": participants,
             "selected_targets": selected_targets,
             "scene_event": scene_event,
         }
+        if scene_event:
+            context["battle_odds"] = self._build_battle_odds_context(
+                player_data=player_data,
+                teammate_data=participants,
+                enemy_data=selected_targets,
+                battle_kind="free_progress_event",
+                ai_win_rate=parsed.get("ai_win_rate"),
+                desire_win_rate=parsed.get("desire_win_rate"),
+            )
+        return context
 
     def build_teammate_completion_prompt(
         self,

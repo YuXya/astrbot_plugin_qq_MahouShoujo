@@ -15,6 +15,15 @@
 上下文选择 JSON：
 {{selection_context_json}}
 
+当前剧情事件规则：
+- selection_context.event_runtime 存在时，表示当前正在处理一段连续剧情；可以根据玩家行动自然延续、转场、改变目标或收束。
+- selection_context.event_outcome 是程序按固定胜率规则确定的本轮结果，正文必须遵守该结果。
+- success_ending / obstacle_ending 是本轮走向指导，不代表事件必须立刻结束。
+- 魔物、追击、调查、救援、决斗或其他目标仍存在时，保留 /进程/当前事件。
+- 只有目标已经解决或彻底消失时，才移除 /进程/当前事件并将 /进程/阶段 改为“日常”。
+- 败北、被抓走、逃跑失败或仍被追击通常表示事件继续。
+- 事件继续时可按正文更新 scene_event、selected_participants、selected_targets，也可以在剧情自然完成后直接结束事件。
+
 ---
 # 2. 阶段协议
 当前阶段：{{phase}}

@@ -4,6 +4,7 @@ import json
 import re
 import shutil
 import time
+from copy import deepcopy
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -424,6 +425,7 @@ class PlayerSaveRepository:
         user_id: str,
         result: ActionTurnResult,
         world_day_offset: int | None = None,
+        event_runtime: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         user_dir = self.get_user_dir(group_id, user_id)
         user_dir.mkdir(parents=True, exist_ok=True)
@@ -438,11 +440,32 @@ class PlayerSaveRepository:
         if not isinstance(player_data, dict) or not player_data:
             raise ValueError("还没有你的魔法少女转生存档，请先使用 /魔法少女转生 建档。")
         player_data["updated_at"] = _now_date_str()
-        applied_patch = self.apply_json_patch(player_data, result.json_patch)
+        if event_runtime and not self._current_story_event(player_data):
+            process = player_data.setdefault("进程", {})
+            process["阶段"] = "事件"
+            process["当前事件"] = deepcopy(event_runtime)
+        elif self._current_story_event(player_data):
+            player_data.setdefault("进程", {})["阶段"] = "事件"
+        previous_event = deepcopy(self._current_story_event(player_data))
+        normalized_patch = self._normalize_story_event_patch(player_data, result.json_patch)
+        result.json_patch = normalized_patch
+        applied_patch = self.apply_json_patch(player_data, normalized_patch)
+        current_event = self._current_story_event(player_data)
+        self._validate_story_event_state(previous_event, player_data)
+        if current_event and not self._patch_updates_event_turn(result.json_patch):
+            current_event["turn_count"] = max(
+                1,
+                int((previous_event or {}).get("turn_count", 0) or 0) + 1,
+            )
+        current_phase = str(player_data.get("进程", {}).get("阶段") or "日常").strip()
+        result.phase = current_phase if current_phase in {"日常", "战斗", "事件"} else "日常"
         self._ensure_battle_count(player_data)
         result.state_snapshot = dict(player_data)
         self._save_current_player_data(user_dir, player_data)
 
+        event_id = self._story_event_id(previous_event or current_event)
+        event_outcome = self._event_outcome_from_runtime(previous_event or current_event)
+        event_ended = bool(previous_event and not current_event)
         self.append_log(
             group_id,
             user_id,
@@ -459,10 +482,84 @@ class PlayerSaveRepository:
                 "action_options": result.action_options,
                 "analysis": result.analysis,
                 "json_patch": applied_patch,
+                "event_id": event_id,
+                "event_outcome": event_outcome,
+                "event_ended": event_ended,
             },
         )
         self.advance_world_clock(group_id, expected_day_offset=world_day_offset)
         return player_data
+
+    @staticmethod
+    def _current_story_event(state: dict[str, Any]) -> dict[str, Any] | None:
+        process = state.get("进程", {}) if isinstance(state, dict) else {}
+        current = process.get("当前事件") if isinstance(process, dict) else None
+        return current if isinstance(current, dict) else None
+
+    @staticmethod
+    def _story_event_id(current_event: dict[str, Any] | None) -> str:
+        scene = current_event.get("scene_event") if isinstance(current_event, dict) else None
+        return str(scene.get("id") or "").strip() if isinstance(scene, dict) else ""
+
+    @classmethod
+    def _normalize_story_event_patch(
+        cls,
+        state: dict[str, Any],
+        patch: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        current = cls._current_story_event(state)
+        if not current or not isinstance(patch, list):
+            return patch
+        normalized = [dict(item) if isinstance(item, dict) else item for item in patch]
+        removes_event = False
+        leaves_event_phase = False
+        for raw_op in normalized:
+            if not isinstance(raw_op, dict):
+                continue
+            op = str(raw_op.get("op") or "").strip()
+            path = str(raw_op.get("path") or "").strip()
+            if op == "remove" and path == "/进程/当前事件":
+                removes_event = True
+            if path == "/进程/阶段" and op in {"replace", "insert"}:
+                leaves_event_phase = str(raw_op.get("value") or "").strip() != "事件"
+        if removes_event and not leaves_event_phase:
+            normalized.append({"op": "replace", "path": "/进程/阶段", "value": "日常"})
+        elif leaves_event_phase and not removes_event:
+            normalized.append({"op": "remove", "path": "/进程/当前事件"})
+        return normalized
+
+    @classmethod
+    def _validate_story_event_state(
+        cls,
+        previous_event: dict[str, Any] | None,
+        state: dict[str, Any],
+    ) -> None:
+        process = state.get("进程", {}) if isinstance(state, dict) else {}
+        phase = str(process.get("阶段") or "日常").strip() if isinstance(process, dict) else "日常"
+        current = cls._current_story_event(state)
+        if phase == "事件" and not cls._story_event_id(current):
+            raise ValueError("事件阶段必须保留合法的当前事件")
+        if current and phase != "事件":
+            raise ValueError("保留当前事件时阶段必须为事件")
+
+    @staticmethod
+    def _patch_updates_event_turn(patch: list[dict[str, Any]]) -> bool:
+        return any(
+            isinstance(item, dict)
+            and str(item.get("path") or "") == "/进程/当前事件/turn_count"
+            for item in (patch or [])
+        )
+
+    @staticmethod
+    def _event_outcome_from_runtime(current_event: dict[str, Any] | None) -> str:
+        if not isinstance(current_event, dict):
+            return ""
+        try:
+            ai_rate = max(0, min(100, int(float(current_event.get("ai_win_rate", 50)))))
+            desire_rate = max(0, min(100, int(float(current_event.get("desire_win_rate", 50)))))
+        except Exception:
+            ai_rate = desire_rate = 50
+        return "success" if round(ai_rate * 0.5 + desire_rate * 0.5) >= 50 else "obstacle"
 
     def apply_json_patch(
         self,

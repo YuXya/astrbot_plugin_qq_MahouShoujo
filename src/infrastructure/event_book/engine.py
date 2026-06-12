@@ -24,8 +24,12 @@ class EventBookEngine:
         book_path: Path | None = None,
         editable_manager: EditableResourceManager | None = None,
     ):
-        self.editable_manager = editable_manager or EditableResourceManager()
-        self.book_path = book_path or self.editable_manager.event_book_path
+        self.editable_manager = editable_manager
+        if book_path is not None:
+            self.book_path = book_path
+        else:
+            self.editable_manager = editable_manager or EditableResourceManager()
+            self.book_path = self.editable_manager.event_book_path
 
     def build_scene_event_candidates(
         self,
@@ -79,6 +83,35 @@ class EventBookEngine:
                 )
 
         return candidates[: max(1, limit)]
+
+    def get_scene_event(self, event_id: str) -> dict[str, object] | None:
+        """Return the latest enabled scene-event payload for a stored event id."""
+        wanted = str(event_id or "").strip()
+        if not wanted:
+            return None
+        for event in self._load_events():
+            entries = [event.as_entry()] if event.is_scene_event else event.entries
+            for entry in entries:
+                if not entry.enabled or entry.id != wanted:
+                    continue
+                return {
+                    "id": entry.id,
+                    "category_id": entry.category_id or event.category_id,
+                    "category_name": entry.category_name or event.category_name,
+                    "title": entry.title or entry.id,
+                    "source_event": event.name or event.id,
+                    "command": event.command,
+                    "allowed_commands": entry.allowed_commands
+                    or event.allowed_commands
+                    or ([event.command] if event.command else []),
+                    "location_tags": entry.location_tags,
+                    "compatible_monsters": entry.compatible_monsters,
+                    "event_gimmick": entry.event_gimmick,
+                    "success_ending": entry.success_ending,
+                    "obstacle_ending": entry.obstacle_ending,
+                    "content": entry.content,
+                }
+        return None
 
     def _load_events(self) -> list[EventBookEvent]:
         if not self.book_path.exists():
