@@ -16,9 +16,9 @@ class EventBookEntry:
     allowed_commands: list[str] = field(default_factory=list)
     location_tags: list[str] = field(default_factory=list)
     compatible_monsters: list[str] = field(default_factory=list)
-    opening_hook: str = ""
-    twist_hook: str = ""
-    ending_hook: str = ""
+    event_gimmick: str = ""
+    success_ending: str = ""
+    obstacle_ending: str = ""
 
     @classmethod
     def from_dict(
@@ -48,9 +48,9 @@ class EventBookEntry:
             allowed_commands=cls._normalize_text_list(raw.get("allowed_commands")),
             location_tags=cls._normalize_text_list(raw.get("location_tags")),
             compatible_monsters=cls._normalize_text_list(raw.get("compatible_monsters")),
-            opening_hook=str(raw.get("opening_hook") or "").strip(),
-            twist_hook=str(raw.get("twist_hook") or "").strip(),
-            ending_hook=str(raw.get("ending_hook") or "").strip(),
+            event_gimmick=str(raw.get("event_gimmick") or "").strip(),
+            success_ending=str(raw.get("success_ending") or "").strip(),
+            obstacle_ending=str(raw.get("obstacle_ending") or "").strip(),
         )
 
     @staticmethod
@@ -83,9 +83,9 @@ class EventBookEvent:
     allowed_commands: list[str] = field(default_factory=list)
     location_tags: list[str] = field(default_factory=list)
     compatible_monsters: list[str] = field(default_factory=list)
-    opening_hook: str = ""
-    twist_hook: str = ""
-    ending_hook: str = ""
+    event_gimmick: str = ""
+    success_ending: str = ""
+    obstacle_ending: str = ""
     entries: list[EventBookEntry] = field(default_factory=list)
 
     @classmethod
@@ -116,9 +116,9 @@ class EventBookEvent:
                 or entry.content
                 or entry.location_tags
                 or entry.compatible_monsters
-                or entry.opening_hook
-                or entry.twist_hook
-                or entry.ending_hook
+                or entry.event_gimmick
+                or entry.success_ending
+                or entry.obstacle_ending
             ):
                 entries.append(entry)
 
@@ -140,9 +140,9 @@ class EventBookEvent:
             compatible_monsters=EventBookEntry._normalize_text_list(
                 raw.get("compatible_monsters")
             ),
-            opening_hook=str(raw.get("opening_hook") or "").strip(),
-            twist_hook=str(raw.get("twist_hook") or "").strip(),
-            ending_hook=str(raw.get("ending_hook") or "").strip(),
+            event_gimmick=str(raw.get("event_gimmick") or "").strip(),
+            success_ending=str(raw.get("success_ending") or "").strip(),
+            obstacle_ending=str(raw.get("obstacle_ending") or "").strip(),
             entries=entries,
         )
 
@@ -154,9 +154,9 @@ class EventBookEvent:
             or self.content
             or self.location_tags
             or self.compatible_monsters
-            or self.opening_hook
-            or self.twist_hook
-            or self.ending_hook
+            or self.event_gimmick
+            or self.success_ending
+            or self.obstacle_ending
         )
 
     def as_entry(self) -> EventBookEntry:
@@ -173,7 +173,7 @@ class EventBookEvent:
             allowed_commands=self.allowed_commands or ([self.command] if self.command else []),
             location_tags=self.location_tags,
             compatible_monsters=self.compatible_monsters,
-            opening_hook=self.opening_hook,
-            twist_hook=self.twist_hook,
-            ending_hook=self.ending_hook,
+            event_gimmick=self.event_gimmick,
+            success_ending=self.success_ending,
+            obstacle_ending=self.obstacle_ending,
         )

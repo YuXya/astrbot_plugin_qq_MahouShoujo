@@ -71,9 +71,9 @@ class EventBookEngine:
                         or ([event.command] if event.command else []),
                         "location_tags": entry.location_tags,
                         "compatible_monsters": entry.compatible_monsters,
-                        "opening_hook": entry.opening_hook,
-                        "twist_hook": entry.twist_hook,
-                        "ending_hook": entry.ending_hook,
+                        "event_gimmick": entry.event_gimmick,
+                        "success_ending": entry.success_ending,
+                        "obstacle_ending": entry.obstacle_ending,
                         "content": entry.content,
                     }
                 )
@@ -116,23 +116,7 @@ class EventBookEngine:
                         events.append(event)
             return events
 
-        raw_events = raw.get("events", []) if isinstance(raw, dict) else []
-        if not isinstance(raw_events, list):
-            logger.warning("事件书 events 字段不是列表")
-            return []
-
-        default_category = self.DEFAULT_EVENT_CATEGORIES[0]
-        for idx, raw_event in enumerate(raw_events):
-            if not isinstance(raw_event, dict):
-                continue
-            event = EventBookEvent.from_dict(
-                raw_event,
-                fallback_id=str(idx),
-                category_id=default_category["id"],
-                category_name=default_category["name"],
-            )
-            if event.id:
-                events.append(event)
+        logger.warning("事件书 categories 字段不是列表")
         return events
 
     @staticmethod

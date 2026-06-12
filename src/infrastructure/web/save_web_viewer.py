@@ -701,7 +701,7 @@ class SaveWebViewer:
               <div class="world-book-toolbar">
                 <div>
                   <h2>魔物列表</h2>
-                  <p class="muted">编辑公共魔物字段：关键词、正文、战斗机制，以及胜利/失败两组结尾表现。</p>
+                  <p class="muted">编辑公共魔物字段：关键词、正文、战斗机制，以及胜利/失败结尾表现。</p>
                 </div>
                 <button id="add-monster" type="button">+ 添加魔物</button>
               </div>
@@ -736,9 +736,9 @@ class SaveWebViewer:
                   name: "",
                   keys: [],
                   content: "",
-                  battle_gimmicks: [],
-                  victory_ending_hooks: [],
-                  defeat_ending_hooks: [],
+                  battle_gimmick: "",
+                  victory_ending: "",
+                  defeat_ending: "",
                 }};
               }}
 
@@ -753,9 +753,9 @@ class SaveWebViewer:
                   name: String(entry.name || "").trim(),
                   keys: monsterSplitList(entry.keys),
                   content: String(entry.content || ""),
-                  battle_gimmicks: monsterSplitList(entry.battle_gimmicks),
-                  victory_ending_hooks: monsterSplitList(entry.victory_ending_hooks),
-                  defeat_ending_hooks: monsterSplitList(entry.defeat_ending_hooks),
+                  battle_gimmick: String(entry.battle_gimmick || ""),
+                  victory_ending: String(entry.victory_ending || ""),
+                  defeat_ending: String(entry.defeat_ending || ""),
                 }};
               }}
 
@@ -797,9 +797,9 @@ class SaveWebViewer:
                   name: card.querySelector("[data-field='name']").value,
                   keys: card.querySelector("[data-field='keys']").value,
                   content: card.querySelector("[data-field='content']").value,
-                  battle_gimmicks: card.querySelector("[data-field='battle_gimmicks']").value,
-                  victory_ending_hooks: card.querySelector("[data-field='victory_ending_hooks']").value,
-                  defeat_ending_hooks: card.querySelector("[data-field='defeat_ending_hooks']").value,
+                  battle_gimmick: card.querySelector("[data-field='battle_gimmick']").value,
+                  victory_ending: card.querySelector("[data-field='victory_ending']").value,
+                  defeat_ending: card.querySelector("[data-field='defeat_ending']").value,
                 }}, index));
               }}
 
@@ -837,10 +837,10 @@ class SaveWebViewer:
                           <textarea data-field="keys" class="keys-editor" spellcheck="false">${{monsterEscapeHtml(entry.keys.join("\\n"))}}</textarea>
                         </div>
                         ${{monsterTextarea("content", entry.content, "正文")}}
-                        ${{monsterTextarea("battle_gimmicks", entry.battle_gimmicks, "战斗机制")}}
+                        ${{monsterTextarea("battle_gimmick", entry.battle_gimmick, "战斗机制")}}
                         <div class="monster-ending-grid">
-                          ${{monsterTextarea("victory_ending_hooks", entry.victory_ending_hooks, "战斗胜利结尾")}}
-                          ${{monsterTextarea("defeat_ending_hooks", entry.defeat_ending_hooks, "战斗失败结尾")}}
+                          ${{monsterTextarea("victory_ending", entry.victory_ending, "战斗胜利结尾")}}
+                          ${{monsterTextarea("defeat_ending", entry.defeat_ending, "战斗失败结尾")}}
                         </div>
                       </div>
                     </details>
@@ -960,7 +960,7 @@ class SaveWebViewer:
               <div class="world-book-toolbar">
                 <div>
                   <h2>事件列表</h2>
-                  <p class="muted">按分类编辑事件；魔物事件通过魔物名称选择 compatible_monsters。</p>
+                  <p class="muted">按分类编辑事件的正文、事件机制、顺利进行和受到阻碍；魔物事件通过魔物名称选择 compatible_monsters。</p>
                 </div>
                 <button id="add-event" type="button">+ 添加事件</button>
               </div>
@@ -992,7 +992,7 @@ class SaveWebViewer:
               let activeMonsterPickerCard = null;
               let activeMonsterPickerSelection = new Set();
               const eventState = {{
-                version: Number(initialEventBook.version || 3),
+                version: Number(initialEventBook.version || 4),
                 categories: eventNormalizeCategories(initialEventBook),
               }};
               let eventOpenKeys = new Set();
@@ -1007,10 +1007,10 @@ class SaveWebViewer:
                   keys: [],
                   location_tags: [],
                   compatible_monsters: [],
-                  opening_hook: "",
-                  twist_hook: "",
-                  ending_hook: "",
                   content: "",
+                  event_gimmick: "",
+                  success_ending: "",
+                  obstacle_ending: "",
                 }};
               }}
 
@@ -1029,10 +1029,10 @@ class SaveWebViewer:
                   keys: eventSplitList(entry.keys),
                   location_tags: eventSplitList(entry.location_tags),
                   compatible_monsters: eventSplitList(entry.compatible_monsters),
-                  opening_hook: String(entry.opening_hook || ""),
-                  twist_hook: String(entry.twist_hook || ""),
-                  ending_hook: String(entry.ending_hook || ""),
                   content: String(entry.content || ""),
+                  event_gimmick: String(entry.event_gimmick || ""),
+                  success_ending: String(entry.success_ending || ""),
+                  obstacle_ending: String(entry.obstacle_ending || ""),
                 }};
               }}
 
@@ -1159,10 +1159,10 @@ class SaveWebViewer:
                       keys: card.querySelector("[data-field='keys']").value,
                       location_tags: card.querySelector("[data-field='location_tags']").value,
                       compatible_monsters: eventGetCardMonsters(card),
-                      opening_hook: card.querySelector("[data-field='opening_hook']").value,
-                      twist_hook: card.querySelector("[data-field='twist_hook']").value,
-                      ending_hook: card.querySelector("[data-field='ending_hook']").value,
                       content: card.querySelector("[data-field='content']").value,
+                      event_gimmick: card.querySelector("[data-field='event_gimmick']").value,
+                      success_ending: card.querySelector("[data-field='success_ending']").value,
+                      obstacle_ending: card.querySelector("[data-field='obstacle_ending']").value,
                     }}, index)),
                   }};
                 }});
@@ -1228,10 +1228,12 @@ class SaveWebViewer:
                               <div class="monster-selected-list" data-role="compatible-monster-list">${{eventSelectedMonsterListHtml(entry.compatible_monsters)}}</div>
                             </div>
                           ` : ""}}
-                          ${{eventTextarea("opening_hook", entry.opening_hook, "开场钩子")}}
-                          ${{eventTextarea("twist_hook", entry.twist_hook, "变奏钩子")}}
-                          ${{eventTextarea("ending_hook", entry.ending_hook, "结尾钩子")}}
                           ${{eventTextarea("content", entry.content, "正文")}}
+                          ${{eventTextarea("event_gimmick", entry.event_gimmick, "事件机制")}}
+                          <div class="monster-ending-grid">
+                            ${{eventTextarea("success_ending", entry.success_ending, "顺利进行")}}
+                            ${{eventTextarea("obstacle_ending", entry.obstacle_ending, "受到阻碍")}}
+                          </div>
                         </div>
                       </details>
                     `;
@@ -1341,9 +1343,9 @@ class SaveWebViewer:
                     "name": name,
                     "keys": cls._normalize_editor_text_list(entry.get("keys")),
                     "content": content,
-                    "battle_gimmicks": cls._normalize_editor_text_list(entry.get("battle_gimmicks")),
-                    "victory_ending_hooks": cls._normalize_editor_text_list(entry.get("victory_ending_hooks")),
-                    "defeat_ending_hooks": cls._normalize_editor_text_list(entry.get("defeat_ending_hooks")),
+                    "battle_gimmick": str(entry.get("battle_gimmick") or "").strip(),
+                    "victory_ending": str(entry.get("victory_ending") or "").strip(),
+                    "defeat_ending": str(entry.get("defeat_ending") or "").strip(),
                 }
             )
         return {
@@ -1359,7 +1361,7 @@ class SaveWebViewer:
             {"id": "character_enemy", "name": "目标是魔法少女", "events": []},
         ]
         if not isinstance(raw, dict):
-            return {"version": 3, "categories": default_categories}
+            return {"version": 4, "categories": default_categories}
 
         categories_by_id: dict[str, dict[str, object]] = {
             str(category["id"]): dict(category) for category in default_categories
@@ -1388,16 +1390,8 @@ class SaveWebViewer:
             ]
             categories_by_id[category_id] = category
 
-        if isinstance(raw.get("events"), list) and raw["events"]:
-            monster_category = categories_by_id["monster_enemy"]
-            monster_category["events"] = [
-                cls._normalize_event_book_entry(entry, idx)
-                for idx, entry in enumerate(raw["events"])
-                if isinstance(entry, dict)
-            ]
-
         return {
-            "version": int(raw.get("version") or 3),
+            "version": int(raw.get("version") or 4),
             "categories": list(categories_by_id.values()),
         }
 
@@ -1411,10 +1405,10 @@ class SaveWebViewer:
             "strategy": "always" if str(entry.get("strategy") or "").strip().lower() == "always" else "keyword",
             "keys": cls._normalize_editor_text_list(entry.get("keys")),
             "location_tags": cls._normalize_editor_text_list(entry.get("location_tags")),
-            "opening_hook": str(entry.get("opening_hook") or "").strip(),
-            "twist_hook": str(entry.get("twist_hook") or "").strip(),
-            "ending_hook": str(entry.get("ending_hook") or "").strip(),
             "content": str(entry.get("content") or "").strip(),
+            "event_gimmick": str(entry.get("event_gimmick") or "").strip(),
+            "success_ending": str(entry.get("success_ending") or "").strip(),
+            "obstacle_ending": str(entry.get("obstacle_ending") or "").strip(),
         }
         compatible_monsters = cls._normalize_editor_text_list(entry.get("compatible_monsters"))
         if compatible_monsters:
