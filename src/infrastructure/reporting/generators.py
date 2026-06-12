@@ -204,13 +204,17 @@ class ReportGenerator(ICardGenerator):
         )
         patch_items = "".join(
             f'<span class="patch-chip">{self._format_action_patch(item)}</span>'
-            for item in result.json_patch[:8]
-            if isinstance(item, dict)
+            for item in [
+                patch
+                for patch in result.json_patch
+                if isinstance(patch, dict)
+                and self._should_display_action_patch(patch)
+            ][:8]
         )
         patch_section = (
             f"""
     <section class="section">
-      <div class="section-title">变量更新</div>
+      <div class="section-title">状态变化</div>
       <div class="patch-grid">{patch_items}</div>
     </section>"""
             if patch_items
@@ -540,6 +544,13 @@ h1 {{
         label = cls._json_path_leaf(item.get("path"))
         value = cls._display_patch_value(item)
         return html_lib.escape(f"{label}：{value}")
+
+    @staticmethod
+    def _should_display_action_patch(item: dict[str, Any]) -> bool:
+        return not (
+            item.get("op") == "insert"
+            and item.get("value") in ({}, [])
+        )
 
     @staticmethod
     def _json_path_leaf(path: object) -> str:

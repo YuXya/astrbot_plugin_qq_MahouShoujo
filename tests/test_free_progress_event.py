@@ -374,6 +374,35 @@ class ActionTurnCardTests(unittest.TestCase):
         self.assertIn(">尝试逃跑</span>", html)
         self.assertNotIn(">时间</span>", html)
 
+    def test_action_card_hides_empty_insert_containers(self):
+        generator = ReportGenerator.__new__(ReportGenerator)
+        result = ActionTurnResult(
+            story_text="测试正文",
+            json_patch=[
+                {"op": "insert", "path": "/主角/身体部位状况", "value": {}},
+                {
+                    "op": "insert",
+                    "path": "/主角/身体部位状况/手腕",
+                    "value": "淡红勒痕",
+                },
+                {"op": "insert", "path": "/主角/快感状态/性癖", "value": []},
+                {"op": "insert", "path": "/主角/快感状态/性癖/恶堕", "value": 1},
+                {"op": "insert", "path": "/主角/标签", "value": {"状态": "警觉"}},
+                {"op": "replace", "path": "/主角/临时状态", "value": {}},
+            ],
+        )
+
+        html = generator._render_action_turn_html(result)
+
+        self.assertIn('<div class="section-title">状态变化</div>', html)
+        self.assertNotIn('<div class="section-title">变量更新</div>', html)
+        self.assertNotIn("身体部位状况：{}", html)
+        self.assertNotIn("性癖：[]", html)
+        self.assertIn("手腕：淡红勒痕", html)
+        self.assertIn("恶堕：1", html)
+        self.assertIn('标签：{&quot;状态&quot;:&quot;警觉&quot;}', html)
+        self.assertIn("临时状态：{}", html)
+
 
 if __name__ == "__main__":
     unittest.main()

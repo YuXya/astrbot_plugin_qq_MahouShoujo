@@ -66,7 +66,7 @@ options_generator_protocol:
 # 8. master_protocol
 你已阅读上方的历史上下文、阶段协议、变量快照、行动选项协议、变量 API、后台事件协议和示例库。
 
-请严格按以下顺序输出：
+【请严格按以下顺序输出】
 1. 故事正文
 2. <行动选项> 块
 3. <UpdateVariable> 块
@@ -96,3 +96,8 @@ UpdateVariable_block:
 
 玩家本轮行动：
 {{action}}
+
+【再次强调，请严格按以下顺序输出】
+1. 故事正文
+2. <行动选项>...</行动选项>
+3. <UpdateVariable><Analysis>...</Analysis><JSONPatch>[...]</JSONPatch></UpdateVariable>
