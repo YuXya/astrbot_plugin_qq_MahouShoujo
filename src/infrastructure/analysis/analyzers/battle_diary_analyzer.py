@@ -285,7 +285,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "action": action_text.strip(),
                 "logs_text": self._format_logs(logs),
                 "cameo_memories_text": self._format_cameo_memories(cameo_memories),
-                "candidates_json": self._json_dump(
+                "candidates_json": self._compact_json_dump(
                     {
                         "participants": self._prompt_protagonist_profiles(
                             teammate_candidates
@@ -294,9 +294,13 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                             "magical_girls": self._prompt_protagonist_profiles(
                                 magical_girl_candidates
                             ),
-                            "monsters": prompt_monster_candidates,
+                            "monsters": self._prompt_monster_candidates(
+                                prompt_monster_candidates
+                            ),
                         },
-                        "scene_events": scene_event_candidates,
+                        "scene_events": self._prompt_scene_event_candidates(
+                            scene_event_candidates
+                        ),
                     }
                 ),
             },
@@ -1000,6 +1004,39 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "scene_events_json": self._json_dump(scene_event_candidates or []),
                 "monster_candidates_json": self._json_dump(monster_candidates or []),
             },
+        )
+
+    @staticmethod
+    def _prompt_scene_event_candidates(candidates: list[dict]) -> list[dict]:
+        fields = (
+            "id",
+            "title",
+            "keys",
+            "location_tags",
+            "compatible_monsters",
+            "content",
+        )
+        return [
+            {field: candidate.get(field) for field in fields}
+            for candidate in candidates
+            if isinstance(candidate, dict)
+        ]
+
+    @staticmethod
+    def _prompt_monster_candidates(candidates: list[dict]) -> list[dict]:
+        fields = ("id", "name", "keys", "content")
+        return [
+            {field: candidate.get(field) for field in fields}
+            for candidate in candidates
+            if isinstance(candidate, dict)
+        ]
+
+    @staticmethod
+    def _compact_json_dump(data: object) -> str:
+        return json.dumps(
+            data if data is not None else [],
+            ensure_ascii=False,
+            separators=(",", ":"),
         )
 
     @staticmethod

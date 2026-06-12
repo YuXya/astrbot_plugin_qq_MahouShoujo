@@ -215,7 +215,10 @@ class ActionTurnApplicationService:
                 "desire_win_rate": desire_rate,
                 "battle_kind": "free_progress_event",
             },
-            "event_runtime": deepcopy(current_event),
+            "event_runtime": {
+                "started_at": str(current_event.get("started_at") or "").strip(),
+                "turn_count": max(0, int(current_event.get("turn_count", 0) or 0)),
+            },
             "event_outcome": {
                 "result": "success" if outcome == "player_win" else "obstacle",
                 "battle_result": outcome,

@@ -32,6 +32,12 @@ from src.application.services.action_turn_application_service import (  # noqa: 
 )
 from src.domain.models.data_models import ActionTurnResult  # noqa: E402
 from src.infrastructure.event_book.engine import EventBookEngine  # noqa: E402
+from src.infrastructure.analysis.analyzers.battle_diary_analyzer import (  # noqa: E402
+    BattleDiaryAnalyzer,
+)
+from src.infrastructure.analysis.analyzers.action_turn_analyzer import (  # noqa: E402
+    ActionTurnAnalyzer,
+)
 from src.infrastructure.reporting.generators import ReportGenerator  # noqa: E402
 from src.infrastructure.storage.player_save_repository import (  # noqa: E402
     PlayerSaveRepository,
@@ -84,6 +90,49 @@ class EventBookLookupTests(unittest.TestCase):
         self.assertEqual(event["obstacle_ending"], "受阻指导")
 
 
+class MagicalBattlePromptCandidateTests(unittest.TestCase):
+    def test_candidate_views_only_keep_selection_fields(self):
+        scene_events = BattleDiaryAnalyzer._prompt_scene_event_candidates(
+            [
+                {
+                    "id": "event-1",
+                    "title": "事件名称",
+                    "keys": ["关键词"],
+                    "location_tags": ["地点"],
+                    "compatible_monsters": ["魔物"],
+                    "content": "事件正文",
+                    "event_gimmick": "不应传入",
+                    "success_ending": "不应传入",
+                    "category_name": "不应传入",
+                }
+            ]
+        )
+        monsters = BattleDiaryAnalyzer._prompt_monster_candidates(
+            [
+                {
+                    "id": "monster-1",
+                    "name": "魔物名称",
+                    "keys": ["关键词"],
+                    "content": "魔物正文",
+                    "battle_gimmick": "不应传入",
+                    "victory_ending": "不应传入",
+                }
+            ]
+        )
+
+        self.assertEqual(
+            set(scene_events[0]),
+            {"id", "title", "keys", "location_tags", "compatible_monsters", "content"},
+        )
+        self.assertEqual(set(monsters[0]), {"id", "name", "keys", "content"})
+        compact = BattleDiaryAnalyzer._compact_json_dump(
+            {"scene_events": scene_events, "monsters": monsters}
+        )
+        self.assertNotIn("event_gimmick", compact)
+        self.assertNotIn("battle_gimmick", compact)
+        self.assertNotIn("\n", compact)
+
+
 class EventContextTests(unittest.TestCase):
     def _service(self):
         service = ActionTurnApplicationService.__new__(ActionTurnApplicationService)
@@ -104,6 +153,43 @@ class EventContextTests(unittest.TestCase):
         self.assertEqual(success["event_outcome"]["result"], "success")
         self.assertEqual(obstacle["event_outcome"]["result"], "obstacle")
         self.assertEqual(success["scene_event"]["content"], "最新版正文")
+
+    def test_active_context_only_exposes_full_target_once(self):
+        runtime = _runtime(turn_count=3)
+        context = self._service()._active_event_context(runtime)
+        visible = ActionTurnAnalyzer._visible_current_variables(
+            {"进程": {"阶段": "事件", "当前事件": runtime}}
+        )
+
+        self.assertEqual(context["selected_targets"][0]["id"], "monster")
+        self.assertEqual(
+            context["event_runtime"],
+            {"started_at": "公元2020年4月1日", "turn_count": 3},
+        )
+        self.assertNotIn("selected_targets", context["event_runtime"])
+        self.assertNotIn("selected_participants", context["event_runtime"])
+        self.assertNotIn("scene_event", context["event_runtime"])
+        llm_payload = json.dumps(
+            {"selection_context": context, "current_variables": visible},
+            ensure_ascii=False,
+        )
+        self.assertEqual(llm_payload.count('"id": "monster"'), 1)
+
+
+class ActionPromptProjectionTests(unittest.TestCase):
+    def test_current_event_is_hidden_from_prompt_snapshot_without_mutating_save(self):
+        player_data = {
+            "进程": {"阶段": "事件", "当前事件": _runtime()},
+            "主角": {"姓名": "测试主角"},
+        }
+
+        visible = ActionTurnAnalyzer._visible_current_variables(player_data)
+
+        self.assertEqual(visible["进程"], {"阶段": "事件"})
+        self.assertEqual(
+            player_data["进程"]["当前事件"]["selected_targets"][0]["id"],
+            "monster",
+        )
 
 
 class EventSaveTests(unittest.TestCase):
@@ -131,9 +217,17 @@ class EventSaveTests(unittest.TestCase):
         started = self._save([], runtime=_runtime(turn_count=0))
         self.assertEqual(started["进程"]["阶段"], "事件")
         self.assertEqual(started["进程"]["当前事件"]["turn_count"], 1)
+        self.assertEqual(
+            started["进程"]["当前事件"]["selected_targets"][0]["id"],
+            "monster",
+        )
 
         continued = self._save([])
         self.assertEqual(continued["进程"]["当前事件"]["turn_count"], 2)
+        self.assertEqual(
+            continued["进程"]["当前事件"]["selected_targets"][0]["id"],
+            "monster",
+        )
 
         ended = self._save(
             [
@@ -162,6 +256,20 @@ class EventSaveTests(unittest.TestCase):
         )
         self.assertEqual(changed["进程"]["当前事件"]["scene_event"]["id"], "other")
         self.assertEqual(changed["进程"]["当前事件"]["ai_win_rate"], 100)
+
+        replaced_target = self._save(
+            [
+                {
+                    "op": "replace",
+                    "path": "/进程/当前事件/selected_targets",
+                    "value": [{"id": "monster-2", "name": "新魔物"}],
+                }
+            ]
+        )
+        service = ActionTurnApplicationService.__new__(ActionTurnApplicationService)
+        service.event_book_engine = SimpleNamespace(get_scene_event=lambda event_id: None)
+        context = service._active_event_context(replaced_target["进程"]["当前事件"])
+        self.assertEqual(context["selected_targets"][0]["id"], "monster-2")
 
         ended = self._save([{"op": "remove", "path": "/进程/当前事件"}])
         self.assertEqual(ended["进程"]["阶段"], "日常")

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
 from typing import Any
 
 from ....utils.logger import logger
@@ -76,21 +75,8 @@ class PlayerRelationshipAnalyzer(BaseAnalyzer[dict[str, Any]]):
         participants_context: dict[str, Any],
         world_date: str,
     ) -> str:
-        event_book_json = self._json_dump(
-            self._load_compact_book(
-                "event_book/default.json",
-                self._compact_event_book,
-            )
-        )
-        monster_book_json = self._json_dump(
-            self._load_compact_book(
-                "monster_book/default.json",
-                self._compact_monster_book,
-            )
-        )
-        template = self.editable_manager.get_prompt("relationship_summary_prompt")
-        prompt = self.editable_manager.render_text(
-            template,
+        return self.editable_manager.render_prompt(
+            "relationship_summary_prompt",
             {
                 "battle_title": str(getattr(card, "title", "") or ""),
                 "world_date": str(world_date or getattr(card, "date_label", "") or ""),
@@ -110,73 +96,8 @@ class PlayerRelationshipAnalyzer(BaseAnalyzer[dict[str, Any]]):
                 "city_players_json": self._json_dump(
                     participants_context.get("city_players", [])
                 ),
-                "event_book_json": event_book_json,
-                "monster_book_json": monster_book_json,
             },
         )
-        if "{{event_book_json}}" not in template:
-            prompt += f"\n\n事件书参考（仅名称、关键词、地点标签、兼容魔物、正文）：\n{event_book_json}"
-        if "{{monster_book_json}}" not in template:
-            prompt += f"\n\n魔物书参考（仅名称、关键词、正文）：\n{monster_book_json}"
-        return prompt
-
-    def _load_compact_book(
-        self,
-        relative_path: str,
-        compact: Callable[[object], list[dict[str, Any]]],
-    ) -> list[dict[str, Any]]:
-        try:
-            raw = json.loads(self.editable_manager.read_text(relative_path))
-            return compact(raw)
-        except Exception as exc:
-            logger.warning(f"人物关系总结读取书籍失败，已使用空列表: {relative_path} {exc}")
-            return []
-
-    @classmethod
-    def _compact_event_book(cls, raw: object) -> list[dict[str, Any]]:
-        if not isinstance(raw, dict) or not isinstance(raw.get("categories"), list):
-            raise ValueError("事件书 categories 字段不是列表")
-
-        events: list[dict[str, Any]] = []
-        for category in raw["categories"]:
-            if not isinstance(category, dict):
-                continue
-            category_events = category.get("events", [])
-            if not isinstance(category_events, list):
-                continue
-            for event in category_events:
-                if not isinstance(event, dict):
-                    continue
-                events.append(
-                    cls._select_fields(
-                        event,
-                        (
-                            "name",
-                            "keys",
-                            "location_tags",
-                            "compatible_monsters",
-                            "content",
-                        ),
-                    )
-                )
-        return events
-
-    @classmethod
-    def _compact_monster_book(cls, raw: object) -> list[dict[str, Any]]:
-        if not isinstance(raw, dict) or not isinstance(raw.get("entries"), list):
-            raise ValueError("魔物书 entries 字段不是列表")
-        return [
-            cls._select_fields(entry, ("name", "keys", "content"))
-            for entry in raw["entries"]
-            if isinstance(entry, dict)
-        ]
-
-    @staticmethod
-    def _select_fields(
-        entry: dict[str, Any],
-        fields: tuple[str, ...],
-    ) -> dict[str, Any]:
-        return {field: entry.get(field) for field in fields}
 
     @classmethod
     def _normalize_result(cls, data: dict[str, Any]) -> dict[str, Any]:

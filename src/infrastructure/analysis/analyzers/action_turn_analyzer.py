@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from copy import deepcopy
 from typing import Any
 
 from ....domain.models.data_models import ActionTurnResult, TokenUsage
@@ -413,11 +414,16 @@ variable_api:
     def _visible_current_variables(player_data: dict) -> dict:
         if not isinstance(player_data, dict):
             return {}
-        return {
+        visible = {
             key: value
             for key, value in player_data.items()
             if str(key) not in HIDDEN_CURRENT_VARIABLE_KEYS
         }
+        process = visible.get("进程")
+        if isinstance(process, dict) and "当前事件" in process:
+            visible["进程"] = deepcopy(process)
+            visible["进程"].pop("当前事件", None)
+        return visible
 
     @staticmethod
     def _backend_event_protocol(pending_events: dict[str, Any]) -> str:

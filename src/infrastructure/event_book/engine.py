@@ -73,6 +73,7 @@ class EventBookEngine:
                         "allowed_commands": entry.allowed_commands
                         or event.allowed_commands
                         or ([event.command] if event.command else []),
+                        "keys": entry.keys,
                         "location_tags": entry.location_tags,
                         "compatible_monsters": entry.compatible_monsters,
                         "event_gimmick": entry.event_gimmick,
@@ -104,6 +105,7 @@ class EventBookEngine:
                     "allowed_commands": entry.allowed_commands
                     or event.allowed_commands
                     or ([event.command] if event.command else []),
+                    "keys": entry.keys,
                     "location_tags": entry.location_tags,
                     "compatible_monsters": entry.compatible_monsters,
                     "event_gimmick": entry.event_gimmick,
