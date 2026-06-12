@@ -92,6 +92,9 @@ class ActionTurnApplicationService:
             result = analysis.result
             result.phase = phase
             result.action = action_text
+            result.selected_targets = self._dict_list(
+                selection_context.get("selected_targets")
+            )
             result.date_label = current_world_date
             if avatar_url:
                 result.avatar_url = avatar_url

@@ -32,6 +32,7 @@ from src.application.services.action_turn_application_service import (  # noqa: 
 )
 from src.domain.models.data_models import ActionTurnResult  # noqa: E402
 from src.infrastructure.event_book.engine import EventBookEngine  # noqa: E402
+from src.infrastructure.reporting.generators import ReportGenerator  # noqa: E402
 from src.infrastructure.storage.player_save_repository import (  # noqa: E402
     PlayerSaveRepository,
 )
@@ -230,6 +231,40 @@ class ActiveEventFlowTests(unittest.IsolatedAsyncioTestCase):
             service.llm_analyzer.selection_context["selected_targets"][0]["id"],
             "monster",
         )
+        self.assertEqual(result.result.selected_targets[0]["name"], "测试魔物")
+
+
+class ActionTurnCardTests(unittest.TestCase):
+    def test_action_card_uses_selected_targets_and_player_action_row(self):
+        generator = ReportGenerator.__new__(ReportGenerator)
+        result = ActionTurnResult(
+            story_text="测试正文",
+            action="尝试逃跑",
+            selected_targets=[
+                {"id": "monster", "name": "测试魔物"},
+                {"target_name": "小夏", "magical_girl_name": "夏光"},
+            ],
+            phase="事件",
+            date_label="2020年4月1日",
+            state_snapshot={
+                "主角": {
+                    "个人信息": {
+                        "姓名": "小明",
+                        "魔法少女名": "星辉",
+                        "身份&职业": "见习调查员",
+                    }
+                }
+            },
+        )
+
+        html = generator._render_action_turn_html(result)
+
+        self.assertIn("测试魔物、小夏", html)
+        self.assertIn(">身份</span>", html)
+        self.assertIn(">见习调查员</span>", html)
+        self.assertIn(">玩家行动</span>", html)
+        self.assertIn(">尝试逃跑</span>", html)
+        self.assertNotIn(">时间</span>", html)
 
 
 if __name__ == "__main__":

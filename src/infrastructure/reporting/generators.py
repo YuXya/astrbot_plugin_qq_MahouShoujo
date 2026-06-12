@@ -176,12 +176,17 @@ class ReportGenerator(ICardGenerator):
             result.state_snapshot,
             ["主角", "个人信息", "姓名"],
         ) or "未命名"
-        target = str(result.action or "").strip() or "自由行动"
+        identity = self._action_turn_profile_value(
+            result.state_snapshot,
+            ["主角", "个人信息", "身份&职业"],
+        ) or "未知"
+        target = self._action_turn_targets_text(result.selected_targets)
+        player_action = str(result.action or "").strip() or "自由行动"
         meta_items = [
             ("魔法少女", magical_girl),
             ("目标", target),
             ("阶段", result.phase or "未知"),
-            ("时间", result.date_label or "未知"),
+            ("身份", identity),
         ]
         meta_html = "".join(
             '<div class="meta-item">'
@@ -343,6 +348,14 @@ h1 {{
   line-height: 1.35;
   font-weight: 700;
 }}
+.player-action {{
+  position: relative;
+  margin: -12px 0 22px;
+  padding: 12px 14px;
+  border: 1px solid rgba(232, 98, 153, .2);
+  border-radius: 8px;
+  background: rgba(255, 247, 251, .82);
+}}
 .section {{
   position: relative;
   margin-top: 20px;
@@ -447,6 +460,10 @@ h1 {{
       {avatar_html}
     </header>
     <div class="meta-row">{meta_html}</div>
+    <div class="player-action">
+      <span class="meta-label">玩家行动</span>
+      <span class="meta-value">{html_lib.escape(player_action)}</span>
+    </div>
     <section class="story">{story_html}</section>
     {options_section}
     {patch_section}
@@ -458,6 +475,26 @@ h1 {{
     @classmethod
     def _highlight_action_quotes(cls, text: object) -> str:
         return cls._highlight_quotes(str(text or ""), "quote")
+
+    @staticmethod
+    def _action_turn_targets_text(targets: object) -> str:
+        if not isinstance(targets, list):
+            return "无"
+        names: list[str] = []
+        for target in targets:
+            if not isinstance(target, dict):
+                continue
+            name = next(
+                (
+                    str(target.get(key) or "").strip()
+                    for key in ("name", "target_name", "magical_girl_name", "id")
+                    if str(target.get(key) or "").strip()
+                ),
+                "",
+            )
+            if name and name not in names:
+                names.append(name)
+        return "、".join(names) or "无"
 
     @staticmethod
     def _highlight_diary_quotes(text: object) -> str:

@@ -175,6 +175,7 @@ class ActionTurnResult:
     state_snapshot: dict[str, Any] = field(default_factory=dict)
     phase: str = "日常"
     action: str = ""
+    selected_targets: list[dict[str, Any]] = field(default_factory=list)
     date_label: str = ""
     title: str = "魔法少女行动"
     footer: str = ""
