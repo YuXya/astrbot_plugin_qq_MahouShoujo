@@ -1236,9 +1236,9 @@ class PlayerSaveRepository:
             "source": source,
             "keys": [str(key).strip() for key in keys if str(key).strip()],
             "content": content,
-            "battle_gimmicks": PlayerSaveRepository._normalize_text_list(entry.get("battle_gimmicks")),
-            "victory_ending_hooks": PlayerSaveRepository._normalize_text_list(entry.get("victory_ending_hooks")),
-            "defeat_ending_hooks": PlayerSaveRepository._normalize_text_list(entry.get("defeat_ending_hooks")),
+            "battle_gimmick": str(entry.get("battle_gimmick") or "").strip(),
+            "victory_ending": str(entry.get("victory_ending") or "").strip(),
+            "defeat_ending": str(entry.get("defeat_ending") or "").strip(),
         }
 
     @staticmethod

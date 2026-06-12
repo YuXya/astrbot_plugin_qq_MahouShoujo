@@ -342,12 +342,11 @@ class EditableResourceManager:
                 "未拥有时会在待开发列表附带简单介绍。"
             ),
             "event_book/default.json": (
-                "Event book v3 uses categories: monster_enemy and character_enemy. "
-                "Each category has an events list; allowed_commands declares usable commands. "
-                "Monster events can list compatible_monsters by public monster name; otherwise the target-selection LLM chooses from the event candidates."
+                "事件书 v4 按 monster_enemy 和 character_enemy 分类。每个事件包含正文、事件机制、"
+                "顺利进行和受到阻碍；关键词、地点标签和兼容魔物仍使用列表。"
             ),
             "monster_book/default.json": (
-                "魔物书文件。公共魔物书是普通魔物目标图鉴，普通魔物战会从这里选择本次目标或异常源。"
+                "魔物书文件。公共魔物书是普通魔物目标图鉴；正文、战斗机制、胜利结尾和失败结尾均为单个文本字段。"
             ),
             self.PROMPT_FILES["reincarnation_prompt"]: (
                 "用于 /魔法少女转生 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"
