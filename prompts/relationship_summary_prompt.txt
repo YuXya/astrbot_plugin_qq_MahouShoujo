@@ -36,6 +36,12 @@
 城市全部角色公开摘要（含已有城市风评，用于辅助判断前辈、后辈、名声等语义）：
 {{city_players_json}}
 
+事件书参考（仅名称、关键词、地点标签、兼容魔物、正文）：
+{{event_book_json}}
+
+魔物书参考（仅名称、关键词、正文）：
+{{monster_book_json}}
+
 请输出以下 JSON 结构：
 {
   "relationships": [
