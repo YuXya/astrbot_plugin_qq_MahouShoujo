@@ -89,6 +89,7 @@ async def call_provider_with_retry(
     backoff = max(1, config_manager.get_llm_backoff())
     last_exc: Exception | None = None
     effective_messages = _normalize_messages(messages)
+    prompt_record = _format_prompt_record(prompt, effective_messages)
 
     for attempt in range(1, retries + 1):
         try:
@@ -117,6 +118,7 @@ async def call_provider_with_retry(
             logger.info(
                 f"[LLM] 调用 Provider={provider_id}, attempt={attempt}, prompt_len={len(prompt)}, messages={len(effective_messages)}"
             )
+            prompt_record = _format_prompt_record(prompt, effective_messages)
             try:
                 response = await context.llm_generate(**kwargs)
             except TypeError as exc:
@@ -128,11 +130,12 @@ async def call_provider_with_retry(
                 fallback_kwargs = {"chat_provider_id": provider_id, "prompt": prompt}
                 if system_prompt:
                     fallback_kwargs["system_prompt"] = system_prompt
+                prompt_record = prompt
                 response = await context.llm_generate(**fallback_kwargs)
             _recent_llm_message_repository().append(
                 purpose=purpose,
                 provider_id=provider_id,
-                prompt=_format_prompt_record(prompt, effective_messages),
+                prompt=prompt_record,
                 system_prompt=system_prompt,
                 response=extract_response_text(response),
                 raw_response=extract_response_debug_json(response),
@@ -148,7 +151,7 @@ async def call_provider_with_retry(
     _recent_llm_message_repository().append(
         purpose=purpose,
         provider_id=provider_id if "provider_id" in locals() else "",
-        prompt=_format_prompt_record(prompt, effective_messages),
+        prompt=prompt_record,
         system_prompt=system_prompt,
         response="",
         error=format_exception_detail(last_exc),
@@ -178,10 +181,7 @@ def _format_prompt_record(
     if not messages:
         return prompt
     return json.dumps(
-        {
-            "messages": messages,
-            "fallback_prompt": prompt,
-        },
+        {"messages": messages},
         ensure_ascii=False,
         indent=2,
     )
