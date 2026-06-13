@@ -179,8 +179,8 @@ class SelectionPromptCandidateTests(unittest.TestCase):
         self.assertNotIn("battle_gimmick", prompt_json)
         self.assertIn("\n", prompt_json)
 
-    def test_daily_context_prompt_uses_filtered_candidate_views(self):
-        template = "events={{scene_events_json}}\nmonsters={{monster_candidates_json}}"
+    def test_action_context_prompt_uses_filtered_candidate_views(self):
+        template = "candidates={{candidates_json}}"
 
         def render_prompt(name, variables):
             text = template
@@ -190,12 +190,13 @@ class SelectionPromptCandidateTests(unittest.TestCase):
 
         analyzer = BattleDiaryAnalyzer.__new__(BattleDiaryAnalyzer)
         analyzer.editable_manager = SimpleNamespace(render_prompt=render_prompt)
-        prompt = analyzer.build_teammate_completion_prompt(
+        prompt = analyzer.build_action_context_prompt(
             action_text="自由行动",
             player_data={},
             logs=[],
             cameo_memories=[],
-            candidates=[],
+            participant_candidates=[],
+            magical_girl_candidates=[],
             scene_event_candidates=[
                 {
                     "id": "event-1",
@@ -262,12 +263,13 @@ class PureLlmSelectionTests(unittest.IsolatedAsyncioTestCase):
             "src.infrastructure.analysis.analyzers.battle_diary_analyzer.call_provider_with_retry",
             new=AsyncMock(return_value=response),
         ):
-            context = await analyzer.select_daily_context(
+            context = await analyzer.select_action_context(
                 action_text="逛街",
                 player_data={},
                 logs=[],
                 cameo_memories=[],
-                candidates=[],
+                participant_candidates=[],
+                magical_girl_candidates=[],
                 monster_candidates=[
                     {"id": "monster", "name": "逛街魔物", "keys": ["逛街"]}
                 ],
@@ -276,6 +278,9 @@ class PureLlmSelectionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNone(context["scene_event"])
         self.assertEqual(context["selected_targets"], [])
+        self.assertEqual(context["action_target"]["type"], "daily_life")
+        self.assertEqual(context["ai_win_rate"], 50)
+        self.assertEqual(context["desire_win_rate"], 50)
         self.assertNotIn("battle_odds", context)
 
     async def test_daily_explicit_llm_selection_resolves_candidates(self):
@@ -286,6 +291,9 @@ class PureLlmSelectionTests(unittest.IsolatedAsyncioTestCase):
                     "participant_names": [],
                     "scene_event": {"id": "shopping", "reason": "LLM 选择"},
                     "selected_targets": [{"id": "monster", "reason": "LLM 选择"}],
+                    "is_continuous_event": False,
+                    "ai_win_rate": 90,
+                    "desire_win_rate": 90,
                 },
                 ensure_ascii=False,
             )
@@ -295,18 +303,83 @@ class PureLlmSelectionTests(unittest.IsolatedAsyncioTestCase):
             "src.infrastructure.analysis.analyzers.battle_diary_analyzer.call_provider_with_retry",
             new=AsyncMock(return_value=response),
         ):
-            context = await analyzer.select_daily_context(
+            context = await analyzer.select_action_context(
                 action_text="普通日常",
                 player_data={},
                 logs=[],
                 cameo_memories=[],
-                candidates=[],
+                participant_candidates=[],
+                magical_girl_candidates=[],
                 monster_candidates=[{"id": "monster", "name": "测试魔物"}],
                 event_command="/魔法少女行动",
             )
 
         self.assertEqual(context["scene_event"]["id"], "shopping")
         self.assertEqual(context["selected_targets"][0]["id"], "monster")
+        self.assertEqual(context["ai_win_rate"], 50)
+        self.assertNotIn("battle_odds", context)
+
+    async def test_continuous_event_builds_battle_odds(self):
+        analyzer = self._analyzer([{"id": "capture", "title": "抓捕事件"}])
+        response = SimpleNamespace(
+            completion_text=json.dumps(
+                {
+                    "action_target": {"type": "战斗", "target": "测试魔物"},
+                    "is_continuous_event": True,
+                    "selected_participants": [],
+                    "scene_event": {"id": "capture", "reason": "持续追击"},
+                    "selected_targets": [{"id": "monster"}],
+                    "ai_win_rate": 70,
+                    "desire_win_rate": 80,
+                },
+                ensure_ascii=False,
+            )
+        )
+
+        with patch(
+            "src.infrastructure.analysis.analyzers.battle_diary_analyzer.call_provider_with_retry",
+            new=AsyncMock(return_value=response),
+        ):
+            with patch(
+                "src.domain.services.battle_outcome_service.random.randint",
+                return_value=50,
+            ):
+                context = await analyzer.select_action_context(
+                    action_text="追击魔物",
+                    player_data={},
+                    logs=[],
+                    cameo_memories=[],
+                    participant_candidates=[],
+                    magical_girl_candidates=[],
+                    monster_candidates=[{"id": "monster", "name": "测试魔物"}],
+                )
+
+        self.assertTrue(context["is_continuous_event"])
+        self.assertEqual(context["battle_odds"]["player_win_rate"], 75)
+
+    async def test_invalid_json_falls_back_to_daily_without_roll(self):
+        analyzer = self._analyzer([])
+        response = SimpleNamespace(completion_text="not json")
+
+        with patch(
+            "src.infrastructure.analysis.analyzers.battle_diary_analyzer.call_provider_with_retry",
+            new=AsyncMock(return_value=response),
+        ), patch(
+            "src.infrastructure.analysis.analyzers.battle_diary_analyzer.mark_latest_llm_error"
+        ):
+            context = await analyzer.select_action_context(
+                action_text="自由行动",
+                player_data={},
+                logs=[],
+                cameo_memories=[],
+                participant_candidates=[],
+                magical_girl_candidates=[],
+                monster_candidates=[],
+            )
+
+        self.assertEqual(context["action_target"]["type"], "日常")
+        self.assertFalse(context["is_continuous_event"])
+        self.assertNotIn("battle_odds", context)
 
 
 class EventContextTests(unittest.TestCase):
@@ -500,7 +573,7 @@ class EventSaveTests(unittest.TestCase):
         self.assertNotIn("当前事件", ended["进程"])
         clock = self.repo._read_json(self.repo._world_clock_path("g1"))
         self.assertEqual(clock["next_conversation_no"], 4)
-        self.assertEqual(clock["next_day_offset"], 1)
+        self.assertEqual(clock["next_day_offset"], 0)
 
         logs = self.repo._read_recent_logs(
             self.repo.get_user_dir("g1", "u1") / "daily_memory.jsonl",
@@ -509,7 +582,7 @@ class EventSaveTests(unittest.TestCase):
         self.assertEqual([item["conversation_no"] for item in logs], [1, 2, 3])
         self.assertEqual([item["event_started"] for item in logs], [True, False, False])
         self.assertEqual([item["event_ended"] for item in logs], [False, False, True])
-        self.assertEqual([item["day_advanced"] for item in logs], [False, False, True])
+        self.assertEqual([item["day_advanced"] for item in logs], [False, False, False])
         self.assertEqual({item["world_day_offset"] for item in logs}, {0})
 
     def test_event_can_start_and_end_in_same_turn(self):
@@ -521,15 +594,15 @@ class EventSaveTests(unittest.TestCase):
         self.assertEqual(ended["进程"]["阶段"], "日常")
         clock = self.repo._read_json(self.repo._world_clock_path("g1"))
         self.assertEqual(clock["next_conversation_no"], 2)
-        self.assertEqual(clock["next_day_offset"], 1)
+        self.assertEqual(clock["next_day_offset"], 0)
         log = self.repo._read_recent_logs(
             self.repo.get_user_dir("g1", "u1") / "daily_memory.jsonl",
             limit=1,
         )[0]
         self.assertTrue(log["event_started"])
         self.assertTrue(log["event_ended"])
-        self.assertTrue(log["day_advanced"])
-        self.assertEqual(log["days_advanced"], 1)
+        self.assertFalse(log["day_advanced"])
+        self.assertEqual(log["days_advanced"], 0)
         self.assertEqual(log["conversation_no"], 1)
 
     def test_active_event_can_advance_multiple_days_without_ending(self):
@@ -745,20 +818,36 @@ class ConversationSequenceMigrationTests(unittest.TestCase):
 
 
 class EventFallbackTests(unittest.TestCase):
-    def test_missing_scene_event_becomes_unique_free_action_event(self):
-        first = ActionTurnApplicationService._ensure_event_context(
-            {"selected_participants": [], "selected_targets": []},
-            action_text="去学校看看",
+    def test_only_continuous_selection_builds_event_runtime(self):
+        service = ActionTurnApplicationService.__new__(ActionTurnApplicationService)
+        daily = service._build_event_runtime(
+            {
+                "is_continuous_event": False,
+                "scene_event": {"id": "shopping", "title": "逛街"},
+            },
+            current_world_date="公元2020年4月1日",
         )
-        second = ActionTurnApplicationService._ensure_event_context(
-            {},
-            action_text="",
+        continuous = service._build_event_runtime(
+            {
+                "is_continuous_event": True,
+                "scene_event": {"id": "capture", "title": "抓捕事件"},
+                "battle_odds": {"ai_win_rate": 60, "desire_win_rate": 70},
+            },
+            current_world_date="公元2020年4月1日",
         )
 
-        self.assertTrue(first["scene_event"]["id"].startswith("free_action_"))
-        self.assertNotEqual(first["scene_event"]["id"], second["scene_event"]["id"])
-        self.assertIn("去学校看看", first["scene_event"]["reason"])
-        self.assertEqual(second["scene_event"]["title"], "自由行动")
+        self.assertIsNone(daily)
+        self.assertEqual(continuous["scene_event"]["id"], "capture")
+
+    def test_legacy_free_action_event_is_detected_for_cleanup(self):
+        self.assertTrue(
+            ActionTurnApplicationService._is_legacy_free_action_event(
+                {"scene_event": {"id": "free_action_old"}}
+            )
+        )
+        self.assertFalse(
+            ActionTurnApplicationService._is_legacy_free_action_event(_runtime())
+        )
 
 
 class _ActiveEventRepository:
@@ -784,10 +873,7 @@ class _ActiveEventRepository:
 
 
 class _ActiveEventAnalyzer:
-    async def select_daily_context(self, **kwargs):
-        raise AssertionError("活动事件不应重新选择上下文")
-
-    async def select_magical_battle_context(self, **kwargs):
+    async def select_action_context(self, **kwargs):
         raise AssertionError("活动事件不应重新选择上下文")
 
     async def analyze_action_turn(self, **kwargs):

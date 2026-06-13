@@ -55,6 +55,148 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
     ) -> BattleDiaryCard:
         return self.domain_service.normalize_card(data, {}, "")
 
+    async def select_action_context(
+        self,
+        *,
+        action_text: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict] | None,
+        participant_candidates: list[dict],
+        magical_girl_candidates: list[dict],
+        monster_candidates: list[dict],
+        event_command: str = "/魔法少女行动",
+        umo: str | None = None,
+    ) -> dict[str, object]:
+        scene_event_candidates = self.event_book_engine.build_scene_event_candidates(
+            current_event=event_command,
+            limit=80,
+        )
+        prompt = self.build_action_context_prompt(
+            action_text=action_text,
+            player_data=player_data,
+            logs=logs,
+            cameo_memories=cameo_memories,
+            participant_candidates=participant_candidates,
+            magical_girl_candidates=magical_girl_candidates,
+            monster_candidates=monster_candidates,
+            scene_event_candidates=scene_event_candidates,
+        )
+        system_prompt = self.editable_manager.get_prompt("default_system_prompt")
+        if self.config_manager.get_debug_mode():
+            self._save_debug_file("action_context_selection_prompt", prompt)
+
+        response = await call_provider_with_retry(
+            self.context,
+            self.config_manager,
+            prompt=prompt,
+            umo=umo,
+            system_prompt=system_prompt,
+            purpose="魔法少女行动上下文判断",
+            provider_id_override=self.config_manager.get_subtask_llm_provider_id(),
+        )
+        result_text = extract_response_text(response)
+        if self.config_manager.get_debug_mode():
+            self._save_debug_file("action_context_selection_response", result_text)
+
+        success, parsed, error = parse_json_object_response(result_text)
+        if not success or not isinstance(parsed, dict):
+            mark_latest_llm_error(f"action context selection JSON parse failed: {error}")
+            logger.warning(f"魔法少女行动上下文判断 JSON 解析失败，降级为普通日常: {error}")
+            parsed = {}
+
+        participants = self._resolve_selected_profiles(
+            parsed.get("selected_participants"),
+            participant_candidates,
+        )
+        selected_payload = self._as_list(parsed.get("selected_targets"))
+        magical_targets = self._resolve_selected_magical_girls(
+            selected_payload,
+            magical_girl_candidates,
+        )
+        monster_targets = self._resolve_selected_targets(
+            selected_payload,
+            monster_candidates,
+        )
+        selected_targets = [*magical_targets, *monster_targets]
+        scene_event = self._resolve_selected_scene_event(
+            parsed.get("scene_event"), scene_event_candidates
+        )
+        action_target = self._normalize_action_target(parsed.get("action_target"))
+        if not action_target:
+            action_target = {
+                "type": "日常",
+                "target": "自由行动",
+                "reason": "未识别到需要持续处理的明确目标",
+            }
+        is_continuous_event = (
+            parsed.get("is_continuous_event") is True and scene_event is not None
+        )
+        context: dict[str, object] = {
+            "battle_type": "event" if is_continuous_event else "daily",
+            "action_target": action_target,
+            "is_continuous_event": is_continuous_event,
+            "selected_participants": participants,
+            "selected_targets": selected_targets,
+            "scene_event": scene_event,
+            "ai_win_rate": self._clamp_percent(parsed.get("ai_win_rate")),
+            "desire_win_rate": self._clamp_percent(parsed.get("desire_win_rate")),
+        }
+        if not is_continuous_event:
+            context["ai_win_rate"] = 50
+            context["desire_win_rate"] = 50
+            return context
+
+        context["battle_odds"] = self._build_battle_odds_context(
+            player_data=player_data,
+            teammate_data=participants,
+            enemy_data=selected_targets,
+            battle_kind="free_progress_event",
+            ai_win_rate=context["ai_win_rate"],
+            desire_win_rate=context["desire_win_rate"],
+        )
+        return context
+
+    def build_action_context_prompt(
+        self,
+        *,
+        action_text: str,
+        player_data: dict,
+        logs: list[dict],
+        cameo_memories: list[dict] | None,
+        participant_candidates: list[dict],
+        magical_girl_candidates: list[dict],
+        monster_candidates: list[dict],
+        scene_event_candidates: list[dict],
+    ) -> str:
+        return self.editable_manager.render_prompt(
+            "action_context_selection_prompt",
+            {
+                "action": action_text.strip() or "自由行动",
+                "player_data_update_json": self._json_dump(player_data),
+                "logs_text": self._format_logs(logs),
+                "cameo_memories_text": self._format_cameo_memories(cameo_memories),
+                "candidates_json": self._json_dump(
+                    {
+                        "participants": self._prompt_protagonist_profiles(
+                            participant_candidates
+                        ),
+                        "targets": {
+                            "magical_girls": self._prompt_protagonist_profiles(
+                                magical_girl_candidates
+                            ),
+                            "monsters": self._prompt_monster_candidates(
+                                monster_candidates
+                            ),
+                        },
+                        "scene_events": self._prompt_scene_event_candidates(
+                            scene_event_candidates
+                        ),
+                    }
+                ),
+            },
+        )
+
     async def analyze_diary(
         self,
         *,
@@ -229,162 +371,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             },
         )
 
-    async def select_magical_battle_context(
-        self,
-        *,
-        action_text: str,
-        player_data: dict,
-        logs: list[dict],
-        cameo_memories: list[dict] | None,
-        magical_girl_candidates: list[dict],
-        monster_candidates: list[dict],
-        teammate_candidates: list[dict],
-        umo: str | None = None,
-    ) -> dict[str, object]:
-        protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
-        text_parts = [
-            action_text,
-            self._format_logs(logs),
-            self._format_cameo_memories(cameo_memories),
-        ]
-        scene_event_candidates = self.event_book_engine.build_scene_event_candidates(
-            current_event="/魔法少女战斗",
-            limit=80,
-        )
-        prompt = self.editable_manager.render_prompt(
-            "magical_battle_target_selection_prompt",
-            {
-                "player_data_update_json": self._json_dump(player_data),
-                "action": action_text.strip(),
-                "logs_text": self._format_logs(logs),
-                "cameo_memories_text": self._format_cameo_memories(cameo_memories),
-                "candidates_json": self._json_dump(
-                    {
-                        "participants": self._prompt_protagonist_profiles(
-                            teammate_candidates
-                        ),
-                        "targets": {
-                            "magical_girls": self._prompt_protagonist_profiles(
-                                magical_girl_candidates
-                            ),
-                            "monsters": self._prompt_monster_candidates(
-                                monster_candidates
-                            ),
-                        },
-                        "scene_events": self._prompt_scene_event_candidates(
-                            scene_event_candidates
-                        ),
-                    }
-                ),
-            },
-        )
-        system_prompt = self.editable_manager.get_prompt("default_system_prompt")
-        if self.config_manager.get_debug_mode():
-            self._save_debug_file("magical_battle_target_selection_prompt", prompt)
-
-        response = await call_provider_with_retry(
-            self.context,
-            self.config_manager,
-            prompt=prompt,
-            umo=umo,
-            system_prompt=system_prompt,
-            purpose="魔法少女战斗目标判断",
-            provider_id_override=self.config_manager.get_subtask_llm_provider_id(),
-        )
-        result_text = extract_response_text(response)
-        if self.config_manager.get_debug_mode():
-            self._save_debug_file("magical_battle_target_selection_response", result_text)
-
-        success, parsed, error = parse_json_object_response(result_text)
-        if not success or not isinstance(parsed, dict):
-            mark_latest_llm_error(f"magical battle target selection JSON parse failed: {error}")
-            logger.warning(f"魔法少女战斗目标判断 JSON 解析失败，按魔物战斗处理: {error}")
-            return self._magical_monster_context(
-                player_data=player_data,
-                monster_candidates=monster_candidates,
-                scene_event_candidates=scene_event_candidates,
-                teammate_candidates=teammate_candidates,
-            )
-
-        selected_target_payload = parsed.get("selected_targets")
-        targets = self._resolve_selected_magical_girls(
-            selected_target_payload,
-            magical_girl_candidates,
-        )
-        if not targets:
-            return self._magical_monster_context(
-                player_data=player_data,
-                monster_candidates=monster_candidates,
-                scene_event_candidates=scene_event_candidates,
-                selected_targets=selected_target_payload,
-                scene_event=parsed.get("scene_event"),
-                ai_win_rate=parsed.get("ai_win_rate"),
-                desire_win_rate=parsed.get("desire_win_rate"),
-                teammate_candidates=teammate_candidates,
-                selected_participants=parsed.get("selected_participants"),
-            )
-        participants = self._resolve_selected_profiles(
-            parsed.get("selected_participants"),
-            teammate_candidates,
-        )
-        return {
-            "battle_type": "magical_girl",
-            "target_magical_girl": targets[0] if targets else None,
-            "selected_participants": participants,
-            "selected_targets": targets,
-            "scene_event": self._resolve_selected_scene_event(
-                parsed.get("scene_event"), scene_event_candidates
-            ),
-            "battle_odds": self._build_battle_odds_context(
-                player_data=player_data,
-                teammate_data=participants,
-                enemy_data=targets,
-                battle_kind="magical_girl_vs_magical_girl",
-                ai_win_rate=parsed.get("ai_win_rate"),
-                desire_win_rate=parsed.get("desire_win_rate"),
-            ),
-        }
-
-    def _magical_monster_context(
-        self,
-        *,
-        player_data: dict,
-        monster_candidates: list[dict],
-        scene_event_candidates: list[dict],
-        selected_targets: object = None,
-        scene_event: object = None,
-        ai_win_rate: object = None,
-        desire_win_rate: object = None,
-        teammate_candidates: list[dict] | None = None,
-        selected_participants: object = None,
-    ) -> dict[str, object]:
-        resolved_scene = self._resolve_selected_scene_event(
-            scene_event, scene_event_candidates
-        )
-        resolved_targets = self._resolve_selected_targets(
-            selected_targets,
-            monster_candidates,
-        )
-        participants = self._resolve_selected_profiles(
-            selected_participants,
-            teammate_candidates or [],
-        )
-        return {
-            "battle_type": "monster",
-            "target_magical_girl": None,
-            "selected_participants": participants,
-            "selected_targets": resolved_targets,
-            "scene_event": resolved_scene,
-            "battle_odds": self._build_battle_odds_context(
-                player_data=player_data,
-                teammate_data=participants,
-                enemy_data=resolved_targets,
-                battle_kind="magical_girl_vs_monster",
-                ai_win_rate=ai_win_rate,
-                desire_win_rate=desire_win_rate,
-            ),
-        }
-
     def _build_battle_odds_context(
         self,
         *,
@@ -429,191 +415,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             return max(0, min(100, int(float(value))))
         except Exception:
             return default
-
-    async def infer_teammate_names(
-        self,
-        *,
-        action_text: str,
-        player_data: dict,
-        logs: list[dict],
-        cameo_memories: list[dict] | None,
-        candidates: list[dict],
-        umo: str | None = None,
-    ) -> list[str]:
-        if not candidates:
-            return []
-        prompt = self.build_teammate_completion_prompt(
-            action_text=action_text,
-            player_data=player_data,
-            logs=logs,
-            cameo_memories=cameo_memories,
-            candidates=candidates,
-        )
-        system_prompt = self.editable_manager.get_prompt("default_system_prompt")
-        if self.config_manager.get_debug_mode():
-            self._save_debug_file("teammate_completion_prompt", prompt)
-
-        response = await call_provider_with_retry(
-            self.context,
-            self.config_manager,
-            prompt=prompt,
-            umo=umo,
-            system_prompt=system_prompt,
-            purpose="参与对象语义识别",
-            provider_id_override=self.config_manager.get_subtask_llm_provider_id(),
-        )
-        result_text = extract_response_text(response)
-        if self.config_manager.get_debug_mode():
-            self._save_debug_file("teammate_completion_response", result_text)
-
-        success, parsed, error = parse_json_object_response(result_text)
-        if not success or not isinstance(parsed, dict):
-            mark_latest_llm_error(f"teammate completion JSON parse failed: {error}")
-            logger.warning(f"参与对象语义识别 JSON 解析失败，已跳过: {error}")
-            return []
-        return self._normalize_participant_names(parsed)
-
-    async def select_daily_context(
-        self,
-        *,
-        action_text: str,
-        player_data: dict,
-        logs: list[dict],
-        cameo_memories: list[dict] | None,
-        candidates: list[dict],
-        monster_candidates: list[dict],
-        event_command: str,
-        umo: str | None = None,
-    ) -> dict[str, object]:
-        protagonist = player_data.get("涓昏", {}) if isinstance(player_data, dict) else {}
-        protagonist = player_data.get("涓昏", protagonist) if isinstance(player_data, dict) else {}
-        if not protagonist and isinstance(player_data, dict):
-            protagonist = next(
-                (value for value in player_data.values() if isinstance(value, dict)),
-                {},
-            )
-        text_parts = [
-            action_text,
-            self._format_logs(logs),
-            self._format_cameo_memories(cameo_memories),
-        ]
-        scene_event_candidates = self.event_book_engine.build_scene_event_candidates(
-            current_event=event_command,
-        )
-        prompt = self.build_teammate_completion_prompt(
-            action_text=action_text,
-            player_data=player_data,
-            logs=logs,
-            cameo_memories=cameo_memories,
-            candidates=candidates,
-            scene_event_candidates=scene_event_candidates,
-            monster_candidates=monster_candidates,
-        )
-        prompt = self._join_optional_prompt_parts(
-            [
-                prompt,
-                (
-                    "请同时输出 action_target，用于【行动目标判断】。格式：\n"
-                    "{\n"
-                    '  "action_target": {\n'
-                    '    "type": "daily_life / training / social / patrol / investigation / monster_or_anomaly / other",\n'
-                    '    "target": "本次行动目标或对象",\n'
-                    '    "reason": "判断理由，简短说明"\n'
-                    "  }\n"
-                    "}\n"
-                    "action_target 必须根据玩家行动、最近记录、候选参与对象、候选场景事件和候选目标判断；不要编造候选外目标。"
-                ),
-                (
-                    "如果选择了 scene_event，还必须输出 ai_win_rate 和 desire_win_rate，"
-                    "两者均为 0-100 的整数。ai_win_rate 表示客观成功可能，"
-                    "desire_win_rate 表示主角本轮想成功的意愿；未选择事件时可省略。"
-                ),
-            ]
-        )
-        system_prompt = self.editable_manager.get_prompt("default_system_prompt")
-        if self.config_manager.get_debug_mode():
-            self._save_debug_file("daily_event_context_selection_prompt", prompt)
-
-        response = await call_provider_with_retry(
-            self.context,
-            self.config_manager,
-            prompt=prompt,
-            umo=umo,
-            system_prompt=system_prompt,
-            purpose="日常事件上下文识别",
-            provider_id_override=self.config_manager.get_subtask_llm_provider_id(),
-        )
-        result_text = extract_response_text(response)
-        if self.config_manager.get_debug_mode():
-            self._save_debug_file("daily_event_context_selection_response", result_text)
-
-        success, parsed, error = parse_json_object_response(result_text)
-        if not success or not isinstance(parsed, dict):
-            mark_latest_llm_error(f"daily event context selection JSON parse failed: {error}")
-            logger.warning(f"daily event context selection JSON parse failed, skipped: {error}")
-            parsed = {}
-
-        selected_targets = self._resolve_selected_targets(
-            parsed.get("selected_targets"),
-            monster_candidates,
-        )
-        scene_event = self._resolve_selected_scene_event(
-            parsed.get("scene_event"), scene_event_candidates
-        )
-        participants = self._resolve_selected_profiles(
-            [
-                {"target_name": name}
-                for name in self._normalize_participant_names(parsed)
-            ],
-            candidates,
-        )
-        context = {
-            "battle_type": "daily",
-            "action_target": self._normalize_action_target(parsed.get("action_target")),
-            "selected_participants": participants,
-            "selected_targets": selected_targets,
-            "scene_event": scene_event,
-        }
-        if scene_event:
-            context["battle_odds"] = self._build_battle_odds_context(
-                player_data=player_data,
-                teammate_data=participants,
-                enemy_data=selected_targets,
-                battle_kind="free_progress_event",
-                ai_win_rate=parsed.get("ai_win_rate"),
-                desire_win_rate=parsed.get("desire_win_rate"),
-            )
-        return context
-
-    def build_teammate_completion_prompt(
-        self,
-        *,
-        action_text: str,
-        player_data: dict,
-        logs: list[dict],
-        cameo_memories: list[dict] | None,
-        candidates: list[dict],
-        scene_event_candidates: list[dict] | None = None,
-        monster_candidates: list[dict] | None = None,
-    ) -> str:
-        return self.editable_manager.render_prompt(
-            "teammate_completion_prompt",
-            {
-                "action": action_text.strip() or "自由战斗",
-                "player_data_update_json": self._json_dump(player_data),
-                "logs_text": self._format_logs(logs),
-                "cameo_memories_text": self._format_cameo_memories(cameo_memories),
-                "candidates_json": self._json_dump(
-                    self._prompt_protagonist_profiles(candidates)
-                ),
-                "scene_events_json": self._json_dump(
-                    self._prompt_scene_event_candidates(scene_event_candidates or [])
-                ),
-                "monster_candidates_json": self._json_dump(
-                    self._prompt_monster_candidates(monster_candidates or [])
-                ),
-            },
-        )
 
     @staticmethod
     def _prompt_scene_event_candidates(candidates: list[dict]) -> list[dict]:

@@ -377,11 +377,17 @@ class ParticipantSelectionMemoryTests(unittest.IsolatedAsyncioTestCase):
                 calls.append(recent_record_count)
                 return []
 
+            def build_city_magical_girl_candidates(
+                self, group_id, user_id, *, recent_record_count
+            ):
+                calls.append(recent_record_count)
+                return []
+
             def build_public_monster_candidates(self):
                 return []
 
         class Analyzer:
-            async def select_daily_context(self, **kwargs):
+            async def select_action_context(self, **kwargs):
                 return {}
 
         service = ActionTurnApplicationService.__new__(ActionTurnApplicationService)
@@ -395,11 +401,10 @@ class ParticipantSelectionMemoryTests(unittest.IsolatedAsyncioTestCase):
             logs=[],
             cameo_memories=[],
             action_text="行动",
-            phase="日常",
             umo=None,
         )
 
-        self.assertEqual(calls, [0])
+        self.assertEqual(calls, [0, 0])
 
 
 if __name__ == "__main__":

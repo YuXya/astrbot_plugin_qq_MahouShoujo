@@ -16,8 +16,8 @@
 {{selection_context_json}}
 
 当前剧情事件规则：
-- 每次行动都属于一个剧情事件；即使是普通日常或自由行动，也必须按事件生命周期处理。
-- selection_context.event_runtime 存在时，表示当前正在处理一段连续剧情；可以根据玩家行动自然延续、转场、改变目标或收束。
+- 普通日常、自由行动、训练和社交可以只生成本轮正文，不需要创建或保存剧情事件。
+- selection_context.event_runtime 存在时，表示当前正在处理一段需要跨回合解决的连续剧情；可以根据玩家行动自然延续、转场、改变目标或收束。
 - selection_context.battle_odds.player_win_rate 是 AI 判断与玩家获胜欲望各占一半得到的胜率；dice_roll 是程序为本回合生成的 20-80 骰点。
 - dice_roll 大于 player_win_rate 时本轮失败，否则本轮成功；selection_context.event_outcome 是程序据此确定的结果，正文必须遵守，不能自行改判。
 - success_ending / obstacle_ending 是本轮走向指导，不代表事件必须立刻结束。
@@ -25,7 +25,7 @@
 - 只有目标已经解决或彻底消失时，才移除 /进程/当前事件并将 /进程/阶段 改为“日常”。
 - 被控制、被抓走、逃跑失败或仍被追击通常表示事件继续。
 - 事件继续时可按正文更新 scene_event、selected_participants、selected_targets，也可以在剧情自然完成后直接结束事件。
-- 剧情明确跨日时，可以对 /世界/日期 使用正整数 delta，数值表示实际经过的天数；不得 replace 或倒退日期。事件完成时程序会保证至少推进一天，已经主动推进多天时不会重复叠加。
+- 正文明确经过一天或多天时，应对 /世界/日期 使用正整数 delta，数值表示实际经过的天数；不得 replace 或倒退日期。没有明确跨日时不要输出日期补丁。
 
 ---
 # 2. 阶段协议

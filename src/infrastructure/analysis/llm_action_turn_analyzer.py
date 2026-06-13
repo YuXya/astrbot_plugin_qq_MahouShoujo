@@ -50,8 +50,5 @@ class LLMActionTurnAnalyzer:
             raw_response=raw_response,
         )
 
-    async def select_daily_context(self, **kwargs):
-        return await self.analyzer.select_daily_context(**kwargs)
-
-    async def select_magical_battle_context(self, **kwargs):
-        return await self.analyzer.select_magical_battle_context(**kwargs)
+    async def select_action_context(self, **kwargs):
+        return await self.analyzer.select_action_context(**kwargs)

@@ -581,7 +581,7 @@ class PlayerSaveRepository:
             event_outcome = self._event_outcome_from_runtime(previous_event or current_event)
         event_started = bool(event_runtime and previous_event)
         event_ended = bool(previous_event and not current_event)
-        days_advanced = max(requested_day_advance, 1 if event_ended else 0)
+        days_advanced = requested_day_advance
         day_advanced = days_advanced > 0
         self.append_log(
             group_id,

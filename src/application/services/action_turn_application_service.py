@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any
-from uuid import uuid4
 
 from ...domain.services.battle_outcome_service import resolve_battle_outcome
 from ...infrastructure.event_book import EventBookEngine
@@ -51,8 +50,22 @@ class ActionTurnApplicationService:
             world_day_offset = self.save_repository.get_current_world_day_offset(group_id)
             current_world_date = self.save_repository.format_world_date(world_day_offset)
             player_data = save_data.get("player_data", {})
+            stored_phase = str(
+                (player_data.get("进程") or {}).get("阶段") or "日常"
+            ).strip() if isinstance(player_data, dict) else "日常"
             phase = self._current_phase(player_data)
             current_event = self._current_event(player_data)
+            legacy_event_cleanup = self._is_legacy_free_action_event(current_event)
+            phase_cleanup = current_event is None and stored_phase != "日常"
+            if legacy_event_cleanup or phase_cleanup:
+                player_data = deepcopy(player_data)
+                process = player_data.setdefault("进程", {})
+                if legacy_event_cleanup:
+                    process.pop("当前事件", None)
+                process["阶段"] = "日常"
+                phase = "日常"
+                if legacy_event_cleanup:
+                    current_event = None
             event_started = False
             if current_event:
                 if phase != "事件":
@@ -68,12 +81,7 @@ class ActionTurnApplicationService:
                     logs=save_data.get("logs", []),
                     cameo_memories=save_data.get("cameo_memories", []),
                     action_text=action_text,
-                    phase=phase,
                     umo=umo,
-                )
-                selection_context = self._ensure_event_context(
-                    selection_context,
-                    action_text=action_text,
                 )
                 current_event = self._build_event_runtime(
                     selection_context,
@@ -89,6 +97,8 @@ class ActionTurnApplicationService:
                         current_event,
                         battle_odds=selection_context.get("battle_odds"),
                     )
+                else:
+                    phase = "日常"
             participant_names = self._participant_names(
                 self._selected_participants(selection_context)
             )
@@ -113,6 +123,15 @@ class ActionTurnApplicationService:
                 current_world_date=current_world_date,
             )
             result = analysis.result
+            cleanup_patch: list[dict[str, object]] = []
+            if legacy_event_cleanup:
+                cleanup_patch.append({"op": "remove", "path": "/进程/当前事件"})
+            if legacy_event_cleanup or phase_cleanup:
+                cleanup_patch.append(
+                    {"op": "replace", "path": "/进程/阶段", "value": "日常"}
+                )
+            if cleanup_patch:
+                result.json_patch = [*cleanup_patch, *result.json_patch]
             result.phase = phase
             result.action = action_text
             result.selected_targets = self._dict_list(
@@ -308,39 +327,27 @@ class ActionTurnApplicationService:
         logs: list[dict],
         cameo_memories: list[dict],
         action_text: str,
-        phase: str,
         umo: str | None,
     ) -> dict[str, object]:
         try:
-            if phase == "战斗":
-                magical_girls = self.save_repository.build_city_magical_girl_candidates(
-                    group_id,
-                    user_id,
-                    recent_record_count=0,
-                )
-                monsters = self.save_repository.build_public_monster_candidates()
-                return await self.llm_analyzer.select_magical_battle_context(
-                    action_text=action_text,
-                    player_data=player_data,
-                    logs=logs,
-                    cameo_memories=cameo_memories,
-                    magical_girl_candidates=magical_girls,
-                    monster_candidates=monsters,
-                    teammate_candidates=magical_girls,
-                    umo=umo,
-                )
             candidates = self.save_repository.build_city_teammate_candidates(
                 group_id,
                 user_id,
                 recent_record_count=0,
             )
+            magical_girls = self.save_repository.build_city_magical_girl_candidates(
+                group_id,
+                user_id,
+                recent_record_count=0,
+            )
             monsters = self.save_repository.build_public_monster_candidates()
-            return await self.llm_analyzer.select_daily_context(
+            return await self.llm_analyzer.select_action_context(
                 action_text=action_text,
                 player_data=player_data,
                 logs=logs,
                 cameo_memories=cameo_memories,
-                candidates=candidates,
+                participant_candidates=candidates,
+                magical_girl_candidates=magical_girls,
                 monster_candidates=monsters,
                 event_command="/魔法少女行动",
                 umo=umo,
@@ -348,34 +355,6 @@ class ActionTurnApplicationService:
         except Exception as exc:
             logger.warning(f"魔法少女行动上下文选择失败，降级为空上下文: {exc}")
             return {}
-
-    @staticmethod
-    def _ensure_event_context(
-        selection_context: dict[str, object] | None,
-        *,
-        action_text: str,
-    ) -> dict[str, object]:
-        context = dict(selection_context) if isinstance(selection_context, dict) else {}
-        scene = context.get("scene_event")
-        event_id = str(scene.get("id") or "").strip() if isinstance(scene, dict) else ""
-        if event_id:
-            return context
-
-        action = str(action_text or "").strip() or "自由行动"
-        fallback_id = f"free_action_{uuid4().hex}"
-        context["battle_type"] = str(context.get("battle_type") or "daily")
-        context["scene_event"] = {
-            "id": fallback_id,
-            "title": "自由行动",
-            "reason": f"玩家发起行动：{action}",
-            "content": "根据玩家行动自然推进本次事件，目标完成后结束事件。",
-            "event_gimmick": "事件可以在一轮内完成，也可以根据剧情需要持续多轮。",
-            "success_ending": "本次行动的目标得到解决，事件自然收束。",
-            "obstacle_ending": "本次行动遇到阻碍，事件继续推进。",
-        }
-        context.setdefault("selected_participants", [])
-        context.setdefault("selected_targets", [])
-        return context
 
     @staticmethod
     def _current_phase(player_data: dict) -> str:
@@ -390,6 +369,12 @@ class ActionTurnApplicationService:
         current = process.get("当前事件") if isinstance(process, dict) else None
         scene = current.get("scene_event") if isinstance(current, dict) else None
         return current if isinstance(scene, dict) and str(scene.get("id") or "").strip() else None
+
+    @staticmethod
+    def _is_legacy_free_action_event(current_event: dict[str, object] | None) -> bool:
+        scene = current_event.get("scene_event") if isinstance(current_event, dict) else None
+        event_id = str(scene.get("id") or "").strip() if isinstance(scene, dict) else ""
+        return event_id.startswith("free_action_")
 
     def _active_event_context(
         self,
@@ -439,7 +424,11 @@ class ActionTurnApplicationService:
         *,
         current_world_date: str,
     ) -> dict[str, object] | None:
-        scene = selection_context.get("scene_event") if isinstance(selection_context, dict) else None
+        if not isinstance(selection_context, dict) or not selection_context.get(
+            "is_continuous_event"
+        ):
+            return None
+        scene = selection_context.get("scene_event")
         event_id = str(scene.get("id") or "").strip() if isinstance(scene, dict) else ""
         if not event_id:
             return None

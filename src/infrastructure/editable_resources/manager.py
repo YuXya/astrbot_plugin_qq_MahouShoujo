@@ -14,17 +14,15 @@ from . import defaults
 class EditableResourceManager:
     LEGACY_PROMPT_FILES = {
         "prompts/reincarnation_prompt.txt": "prompts/magical_girl/reincarnation_prompt.txt",
-        "prompts/battle_target_selection_prompt.txt": "prompts/magical_girl/battle_target_selection_prompt.txt",
     }
 
     PROMPT_FILES = {
         "reincarnation_prompt": "prompts/magical_girl/reincarnation_prompt.txt",
-        "magical_battle_target_selection_prompt": "prompts/magical_girl/battle_target_selection_prompt.txt",
+        "action_context_selection_prompt": "prompts/magical_girl/action_context_selection_prompt.txt",
         "action_turn_prompt": "prompts/magical_girl/action_turn_prompt.txt",
         "relationship_summary_prompt": "prompts/relationship_summary_prompt.txt",
         "interaction_memory_summary_prompt": "prompts/interaction_memory_summary_prompt.txt",
         "memory_compaction_prompt": "prompts/memory_compaction_prompt.txt",
-        "teammate_completion_prompt": "prompts/teammate_completion_prompt.txt",
         "default_system_prompt": "prompts/default_system_prompt.txt",
     }
 
@@ -278,8 +276,8 @@ class EditableResourceManager:
                 "category": "text_completion",
             },
             {
-                "id": self.PROMPT_FILES["magical_battle_target_selection_prompt"],
-                "label": "魔法少女战斗目标判断 Prompt",
+                "id": self.PROMPT_FILES["action_context_selection_prompt"],
+                "label": "魔法少女行动上下文判断 Prompt",
                 "type": "text",
                 "category": "text_completion",
             },
@@ -308,12 +306,6 @@ class EditableResourceManager:
                 "category": "text_completion",
             },
             {
-                "id": self.PROMPT_FILES["teammate_completion_prompt"],
-                "label": "参与对象语义识别 Prompt",
-                "type": "text",
-                "category": "text_completion",
-            },
-            {
                 "id": self.PROMPT_FILES["default_system_prompt"],
                 "label": "默认 System Prompt",
                 "type": "text",
@@ -330,12 +322,11 @@ class EditableResourceManager:
             "event_book/default.json": defaults.EVENT_BOOK_DEFAULT,
             "monster_book/default.json": defaults.MONSTER_BOOK_DEFAULT,
             self.PROMPT_FILES["reincarnation_prompt"]: defaults.REINCARNATION_PROMPT,
-            self.PROMPT_FILES["magical_battle_target_selection_prompt"]: defaults.MAGICAL_BATTLE_TARGET_SELECTION_PROMPT,
+            self.PROMPT_FILES["action_context_selection_prompt"]: defaults.ACTION_CONTEXT_SELECTION_PROMPT,
             self.PROMPT_FILES["action_turn_prompt"]: defaults.ACTION_TURN_PROMPT,
             self.PROMPT_FILES["relationship_summary_prompt"]: defaults.RELATIONSHIP_SUMMARY_PROMPT,
             self.PROMPT_FILES["interaction_memory_summary_prompt"]: defaults.INTERACTION_MEMORY_SUMMARY_PROMPT,
             self.PROMPT_FILES["memory_compaction_prompt"]: defaults.MEMORY_COMPACTION_PROMPT,
-            self.PROMPT_FILES["teammate_completion_prompt"]: defaults.TEAMMATE_COMPLETION_PROMPT,
             self.PROMPT_FILES["default_system_prompt"]: defaults.DEFAULT_SYSTEM_PROMPT,
         }
 
@@ -370,16 +361,17 @@ class EditableResourceManager:
                 "可用变量：{{theme}}（触发命令+玩家偏好）、{{player_text}}（目标群友昵称或ID）、"
                 "{{supplement_text}}（世界书+状态书+事件书命中的补充设定，未命中时为空）。"
             ),
-            self.PROMPT_FILES["magical_battle_target_selection_prompt"]: (
-                "用于 /魔法少女战斗 正文生成前的后台目标判断。使用子任务 LLM Provider，"
-                "选择 scene_event、selected_participants、selected_targets，并给出 AI 侧胜率判断。"
+            self.PROMPT_FILES["action_context_selection_prompt"]: (
+                "用于 /魔法少女行动 正文生成前的统一上下文判断。使用子任务 LLM Provider，"
+                "判断 action_target、is_continuous_event、参与者、目标、场景事件和胜率。"
+                "普通日常不创建持续事件，胜率固定为 50。"
             ),
             self.PROMPT_FILES["action_turn_prompt"]: (
                 "用于 /魔法少女行动 的酒馆式完整回合 Prompt。发给 AI 的 user message "
                 "按历史上下文、阶段协议、变量快照、行动选项、变量 API、后台事件、示例库和 master_protocol 拼接。"
             ),
             self.PROMPT_FILES["relationship_summary_prompt"]: (
-                "用于多人 /魔法少女战斗 结束后的后台人物关系总结。发给 AI 的 user message 就是这个模板渲染后的结果。"
+                "用于多人 /魔法少女行动 结束后的后台人物关系总结。发给 AI 的 user message 就是这个模板渲染后的结果。"
                 "可用变量：{{battle_title}}、{{world_date}}、{{participants_json}}、{{diary}}、{{encounter}}、{{result}}、"
                 "{{update_changes_json}}、{{participants_profile_json}}、{{existing_relationships_json}}、{{city_players_json}}。"
                 "要求 AI 返回纯 JSON，relationships 数组代表单向关系箭头，public_reputations 数组代表城市风评。"
@@ -391,15 +383,8 @@ class EditableResourceManager:
             self.PROMPT_FILES["memory_compaction_prompt"]: (
                 "用于玩家两类记忆正文超过阈值后的长期记忆大压缩。只输出客观摘要正文。"
             ),
-            self.PROMPT_FILES["teammate_completion_prompt"]: (
-                "用于日常正文生成前的后台日常事件上下文识别；会判断 action_target、participant_names、scene_event 和 selected_targets。"
-                "可用变量还包括 {{scene_events_json}} 与 {{monster_candidates_json}}。"
-                "用于 /魔法少女战斗 生成前的后台参与对象语义识别。发给 AI 的 user message 就是这个模板渲染后的结果。"
-                "可用变量：{{action}}、{{player_data_update_json}}、{{logs_text}}、{{cameo_memories_text}}、{{candidates_json}}。"
-                "要求 AI 返回纯 JSON，participant_names 数组中的每一项是候选玩家名或魔法少女名。"
-            ),
             self.PROMPT_FILES["default_system_prompt"]: (
-                "用于 /魔法少女转生 和 /魔法少女战斗 的 system message。"
+                "用于 /魔法少女转生 和 /魔法少女行动 的 system message。"
                 "你可以在这里定义 AI 的基础人格和行为准则。"
             ),
         }
