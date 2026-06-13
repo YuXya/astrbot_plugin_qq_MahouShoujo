@@ -235,7 +235,7 @@ class ReportGenerator(ICardGenerator):
 }}
 body {{
   margin: 0;
-  padding: 34px;
+  padding: 38px;
   background:
     linear-gradient(135deg, rgba(255, 246, 250, .96), rgba(236, 251, 255, .95) 48%, rgba(255, 247, 224, .94)),
     repeating-linear-gradient(45deg, rgba(233, 90, 147, .08) 0 2px, transparent 2px 18px);
@@ -245,12 +245,12 @@ body {{
 .card {{
   position: relative;
   overflow: hidden;
-  max-width: 880px;
+  max-width: 900px;
   margin: 0 auto;
   background: rgba(255, 255, 255, .92);
   border: 1px solid rgba(232, 98, 153, .24);
   border-radius: 8px;
-  padding: 30px;
+  padding: 34px;
   box-shadow: 0 22px 52px rgba(102, 53, 89, .18);
 }}
 .card::before {{
@@ -274,21 +274,21 @@ body {{
 .eyebrow {{
   display: inline-flex;
   align-items: center;
-  min-height: 26px;
-  padding: 3px 12px;
+  min-height: 30px;
+  padding: 4px 14px;
   border: 1px solid rgba(38, 168, 175, .28);
   border-radius: 999px;
   color: #157d84;
   background: rgba(229, 252, 254, .72);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0;
 }}
 h1 {{
   margin: 12px 0 14px;
   color: #49253f;
-  font-size: 31px;
-  line-height: 1.18;
+  font-size: 36px;
+  line-height: 1.22;
 }}
 .avatar {{
   position: absolute;
@@ -315,7 +315,7 @@ h1 {{
   align-items: center;
   justify-content: center;
   color: #c8457d;
-  font-size: 30px;
+  font-size: 34px;
   font-weight: 800;
 }}
 .meta-row {{
@@ -327,7 +327,7 @@ h1 {{
 }}
 .meta-item {{
   min-width: 0;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1px solid rgba(38, 168, 175, .18);
   border-radius: 8px;
   background: rgba(246, 253, 255, .82);
@@ -335,22 +335,22 @@ h1 {{
 .meta-label {{
   display: block;
   color: #8a6076;
-  font-size: 12px;
-  line-height: 1.2;
+  font-size: 15px;
+  line-height: 1.3;
 }}
 .meta-value {{
   display: block;
   overflow-wrap: anywhere;
   margin-top: 4px;
   color: #332333;
-  font-size: 15px;
-  line-height: 1.35;
+  font-size: 18px;
+  line-height: 1.45;
   font-weight: 700;
 }}
 .player-action {{
   position: relative;
   margin: -12px 0 22px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid rgba(232, 98, 153, .2);
   border-radius: 8px;
   background: rgba(255, 247, 251, .82);
@@ -365,7 +365,7 @@ h1 {{
   gap: 8px;
   margin-bottom: 10px;
   color: #c34d82;
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 800;
 }}
 .section-title::before {{
@@ -379,9 +379,9 @@ h1 {{
 .story {{
   position: relative;
   white-space: pre-wrap;
-  line-height: 1.9;
-  font-size: 17px;
-  padding: 18px 20px;
+  line-height: 1.85;
+  font-size: 21px;
+  padding: 22px 24px;
   border: 1px solid rgba(255, 196, 87, .28);
   border-radius: 8px;
   background: rgba(255, 253, 247, .82);
@@ -400,13 +400,13 @@ h1 {{
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 14px;
+  padding: 16px;
   border: 1px solid rgba(232, 98, 153, .22);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 247, 251, .95), rgba(246, 253, 255, .92));
   color: #382533;
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 18px;
+  line-height: 1.6;
   box-shadow: 0 8px 18px rgba(96, 60, 84, .08);
 }}
 .option-index {{
@@ -419,7 +419,7 @@ h1 {{
   justify-content: center;
   background: #c84d83;
   color: #fff;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
 }}
 .patch-grid {{
@@ -430,15 +430,15 @@ h1 {{
 .patch-chip {{
   display: inline-flex;
   max-width: 100%;
-  min-height: 34px;
+  min-height: 40px;
   align-items: center;
-  padding: 7px 12px;
+  padding: 9px 14px;
   border: 1px solid rgba(38, 168, 175, .22);
   border-radius: 8px;
   background: rgba(232, 251, 252, .86);
   color: #28505a;
-  font-size: 14px;
-  line-height: 1.35;
+  font-size: 17px;
+  line-height: 1.5;
   font-weight: 700;
   overflow-wrap: anywhere;
 }}
@@ -446,7 +446,7 @@ h1 {{
   position: relative;
   margin-top: 18px;
   color: #8a6076;
-  font-size: 13px;
+  font-size: 16px;
   text-align: right;
 }}
 </style>

@@ -399,6 +399,9 @@ class ActionTurnCardTests(unittest.TestCase):
         self.assertIn(">玩家行动</span>", html)
         self.assertIn(">尝试逃跑</span>", html)
         self.assertNotIn(">时间</span>", html)
+        self.assertIn("max-width: 900px", html)
+        self.assertIn("font-size: 21px", html)
+        self.assertIn("font-size: 17px", html)
 
     def test_action_card_hides_empty_insert_containers(self):
         generator = ReportGenerator.__new__(ReportGenerator)
