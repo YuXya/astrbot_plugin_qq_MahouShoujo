@@ -707,24 +707,44 @@ class EventSaveTests(unittest.TestCase):
             (self.repo.get_user_dir("g1", "u1") / "daily_memory.jsonl").exists()
         )
 
-    def test_allows_event_swap_and_normalizes_unpaired_removal(self):
+    def test_event_swap_requires_whole_runtime_and_normalizes_unpaired_removal(self):
         self._save([], runtime=_runtime(turn_count=0))
+        with self.assertRaisesRegex(ValueError, "切换事件必须整体替换"):
+            self._save(
+                [
+                    {
+                        "op": "replace",
+                        "path": "/进程/当前事件/scene_event/id",
+                        "value": "other",
+                    }
+                ]
+            )
+
+        next_runtime = {
+            "scene_event": {"id": "other", "title": "新事件", "reason": "切换"},
+            "selected_participants": [],
+            "selected_targets": [{"id": "monster-2", "name": "新魔物"}],
+            "ai_win_rate": 100,
+            "desire_win_rate": 100,
+            "started_at": "公元2020年4月1日",
+            "turn_count": 99,
+        }
         changed = self._save(
             [
                 {
                     "op": "replace",
-                    "path": "/进程/当前事件/scene_event/id",
-                    "value": "other",
-                },
-                {
-                    "op": "replace",
-                    "path": "/进程/当前事件/ai_win_rate",
-                    "value": 100,
-                },
+                    "path": "/进程/当前事件",
+                    "value": next_runtime,
+                }
             ]
         )
         self.assertEqual(changed["进程"]["当前事件"]["scene_event"]["id"], "other")
         self.assertEqual(changed["进程"]["当前事件"]["ai_win_rate"], 100)
+        self.assertEqual(changed["进程"]["当前事件"]["turn_count"], 1)
+        self.assertEqual(
+            changed["进程"]["当前事件"]["selected_targets"],
+            [{"id": "monster-2", "name": "新魔物"}],
+        )
 
         replaced_target = self._save(
             [
@@ -867,6 +887,18 @@ class _ActiveEventRepository:
     def format_world_date(self, offset):
         return "公元2020年4月1日"
 
+    def build_city_teammate_candidates(self, *args, **kwargs):
+        return []
+
+    def build_city_magical_girl_candidates(self, *args, **kwargs):
+        return []
+
+    def build_public_monster_candidates(self):
+        return [{"id": "tentacle", "name": "触手怪"}]
+
+    def find_participant_npcs(self, *args, **kwargs):
+        return []
+
     def save_action_turn_result(self, **kwargs):
         self.saved = kwargs
         return kwargs["result"].state_snapshot
@@ -874,7 +906,26 @@ class _ActiveEventRepository:
 
 class _ActiveEventAnalyzer:
     async def select_action_context(self, **kwargs):
-        raise AssertionError("活动事件不应重新选择上下文")
+        self.selection_input = kwargs
+        return {
+            "action_target": {"type": "战斗", "target": "触手怪"},
+            "is_continuous_event": True,
+            "scene_event": {"id": "tentacle_event", "title": "触手怪事件"},
+            "selected_participants": [],
+            "selected_targets": [{"id": "tentacle", "name": "触手怪"}],
+            "battle_odds": {
+                "ai_win_rate": 10,
+                "desire_win_rate": 100,
+                "player_win_rate": 55,
+                "dice_roll": 70,
+                "outcome": "player_lose",
+            },
+            "event_outcome": {
+                "result": "obstacle",
+                "battle_result": "player_lose",
+                "guidance": "未能脱离",
+            },
+        }
 
     async def analyze_action_turn(self, **kwargs):
         self.selection_context = kwargs["selection_context"]
@@ -885,9 +936,11 @@ class _ActiveEventAnalyzer:
 
 
 class ActiveEventFlowTests(unittest.IsolatedAsyncioTestCase):
-    async def test_active_event_skips_context_selection(self):
+    async def test_active_event_selects_one_candidate_and_keeps_current_event(self):
         service = ActionTurnApplicationService.__new__(ActionTurnApplicationService)
-        service.config_manager = SimpleNamespace()
+        service.config_manager = SimpleNamespace(
+            get_teammate_recent_record_count=lambda: 0
+        )
         service.llm_analyzer = _ActiveEventAnalyzer()
         service.save_repository = _ActiveEventRepository()
         service.card_generator = None
@@ -897,20 +950,24 @@ class ActiveEventFlowTests(unittest.IsolatedAsyncioTestCase):
             group_id="g1",
             user_id="u1",
             nickname="测试",
-            action_text="尝试逃跑",
+            action_text="挑战触手怪",
             umo=None,
         )
 
         self.assertTrue(result.success)
         self.assertEqual(
-            service.llm_analyzer.selection_context["scene_event"]["id"],
+            service.llm_analyzer.selection_input["current_event"]["scene_event"]["id"],
             "capture",
         )
         self.assertEqual(
-            service.llm_analyzer.selection_context["selected_targets"][0]["id"],
-            "monster",
+            service.llm_analyzer.selection_context["current_event"]["scene_event"]["id"],
+            "capture",
         )
-        self.assertEqual(result.result.selected_targets[0]["name"], "测试魔物")
+        self.assertEqual(
+            service.llm_analyzer.selection_context["proposed_event"]["scene_event"]["id"],
+            "tentacle_event",
+        )
+        self.assertEqual(result.result.selected_targets[0]["name"], "触手怪")
         self.assertIs(
             service.save_repository.saved["battle_odds"],
             service.llm_analyzer.selection_context["battle_odds"],

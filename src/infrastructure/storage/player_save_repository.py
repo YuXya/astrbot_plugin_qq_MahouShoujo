@@ -558,7 +558,24 @@ class PlayerSaveRepository:
             )
         current_event = self._current_story_event(player_data)
         self._validate_story_event_state(previous_event, player_data)
-        if current_event and not self._patch_updates_event_turn(result.json_patch):
+        previous_event_id = self._story_event_id(previous_event)
+        current_event_id = self._story_event_id(current_event)
+        event_switched = bool(
+            previous_event_id
+            and current_event_id
+            and previous_event_id != current_event_id
+        )
+        if event_switched and not self._patch_replaces_whole_event(result.json_patch):
+            raise ValueError("切换事件必须整体替换 /进程/当前事件")
+        if event_switched:
+            current_event["turn_count"] = 1
+            for item in applied_patch:
+                if (
+                    item.get("path") == "/进程/当前事件"
+                    and isinstance(item.get("value"), dict)
+                ):
+                    item["value"] = deepcopy(current_event)
+        elif current_event and not self._patch_updates_event_turn(result.json_patch):
             current_event["turn_count"] = max(
                 1,
                 int((previous_event or {}).get("turn_count", 0) or 0) + 1,
@@ -569,7 +586,9 @@ class PlayerSaveRepository:
         result.state_snapshot = dict(player_data)
         self._save_current_player_data(user_dir, player_data)
 
-        event_id = self._story_event_id(previous_event or current_event)
+        event_id = current_event_id if event_switched else self._story_event_id(
+            previous_event or current_event
+        )
         event_win_rate = self._battle_odds_int(battle_odds, "player_win_rate")
         event_dice_roll = self._battle_odds_int(battle_odds, "dice_roll")
         outcome = str((battle_odds or {}).get("outcome") or "").strip()
@@ -700,6 +719,16 @@ class PlayerSaveRepository:
         return any(
             isinstance(item, dict)
             and str(item.get("path") or "") == "/进程/当前事件/turn_count"
+            for item in (patch or [])
+        )
+
+    @staticmethod
+    def _patch_replaces_whole_event(patch: list[dict[str, Any]]) -> bool:
+        return any(
+            isinstance(item, dict)
+            and str(item.get("op") or "").strip() in {"replace", "insert"}
+            and str(item.get("path") or "").strip() == "/进程/当前事件"
+            and isinstance(item.get("value"), dict)
             for item in (patch or [])
         )
 

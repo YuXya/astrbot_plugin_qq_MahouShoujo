@@ -66,23 +66,29 @@ class ActionTurnApplicationService:
                 phase = "日常"
                 if legacy_event_cleanup:
                     current_event = None
+            selection_candidate = await self._select_context(
+                group_id=group_id,
+                user_id=user_id,
+                player_data=player_data,
+                logs=save_data.get("logs", []),
+                cameo_memories=save_data.get("cameo_memories", []),
+                action_text=action_text,
+                current_event=self._expanded_event_runtime(current_event),
+                umo=umo,
+            )
             event_started = False
             if current_event:
                 if phase != "事件":
                     player_data = deepcopy(player_data)
                     player_data.setdefault("进程", {})["阶段"] = "事件"
                     phase = "事件"
-                selection_context = self._active_event_context(current_event)
-            else:
-                selection_context = await self._select_context(
-                    group_id=group_id,
-                    user_id=user_id,
-                    player_data=player_data,
-                    logs=save_data.get("logs", []),
-                    cameo_memories=save_data.get("cameo_memories", []),
-                    action_text=action_text,
-                    umo=umo,
+                selection_context = self._active_event_selection_context(
+                    current_event,
+                    selection_candidate,
+                    current_world_date=current_world_date,
                 )
+            else:
+                selection_context = selection_candidate
                 current_event = self._build_event_runtime(
                     selection_context,
                     current_world_date=current_world_date,
@@ -327,6 +333,7 @@ class ActionTurnApplicationService:
         logs: list[dict],
         cameo_memories: list[dict],
         action_text: str,
+        current_event: dict[str, object] | None,
         umo: str | None,
     ) -> dict[str, object]:
         try:
@@ -349,12 +356,96 @@ class ActionTurnApplicationService:
                 participant_candidates=candidates,
                 magical_girl_candidates=magical_girls,
                 monster_candidates=monsters,
+                current_event=current_event,
                 event_command="/魔法少女行动",
                 umo=umo,
             )
         except Exception as exc:
             logger.warning(f"魔法少女行动上下文选择失败，降级为空上下文: {exc}")
             return {}
+
+    def _active_event_selection_context(
+        self,
+        current_event: dict[str, object],
+        proposed_context: dict[str, object] | None,
+        *,
+        current_world_date: str,
+    ) -> dict[str, object]:
+        proposed = dict(proposed_context) if isinstance(proposed_context, dict) else {}
+        expanded_current = self._expanded_event_runtime(current_event) or current_event
+        current_scene = dict(expanded_current.get("scene_event") or {})
+
+        proposed_runtime = self._build_event_runtime(
+            proposed,
+            current_world_date=current_world_date,
+        )
+        proposed_scene = proposed.get("scene_event")
+        has_proposed_event = isinstance(proposed_scene, dict) and bool(
+            str(proposed_scene.get("id") or "").strip()
+        )
+        participants = self._dict_list(current_event.get("selected_participants"))
+        for item in self._dict_list(proposed.get("selected_participants")):
+            if item not in participants:
+                participants.append(item)
+
+        return {
+            "battle_type": "event",
+            "scene_event": current_scene,
+            "selected_participants": participants,
+            "selected_targets": self._dict_list(
+                proposed.get("selected_targets")
+                if has_proposed_event
+                else current_event.get("selected_targets")
+            ),
+            "battle_odds": proposed.get("battle_odds"),
+            "event_outcome": proposed.get("event_outcome"),
+            "event_runtime": {
+                "started_at": str(current_event.get("started_at") or "").strip(),
+                "turn_count": max(0, int(current_event.get("turn_count", 0) or 0)),
+            },
+            "current_event": {
+                "scene_event": current_scene,
+                "selected_participants": self._dict_list(
+                    current_event.get("selected_participants")
+                ),
+                "selected_targets": self._dict_list(current_event.get("selected_targets")),
+                "ai_win_rate": self._clamp_percent(current_event.get("ai_win_rate")),
+                "desire_win_rate": self._clamp_percent(
+                    current_event.get("desire_win_rate")
+                ),
+                "started_at": str(current_event.get("started_at") or "").strip(),
+                "turn_count": max(0, int(current_event.get("turn_count", 0) or 0)),
+            },
+            "proposed_event": {
+                "action_target": proposed.get("action_target"),
+                "is_continuous_event": bool(proposed.get("is_continuous_event")),
+                "scene_event": proposed_scene if has_proposed_event else None,
+                "selected_participants": self._dict_list(
+                    proposed.get("selected_participants")
+                ),
+                "selected_targets": self._dict_list(proposed.get("selected_targets")),
+                "runtime": proposed_runtime,
+            },
+            "proposed_battle_odds": proposed.get("battle_odds"),
+        }
+
+    def _expanded_event_runtime(
+        self,
+        current_event: dict[str, object] | None,
+    ) -> dict[str, object] | None:
+        if not isinstance(current_event, dict):
+            return None
+        expanded = deepcopy(current_event)
+        stored_scene = current_event.get("scene_event")
+        event_id = str(stored_scene.get("id") or "").strip() if isinstance(stored_scene, dict) else ""
+        latest_scene = self.event_book_engine.get_scene_event(event_id)
+        if latest_scene:
+            expanded["scene_event"] = dict(latest_scene)
+            if isinstance(stored_scene, dict):
+                expanded["scene_event"]["reason"] = str(
+                    stored_scene.get("reason") or ""
+                ).strip()
+        return expanded
 
     @staticmethod
     def _current_phase(player_data: dict) -> str:

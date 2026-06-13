@@ -16,7 +16,7 @@
 {{selection_context_json}}
 
 当前剧情事件规则：
-- 普通日常、自由行动、训练和社交可以只生成本轮正文，不需要创建或保存剧情事件。
+- 普通日常、训练和社交可以只生成本轮正文，不需要创建或保存剧情事件。
 - selection_context.event_runtime 存在时，表示当前正在处理一段需要跨回合解决的连续剧情；可以根据玩家行动自然延续、转场、改变目标或收束。
 - selection_context.battle_odds.player_win_rate 是 AI 判断与玩家获胜欲望各占一半得到的胜率；dice_roll 是程序为本回合生成的 20-80 骰点。
 - dice_roll 大于 player_win_rate 时本轮失败，否则本轮成功；selection_context.event_outcome 是程序据此确定的结果，正文必须遵守，不能自行改判。
@@ -25,6 +25,12 @@
 - 只有目标已经解决或彻底消失时，才移除 /进程/当前事件并将 /进程/阶段 改为“日常”。
 - 被控制、被抓走、逃跑失败或仍被追击通常表示事件继续。
 - 事件继续时可按正文更新 scene_event、selected_participants、selected_targets，也可以在剧情自然完成后直接结束事件。
+- selection_context.current_event 是当前真实事件；selection_context.proposed_event 是子模型根据玩家行动选出的唯一候选事件，不代表已经成功切换。
+- selection_context.proposed_battle_odds 与 selection_context.event_outcome 约束玩家尝试候选行动的本轮成败，但不能覆盖当前事件中的抓捕、拘束、昏迷或其他明确硬限制。
+- 如果候选行动成功且当前处境允许离开，必须在本回合快速收束旧事件，并用 proposed_event.runtime 整体 replace /进程/当前事件；不得只替换事件 id。新事件会从第 1 回合开始。
+- 如果行动失败或当前事件机制仍禁止脱离，正文必须表现尝试失败并保留当前事件。候选魔物可以合理介入当前现场，但最终仍只能保存一个当前事件，可按实际发展更新旧事件目标。
+- 如果旧事件已经结束而候选事件没有成立，可以移除当前事件并回到日常。
+- 无论如何不得创建事件数组、并行事件或同时保存两个当前事件。
 - 正文明确经过一天或多天时，应对 /世界/日期 使用正整数 delta，数值表示实际经过的天数；不得 replace 或倒退日期。没有明确跨日时不要输出日期补丁。
 
 ---

@@ -401,6 +401,7 @@ class ParticipantSelectionMemoryTests(unittest.IsolatedAsyncioTestCase):
             logs=[],
             cameo_memories=[],
             action_text="行动",
+            current_event=None,
             umo=None,
         )
 

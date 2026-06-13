@@ -65,6 +65,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         participant_candidates: list[dict],
         magical_girl_candidates: list[dict],
         monster_candidates: list[dict],
+        current_event: dict | None = None,
         event_command: str = "/魔法少女行动",
         umo: str | None = None,
     ) -> dict[str, object]:
@@ -81,6 +82,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             magical_girl_candidates=magical_girl_candidates,
             monster_candidates=monster_candidates,
             scene_event_candidates=scene_event_candidates,
+            current_event=current_event,
         )
         system_prompt = self.editable_manager.get_prompt("default_system_prompt")
         if self.config_manager.get_debug_mode():
@@ -155,6 +157,15 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             ai_win_rate=context["ai_win_rate"],
             desire_win_rate=context["desire_win_rate"],
         )
+        outcome = str(context["battle_odds"].get("outcome") or "")
+        context["event_outcome"] = {
+            "result": "success" if outcome == "player_win" else "obstacle",
+            "battle_result": outcome,
+            "guidance": scene_event.get(
+                "success_ending" if outcome == "player_win" else "obstacle_ending",
+                "",
+            ),
+        }
         return context
 
     def build_action_context_prompt(
@@ -168,6 +179,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         magical_girl_candidates: list[dict],
         monster_candidates: list[dict],
         scene_event_candidates: list[dict],
+        current_event: dict | None = None,
     ) -> str:
         return self.editable_manager.render_prompt(
             "action_context_selection_prompt",
@@ -176,6 +188,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "player_data_update_json": self._json_dump(player_data),
                 "logs_text": self._format_logs(logs),
                 "cameo_memories_text": self._format_cameo_memories(cameo_memories),
+                "current_event_json": self._json_dump(current_event),
                 "candidates_json": self._json_dump(
                     {
                         "participants": self._prompt_protagonist_profiles(
