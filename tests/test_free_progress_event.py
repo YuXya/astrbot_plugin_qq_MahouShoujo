@@ -191,6 +191,32 @@ class ActionPromptProjectionTests(unittest.TestCase):
             "monster",
         )
 
+    def test_action_messages_establish_cat_god_dm_before_runtime_prompt(self):
+        prompt = "完整运行时 Prompt"
+        messages = ActionTurnAnalyzer._build_action_messages(prompt, "系统规则")
+
+        self.assertEqual(
+            [message["role"] for message in messages],
+            ["system", "user", "assistant", "user", "assistant", "user"],
+        )
+        assistant_history = "\n".join(
+            message["content"]
+            for message in messages
+            if message["role"] == "assistant"
+        )
+        self.assertIn("小猫之神", messages[1]["content"])
+        self.assertIn("小猫之神", assistant_history)
+        self.assertIn("小鱼干", assistant_history)
+        self.assertIn("DM", assistant_history)
+        self.assertIn("第三人称", assistant_history)
+        self.assertEqual(messages[-1], {"role": "user", "content": prompt})
+
+    def test_action_messages_without_prompt_do_not_create_persona_history(self):
+        self.assertEqual(
+            ActionTurnAnalyzer._build_action_messages("", "系统规则"),
+            [{"role": "system", "content": "系统规则"}],
+        )
+
 
 class EventSaveTests(unittest.TestCase):
     def setUp(self):

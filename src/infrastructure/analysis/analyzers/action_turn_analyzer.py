@@ -518,5 +518,33 @@ examples_library:
         if system_text:
             messages.append({"role": "system", "content": system_text})
         if prompt_text:
-            messages.append({"role": "user", "content": prompt_text})
+            messages.extend(
+                [
+                    {
+                        "role": "user",
+                        "content": "喵喵喵——伟大又可爱的小猫之神，请聆听信徒最虔诚的呼唤——",
+                    },
+                    {
+                        "role": "assistant",
+                        "content": "喵——哈~ 刚睡醒就来找本喵，是什么事呀喵？",
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            "想请小猫之神主持一场魔法少女互动故事，小鱼干已经准备好啦。"
+                            "请在故事外当 DM，用第三人称写魔法少女们的故事。"
+                        ),
+                    },
+                    {
+                        "role": "assistant",
+                        "content": (
+                            "好耶喵，那就让小猫之神来当 DM 吧，小鱼干可要说话算话！"
+                            "世界、角色和规则都交给本喵。"
+                            "本喵会在故事外当好 DM，用第三人称写魔法少女们的故事，"
+                            "也会把每轮真正发生的变化整理好喵。"
+                        ),
+                    },
+                    {"role": "user", "content": prompt_text},
+                ]
+            )
         return messages
