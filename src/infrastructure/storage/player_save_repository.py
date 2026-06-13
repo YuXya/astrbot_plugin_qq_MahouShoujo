@@ -426,6 +426,7 @@ class PlayerSaveRepository:
         result: ActionTurnResult,
         world_day_offset: int | None = None,
         event_runtime: dict[str, Any] | None = None,
+        battle_odds: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         user_dir = self.get_user_dir(group_id, user_id)
         user_dir.mkdir(parents=True, exist_ok=True)
@@ -464,7 +465,15 @@ class PlayerSaveRepository:
         self._save_current_player_data(user_dir, player_data)
 
         event_id = self._story_event_id(previous_event or current_event)
-        event_outcome = self._event_outcome_from_runtime(previous_event or current_event)
+        event_win_rate = self._battle_odds_int(battle_odds, "player_win_rate")
+        event_dice_roll = self._battle_odds_int(battle_odds, "dice_roll")
+        outcome = str((battle_odds or {}).get("outcome") or "").strip()
+        if outcome == "player_win":
+            event_outcome = "success"
+        elif outcome == "player_lose":
+            event_outcome = "obstacle"
+        else:
+            event_outcome = self._event_outcome_from_runtime(previous_event or current_event)
         event_ended = bool(previous_event and not current_event)
         self.append_log(
             group_id,
@@ -484,6 +493,8 @@ class PlayerSaveRepository:
                 "json_patch": applied_patch,
                 "event_id": event_id,
                 "event_outcome": event_outcome,
+                "event_win_rate": event_win_rate,
+                "event_dice_roll": event_dice_roll,
                 "event_ended": event_ended,
             },
         )
@@ -560,6 +571,15 @@ class PlayerSaveRepository:
         except Exception:
             ai_rate = desire_rate = 50
         return "success" if round(ai_rate * 0.5 + desire_rate * 0.5) >= 50 else "obstacle"
+
+    @staticmethod
+    def _battle_odds_int(battle_odds: dict[str, Any] | None, key: str) -> int | None:
+        if not isinstance(battle_odds, dict) or battle_odds.get(key) is None:
+            return None
+        try:
+            return int(float(battle_odds[key]))
+        except Exception:
+            return None
 
     def apply_json_patch(
         self,

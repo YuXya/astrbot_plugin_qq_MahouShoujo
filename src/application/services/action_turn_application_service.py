@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from ...domain.services.battle_outcome_service import resolve_battle_outcome
 from ...infrastructure.event_book import EventBookEngine
 
 from ...domain.models.data_models import ActionTurnExecutionResult
@@ -77,7 +78,10 @@ class ActionTurnApplicationService:
                     player_data.setdefault("进程", {})["阶段"] = "事件"
                     player_data["进程"]["当前事件"] = deepcopy(current_event)
                     phase = "事件"
-                    selection_context = self._active_event_context(current_event)
+                    selection_context = self._active_event_context(
+                        current_event,
+                        battle_odds=selection_context.get("battle_odds"),
+                    )
             nearby_players = self._selected_participants(selection_context)
             analysis = await self.llm_analyzer.analyze_action_turn(
                 action_text=action_text,
@@ -105,6 +109,7 @@ class ActionTurnApplicationService:
                 result=result,
                 world_day_offset=world_day_offset,
                 event_runtime=current_event if event_started else None,
+                battle_odds=selection_context.get("battle_odds"),
             )
             result.state_snapshot = updated_state
             image_path = None
@@ -192,29 +197,34 @@ class ActionTurnApplicationService:
         scene = current.get("scene_event") if isinstance(current, dict) else None
         return current if isinstance(scene, dict) and str(scene.get("id") or "").strip() else None
 
-    def _active_event_context(self, current_event: dict[str, object]) -> dict[str, object]:
+    def _active_event_context(
+        self,
+        current_event: dict[str, object],
+        *,
+        battle_odds: object = None,
+    ) -> dict[str, object]:
         stored_scene = current_event.get("scene_event")
         event_id = str(stored_scene.get("id") or "").strip() if isinstance(stored_scene, dict) else ""
         latest_scene = self.event_book_engine.get_scene_event(event_id)
         scene_event = dict(latest_scene or stored_scene or {})
         if isinstance(stored_scene, dict):
             scene_event["reason"] = str(stored_scene.get("reason") or "").strip()
-        ai_rate = self._clamp_percent(current_event.get("ai_win_rate"))
-        desire_rate = self._clamp_percent(current_event.get("desire_win_rate"))
-        final_rate = round(ai_rate * 0.5 + desire_rate * 0.5)
-        outcome = "player_win" if final_rate >= 50 else "player_lose"
+        previous_odds = battle_odds if isinstance(battle_odds, dict) else {}
+        odds = resolve_battle_outcome(
+            current_event.get("ai_win_rate"),
+            current_event.get("desire_win_rate"),
+            dice_roll=previous_odds.get("dice_roll"),
+        )
+        previous_outcome = str(previous_odds.get("outcome") or "").strip()
+        if previous_outcome in {"player_win", "player_lose"}:
+            odds["outcome"] = previous_outcome
+        outcome = str(odds["outcome"])
         return {
             "battle_type": "event",
             "scene_event": scene_event,
             "selected_participants": self._dict_list(current_event.get("selected_participants")),
             "selected_targets": self._dict_list(current_event.get("selected_targets")),
-            "battle_odds": {
-                "player_win_rate": final_rate,
-                "outcome": outcome,
-                "ai_win_rate": ai_rate,
-                "desire_win_rate": desire_rate,
-                "battle_kind": "free_progress_event",
-            },
+            "battle_odds": {**odds, "battle_kind": "free_progress_event"},
             "event_runtime": {
                 "started_at": str(current_event.get("started_at") or "").strip(),
                 "turn_count": max(0, int(current_event.get("turn_count", 0) or 0)),

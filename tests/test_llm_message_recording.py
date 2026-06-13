@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import sys
+import tempfile
 import types
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -29,6 +31,9 @@ sys.modules.setdefault("astrbot.api.star", astrbot_star)
 from src.infrastructure.analysis.utils import llm_utils  # noqa: E402
 from src.infrastructure.analysis.analyzers.action_turn_analyzer import (  # noqa: E402
     ActionTurnAnalyzer,
+)
+from src.infrastructure.storage.recent_llm_message_repository import (  # noqa: E402
+    RecentLLMMessageRepository,
 )
 
 
@@ -71,6 +76,26 @@ class _Context:
 
 
 class LLMMessageRecordingTests(unittest.IsolatedAsyncioTestCase):
+    def test_recent_message_repository_defaults_to_twelve_records(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repository = RecentLLMMessageRepository(Path(temp_dir))
+
+            self.assertEqual(repository.get_limit(), 12)
+
+            for index in range(14):
+                repository.append(
+                    purpose="测试",
+                    provider_id="provider",
+                    prompt=f"prompt-{index}",
+                    system_prompt="system",
+                    response=f"response-{index}",
+                )
+
+            records = repository.list_records()
+            self.assertEqual(len(records), 12)
+            self.assertEqual(records[0]["prompt"], "prompt-13")
+            self.assertEqual(records[-1]["prompt"], "prompt-2")
+
     async def test_contexts_record_contains_runtime_prompt_once(self):
         prompt = "完整 action_turn_prompt"
         messages = ActionTurnAnalyzer._build_action_messages(prompt, "系统规则")

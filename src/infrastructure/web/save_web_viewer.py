@@ -582,6 +582,14 @@ class SaveWebViewer:
                     note,
                     content,
                 )
+            if file_id == "fetish_book/default.json":
+                return self._fetish_book_file_response(
+                    title,
+                    file_id,
+                    back_category,
+                    note,
+                    content,
+                )
             return self._world_book_file_response(
                 title,
                 file_id,
@@ -648,6 +656,238 @@ class SaveWebViewer:
     ) -> web.Response:
         return self._plain_editable_file_response(
             title, file_id, back_category, note, content
+        )
+
+    def _fetish_book_file_response(
+        self,
+        title: str,
+        file_id: str,
+        back_category: str,
+        note: str,
+        content: str,
+    ) -> web.Response:
+        try:
+            book = self._normalize_fetish_book(self._loads_json_text(content))
+        except Exception as exc:
+            return self._plain_editable_file_response(
+                title,
+                file_id,
+                back_category,
+                note,
+                content,
+                warning=f"性癖书 JSON 解析失败，请先修复源码 JSON：{exc}",
+            )
+
+        book_json = self._json_script_data(book)
+        source_url = self._url(
+            f"/editable/source?id={quote(file_id, safe='')}&category={self._e(back_category)}"
+        )
+        export_url = self._url(f"/editable/export?id={quote(file_id, safe='')}")
+        storage_key = "qq_mahoushoujo:fetish_book:open_entries"
+        return self._html_response(
+            title,
+            f"""
+            <h1>{self._e(title)}</h1>
+            <p><a href="{self._url(f'/editable?category={self._e(back_category)}')}">返回{self._e(self._editable_category_title(back_category))}</a></p>
+            <p class="muted">{self._e(file_id)}</p>
+            <div class="source-actions">
+              <a class="button-link secondary-link" href="{source_url}">编辑源码</a>
+              <a class="button-link secondary-link" href="{export_url}">导出 JSON</a>
+              <form class="inline-import-form" method="post" action="{self._url('/editable/import')}" enctype="multipart/form-data">
+                <input type="hidden" name="id" value="{self._e(file_id)}">
+                <input type="hidden" name="category" value="{self._e(back_category)}">
+                <input name="import_file" type="file" accept=".json,application/json">
+                <button class="secondary compact-button" type="submit">导入 JSON</button>
+              </form>
+            </div>
+            <form id="fetish-book-form" method="post" action="{self._url('/editable/save')}">
+              <input type="hidden" name="id" value="{self._e(file_id)}">
+              <input type="hidden" name="category" value="{self._e(back_category)}">
+              <input id="fetish-book-content" type="hidden" name="content" value="">
+              <label for="note">资源说明 / 注释</label>
+              <textarea id="note" class="note-editor" name="note" spellcheck="false">{self._e(note)}</textarea>
+              <div class="book-config-grid">
+                <div>
+                  <label for="fetish-book-base-path">默认 change 基础路径</label>
+                  <input id="fetish-book-base-path" type="text" value="{self._e(book.get('base_path') or '')}" spellcheck="false">
+                </div>
+              </div>
+              <p class="muted">这个路径会发给 AI 作为 update.changes 的路径提示，不代表 JSON 文件实际存放路径。</p>
+              <div class="world-book-toolbar">
+                <div>
+                  <h2>性癖书条目</h2>
+                  <p class="muted">编辑简介与五个百分比进度区间效果。已拥有性癖会按当前进度注入对应效果。</p>
+                </div>
+                <button id="add-fetish-entry" type="button">+ 添加条目</button>
+              </div>
+              <div id="fetish-book-entries"></div>
+              <div class="actions"><button type="submit">保存</button></div>
+            </form>
+            <form method="post" action="{self._url('/editable/reset')}" onsubmit="return confirm('确定恢复为当前代码内置默认内容？旧文件会先自动备份。');">
+              <input type="hidden" name="id" value="{self._e(file_id)}">
+              <input type="hidden" name="category" value="{self._e(back_category)}">
+              <button class="secondary" type="submit">恢复当前默认内容</button>
+            </form>
+            <script>
+              const initialFetishBook = {book_json};
+              const fetishRanges = ["0-20", "21-40", "41-60", "61-80", "81-100"];
+              const fetishEntriesEl = document.getElementById("fetish-book-entries");
+              const fetishForm = document.getElementById("fetish-book-form");
+              const fetishContentInput = document.getElementById("fetish-book-content");
+              const fetishBasePathInput = document.getElementById("fetish-book-base-path");
+              const fetishStorageKey = "{self._e(storage_key)}";
+              let fetishOpenKeys = new Set();
+              let fetishDraggingIndex = null;
+              const fetishState = {{
+                version: Number(initialFetishBook.version || 1),
+                base_path: String(initialFetishBook.base_path || ""),
+                entries: Array.isArray(initialFetishBook.entries) ? initialFetishBook.entries : [],
+              }};
+
+              function fetishSplitKeys(value) {{
+                const raw = Array.isArray(value) ? value.join("\\n") : String(value || "");
+                return raw.split(/[\\n,，、]/).map((item) => item.trim()).filter(Boolean);
+              }}
+
+              function fetishDefaults(index) {{
+                return {{
+                  id: `entry_${{index + 1}}`, title: "", enabled: true, recursive: false,
+                  strategy: "keyword", keys: [], content: "",
+                  percentage_descriptions: Object.fromEntries(fetishRanges.map((range) => [range, ""])),
+                }};
+              }}
+
+              function fetishNormalizeEntry(entry, index) {{
+                const descriptions = entry.percentage_descriptions && typeof entry.percentage_descriptions === "object"
+                  ? entry.percentage_descriptions : {{}};
+                return {{
+                  id: String(entry.id || `entry_${{index + 1}}`).trim(),
+                  title: String(entry.title || ""),
+                  enabled: entry.enabled !== false,
+                  recursive: entry.recursive !== false,
+                  strategy: entry.strategy === "always" ? "always" : "keyword",
+                  keys: fetishSplitKeys(entry.keys),
+                  content: String(entry.content || ""),
+                  percentage_descriptions: Object.fromEntries(
+                    fetishRanges.map((range) => [range, String(descriptions[range] || "")])
+                  ),
+                }};
+              }}
+
+              function fetishEscapeHtml(value) {{
+                return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+              }}
+
+              function fetishEscapeAttr(value) {{
+                return fetishEscapeHtml(value).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+              }}
+
+              function fetishEntryKey(entry, index) {{
+                return String(entry.id || entry.title || `entry_${{index + 1}}`).trim();
+              }}
+
+              function fetishLoadOpenState() {{
+                try {{
+                  const raw = localStorage.getItem(fetishStorageKey);
+                  if (raw) fetishOpenKeys = new Set(JSON.parse(raw).map(String));
+                }} catch (error) {{ console.warn("failed to load fetish book open state", error); }}
+              }}
+
+              function fetishPersistOpenState() {{
+                try {{ localStorage.setItem(fetishStorageKey, JSON.stringify(Array.from(fetishOpenKeys))); }}
+                catch (error) {{ console.warn("failed to save fetish book open state", error); }}
+              }}
+
+              function fetishSyncFromDom() {{
+                fetishState.base_path = fetishBasePathInput.value;
+                fetishState.entries = Array.from(fetishEntriesEl.querySelectorAll(".fetish-entry")).map((card, index) => fetishNormalizeEntry({{
+                  id: card.querySelector("[data-field='id']").value,
+                  title: card.querySelector("[data-field='title']").value,
+                  enabled: card.querySelector("[data-field='enabled']").checked,
+                  recursive: card.querySelector("[data-field='recursive']").checked,
+                  strategy: card.querySelector("[data-field='strategy']").value,
+                  keys: card.querySelector("[data-field='keys']").value,
+                  content: card.querySelector("[data-field='content']").value,
+                  percentage_descriptions: Object.fromEntries(fetishRanges.map((range) => [
+                    range, card.querySelector(`[data-range="${{range}}"]`).value,
+                  ])),
+                }}, index));
+              }}
+
+              function fetishRender() {{
+                fetishEntriesEl.innerHTML = "";
+                fetishState.entries = fetishState.entries.map(fetishNormalizeEntry);
+                fetishState.entries.forEach((entry, index) => {{
+                  const key = fetishEntryKey(entry, index);
+                  const card = document.createElement("article");
+                  card.className = "world-entry fetish-entry";
+                  card.draggable = false;
+                  card.innerHTML = `
+                    <details ${{fetishOpenKeys.has(key) ? "open" : ""}}>
+                      <summary class="world-entry-head">
+                        <button class="drag-handle" type="button" draggable="true" data-action="drag" title="拖拽排序">↕</button>
+                        <span class="entry-title">${{fetishEscapeHtml(entry.title || entry.id || `条目 ${{index + 1}}`)}}</span>
+                        <span class="tag">${{fetishEscapeHtml(entry.strategy)}}</span>
+                        <label class="summary-check"><input data-field="enabled" type="checkbox"${{entry.enabled ? " checked" : ""}}> 启用</label>
+                        <button class="danger compact-button" type="button" data-action="delete">删除</button>
+                      </summary>
+                      <div class="world-entry-body">
+                        <div class="world-entry-grid">
+                          <label class="title-field">ID<input data-field="id" type="text" value="${{fetishEscapeAttr(entry.id)}}" spellcheck="false"></label>
+                          <label class="title-field">标题<input data-field="title" type="text" value="${{fetishEscapeAttr(entry.title)}}" spellcheck="false"></label>
+                          <label class="compact-field"><span>策略</span><select data-field="strategy"><option value="keyword"${{entry.strategy !== "always" ? " selected" : ""}}>keyword</option><option value="always"${{entry.strategy === "always" ? " selected" : ""}}>always</option></select></label>
+                          <label class="summary-check"><input data-field="recursive" type="checkbox"${{entry.recursive ? " checked" : ""}}> 递归关键词</label>
+                        </div>
+                        <div class="block-field"><label>关键词</label><textarea data-field="keys" class="keys-editor" spellcheck="false">${{fetishEscapeHtml(entry.keys.join("\\n"))}}</textarea></div>
+                        <div class="block-field"><label>简介</label><textarea data-field="content" class="entry-content-editor" spellcheck="false">${{fetishEscapeHtml(entry.content)}}</textarea></div>
+                        <div class="fetish-range-grid">${{fetishRanges.map((range) => `
+                          <div class="block-field"><label>${{range}}%</label><textarea data-range="${{range}}" class="entry-content-editor" spellcheck="false">${{fetishEscapeHtml(entry.percentage_descriptions[range])}}</textarea></div>
+                        `).join("")}}</div>
+                      </div>
+                    </details>`;
+                  card.querySelector("details").addEventListener("toggle", (event) => {{
+                    if (event.currentTarget.open) fetishOpenKeys.add(key); else fetishOpenKeys.delete(key);
+                    fetishPersistOpenState();
+                  }});
+                  card.querySelectorAll(".summary-check").forEach((control) => control.addEventListener("click", (event) => event.stopPropagation()));
+                  card.querySelector("[data-action='delete']").addEventListener("click", (event) => {{
+                    event.preventDefault(); event.stopPropagation();
+                    if (!confirm("确定删除这个性癖书条目？")) return;
+                    fetishSyncFromDom(); fetishState.entries.splice(index, 1); fetishOpenKeys.delete(key); fetishRender();
+                  }});
+                  const dragHandle = card.querySelector("[data-action='drag']");
+                  dragHandle.addEventListener("click", (event) => {{ event.preventDefault(); event.stopPropagation(); }});
+                  dragHandle.addEventListener("dragstart", (event) => {{
+                    fetishSyncFromDom(); fetishDraggingIndex = index; card.classList.add("dragging");
+                    event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(index));
+                  }});
+                  dragHandle.addEventListener("dragend", () => {{ fetishDraggingIndex = null; card.classList.remove("dragging"); }});
+                  card.addEventListener("dragover", (event) => {{ if (fetishDraggingIndex !== null && fetishDraggingIndex !== index) {{ event.preventDefault(); card.classList.add("drag-over"); }} }});
+                  card.addEventListener("dragleave", () => card.classList.remove("drag-over"));
+                  card.addEventListener("drop", (event) => {{
+                    event.preventDefault(); card.classList.remove("drag-over");
+                    if (fetishDraggingIndex === null || fetishDraggingIndex === index) return;
+                    const [moved] = fetishState.entries.splice(fetishDraggingIndex, 1);
+                    fetishState.entries.splice(index, 0, moved); fetishDraggingIndex = null; fetishRender();
+                  }});
+                  const refreshTitle = () => {{ card.querySelector(".entry-title").textContent = card.querySelector("[data-field='title']").value.trim() || card.querySelector("[data-field='id']").value.trim() || `条目 ${{index + 1}}`; }};
+                  card.querySelector("[data-field='title']").addEventListener("input", refreshTitle);
+                  card.querySelector("[data-field='id']").addEventListener("input", refreshTitle);
+                  fetishEntriesEl.appendChild(card);
+                }});
+              }}
+
+              document.getElementById("add-fetish-entry").addEventListener("click", () => {{
+                fetishSyncFromDom();
+                const entry = fetishDefaults(fetishState.entries.length);
+                fetishState.entries.push(entry); fetishOpenKeys.add(fetishEntryKey(entry, fetishState.entries.length - 1)); fetishRender();
+              }});
+              fetishForm.addEventListener("submit", () => {{ fetishSyncFromDom(); fetishContentInput.value = JSON.stringify(fetishState, null, 2); }});
+              fetishState.entries = fetishState.entries.map(fetishNormalizeEntry);
+              fetishLoadOpenState();
+              fetishRender();
+            </script>
+            """,
         )
 
     def _monster_book_file_response(
@@ -1321,6 +1561,44 @@ class SaveWebViewer:
             </script>
             """,
         )
+
+    @classmethod
+    def _normalize_fetish_book(cls, raw: object) -> dict[str, object]:
+        if not isinstance(raw, dict):
+            return {"version": 1, "base_path": "/主角/快感状态/性癖/", "entries": []}
+        raw_entries = raw.get("entries", [])
+        if not isinstance(raw_entries, list):
+            raw_entries = []
+        ranges = ("0-20", "21-40", "41-60", "61-80", "81-100")
+        entries: list[dict[str, object]] = []
+        for idx, entry in enumerate(raw_entries):
+            if not isinstance(entry, dict):
+                continue
+            descriptions = entry.get("percentage_descriptions")
+            if not isinstance(descriptions, dict):
+                descriptions = {}
+            entries.append(
+                {
+                    "id": str(entry.get("id") or f"entry_{idx + 1}").strip(),
+                    "title": str(entry.get("title") or "").strip(),
+                    "enabled": entry.get("enabled", True) is not False,
+                    "recursive": entry.get("recursive", False) is not False,
+                    "strategy": "always"
+                    if str(entry.get("strategy") or "").strip().lower() == "always"
+                    else "keyword",
+                    "keys": cls._normalize_editor_text_list(entry.get("keys")),
+                    "content": str(entry.get("content") or "").strip(),
+                    "percentage_descriptions": {
+                        range_name: str(descriptions.get(range_name) or "").strip()
+                        for range_name in ranges
+                    },
+                }
+            )
+        return {
+            "version": int(raw.get("version") or 1),
+            "base_path": str(raw.get("base_path") or "/主角/快感状态/性癖/").strip(),
+            "entries": entries,
+        }
 
     @classmethod
     def _normalize_monster_book(cls, raw: object) -> dict[str, object]:
@@ -3516,6 +3794,7 @@ class SaveWebViewer:
     .book-config-grid {{ display: grid; grid-template-columns: minmax(180px, .72fr) minmax(260px, 1.28fr); gap: 12px; align-items: start; }}
     #world-book-entries {{ display: grid; gap: 6px; }}
     #monster-book-entries {{ display: grid; gap: 6px; }}
+    #fetish-book-entries {{ display: grid; gap: 6px; }}
     .world-entry {{ margin: 0; background: #fff; border: 1px solid #dde2ea; border-radius: 8px; box-shadow: 0 3px 10px rgba(31, 41, 55, 0.04); transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease, opacity .14s ease; }}
     .world-entry.dragging {{ opacity: .45; transform: scale(.995); }}
     .world-entry.drag-over {{ border-color: #1f6feb; box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.14), 0 12px 28px rgba(31, 41, 55, 0.1); }}
@@ -3544,6 +3823,8 @@ class SaveWebViewer:
     .block-field {{ margin-top: 12px; }}
     .monster-ending-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }}
     .monster-ending-grid .block-field {{ margin-top: 12px; }}
+    .fetish-range-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; align-items: start; }}
+    .fetish-range-grid .block-field:last-child {{ grid-column: 1 / -1; }}
     textarea.keys-editor {{ min-height: 48px; font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }}
     textarea.entry-content-editor {{ min-height: 78px; }}
     .monster-picker {{ margin-top: 12px; padding: 10px 12px; border: 1px solid #d9e1eb; border-radius: 8px; background: #f8fafc; }}

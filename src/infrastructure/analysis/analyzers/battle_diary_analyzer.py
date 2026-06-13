@@ -4,6 +4,7 @@ import json
 import random
 
 from ....domain.models.data_models import BattleDiaryCard, TokenUsage
+from ....domain.services.battle_outcome_service import resolve_battle_outcome
 from ....domain.services.battle_diary_domain_service import BattleDiaryDomainService
 from ....utils.logger import logger
 from ...change_books import ChangeBookEngine
@@ -686,18 +687,13 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         teammate_data: list[dict] | None = None,
         enemy_data: list[dict] | None = None,
     ) -> dict[str, object]:
-        """Build deterministic battle odds used by the diary prompt."""
-        ai_rate = self._clamp_percent(ai_win_rate, default=50)
-        desire_rate = self._clamp_percent(desire_win_rate, default=50)
-
-        if force_lose:
-            final_rate = 0
-            outcome = "player_lose"
-        else:
-            final_rate = self._clamp_percent(
-                round(desire_rate * 0.5 + ai_rate * 0.5)
-            )
-            outcome = "player_win" if final_rate >= 50 else "player_lose"
+        """Build randomized battle odds used by the diary prompt."""
+        odds = resolve_battle_outcome(
+            ai_win_rate,
+            desire_win_rate,
+            force_lose=force_lose,
+        )
+        final_rate = int(odds["player_win_rate"])
 
         closeness = 50 - abs(final_rate - 50)
         if final_rate in {0, 100}:
@@ -710,10 +706,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             tempo = "优势明显，收束较快"
 
         return {
-            "player_win_rate": final_rate,
-            "outcome": outcome,
-            "ai_win_rate": ai_rate,
-            "desire_win_rate": desire_rate,
+            **odds,
             "battle_kind": battle_kind,
             "tempo": tempo,
             "force_reason": force_reason,

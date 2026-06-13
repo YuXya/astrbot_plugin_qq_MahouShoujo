@@ -7,6 +7,7 @@ import types
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 
 class _Logger:
@@ -31,6 +32,9 @@ from src.application.services.action_turn_application_service import (  # noqa: 
     ActionTurnApplicationService,
 )
 from src.domain.models.data_models import ActionTurnResult  # noqa: E402
+from src.domain.services.battle_outcome_service import (  # noqa: E402
+    resolve_battle_outcome,
+)
 from src.infrastructure.event_book.engine import EventBookEngine  # noqa: E402
 from src.infrastructure.analysis.analyzers.battle_diary_analyzer import (  # noqa: E402
     BattleDiaryAnalyzer,
@@ -147,11 +151,19 @@ class EventContextTests(unittest.TestCase):
         )
         return service
 
-    def test_threshold_50_is_success_and_49_is_obstacle(self):
-        success = self._service()._active_event_context(_runtime(ai=50, desire=50))
-        obstacle = self._service()._active_event_context(_runtime(ai=49, desire=49))
+    def test_dice_equal_to_rate_is_success_and_higher_dice_is_obstacle(self):
+        success = self._service()._active_event_context(
+            _runtime(ai=70, desire=70),
+            battle_odds={"dice_roll": 70},
+        )
+        obstacle = self._service()._active_event_context(
+            _runtime(ai=70, desire=70),
+            battle_odds={"dice_roll": 71},
+        )
         self.assertEqual(success["event_outcome"]["result"], "success")
         self.assertEqual(obstacle["event_outcome"]["result"], "obstacle")
+        self.assertEqual(success["battle_odds"]["dice_roll"], 70)
+        self.assertEqual(obstacle["battle_odds"]["dice_roll"], 71)
         self.assertEqual(success["scene_event"]["content"], "最新版正文")
 
     def test_active_context_only_exposes_full_target_once(self):
@@ -231,12 +243,13 @@ class EventSaveTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def _save(self, patch, *, runtime=None):
+    def _save(self, patch, *, runtime=None, battle_odds=None):
         return self.repo.save_action_turn_result(
             group_id="g1",
             user_id="u1",
             result=ActionTurnResult(story_text="测试正文", json_patch=patch),
             event_runtime=runtime,
+            battle_odds=battle_odds,
         )
 
     def test_start_continue_and_end_event(self):
@@ -300,6 +313,20 @@ class EventSaveTests(unittest.TestCase):
         ended = self._save([{"op": "remove", "path": "/进程/当前事件"}])
         self.assertEqual(ended["进程"]["阶段"], "日常")
         self.assertNotIn("当前事件", ended["进程"])
+
+    def test_log_uses_supplied_battle_odds(self):
+        odds = {
+            "player_win_rate": 70,
+            "dice_roll": 71,
+            "outcome": "player_lose",
+        }
+        with patch.object(self.repo, "append_log") as append_log:
+            self._save([], runtime=_runtime(turn_count=0), battle_odds=odds)
+
+        log_entry = append_log.call_args.args[2]
+        self.assertEqual(log_entry["event_win_rate"], 70)
+        self.assertEqual(log_entry["event_dice_roll"], 71)
+        self.assertEqual(log_entry["event_outcome"], "obstacle")
 
 
 class _ActiveEventRepository:
@@ -366,6 +393,56 @@ class ActiveEventFlowTests(unittest.IsolatedAsyncioTestCase):
             "monster",
         )
         self.assertEqual(result.result.selected_targets[0]["name"], "测试魔物")
+        self.assertIs(
+            service.save_repository.saved["battle_odds"],
+            service.llm_analyzer.selection_context["battle_odds"],
+        )
+
+
+class BattleOutcomeTests(unittest.TestCase):
+    def test_roll_boundaries_and_upset_results(self):
+        with patch(
+            "src.domain.services.battle_outcome_service.random.randint",
+            side_effect=[20, 80],
+        ) as randint:
+            low_rate_win = resolve_battle_outcome(30, 30)
+            high_rate_loss = resolve_battle_outcome(70, 70)
+
+        self.assertEqual(randint.call_args_list[0].args, (20, 80))
+        self.assertEqual(low_rate_win["dice_roll"], 20)
+        self.assertEqual(low_rate_win["outcome"], "player_win")
+        self.assertEqual(high_rate_loss["dice_roll"], 80)
+        self.assertEqual(high_rate_loss["outcome"], "player_lose")
+
+    def test_force_lose_ignores_favorable_roll(self):
+        odds = resolve_battle_outcome(100, 100, dice_roll=20, force_lose=True)
+
+        self.assertEqual(odds["player_win_rate"], 100)
+        self.assertEqual(odds["dice_roll"], 20)
+        self.assertEqual(odds["outcome"], "player_lose")
+
+    def test_first_event_context_preserves_forced_loss(self):
+        service = EventContextTests()._service()
+        context = service._active_event_context(
+            _runtime(ai=100, desire=100),
+            battle_odds={"dice_roll": 20, "outcome": "player_lose"},
+        )
+
+        self.assertEqual(context["battle_odds"]["dice_roll"], 20)
+        self.assertEqual(context["event_outcome"]["result"], "obstacle")
+
+    def test_active_event_rerolls_once_per_context(self):
+        service = EventContextTests()._service()
+        with patch(
+            "src.domain.services.battle_outcome_service.random.randint",
+            side_effect=[20, 80],
+        ) as randint:
+            first = service._active_event_context(_runtime(ai=50, desire=50))
+            second = service._active_event_context(_runtime(ai=50, desire=50))
+
+        self.assertEqual(randint.call_count, 2)
+        self.assertEqual(first["battle_odds"]["outcome"], "player_win")
+        self.assertEqual(second["battle_odds"]["outcome"], "player_lose")
 
 
 class ActionTurnCardTests(unittest.TestCase):

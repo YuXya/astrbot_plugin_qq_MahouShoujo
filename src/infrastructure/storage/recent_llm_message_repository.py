@@ -12,7 +12,7 @@ from ...utils.logger import logger
 
 
 class RecentLLMMessageRepository:
-    DEFAULT_LIMIT = 3
+    DEFAULT_LIMIT = 12
     MAX_LIMIT = 100
     PLUGIN_NAME = "astrbot_plugin_qq_MahouShoujo"
     _lock = threading.Lock()
