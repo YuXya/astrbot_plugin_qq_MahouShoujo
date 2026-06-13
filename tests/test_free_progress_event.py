@@ -1018,6 +1018,78 @@ class ActionTurnCardTests(unittest.TestCase):
         self.assertIn("等级：10", html)
         self.assertNotIn("进度：10", html)
 
+    def test_action_card_only_displays_current_event_reason(self):
+        generator = ReportGenerator.__new__(ReportGenerator)
+        reason = "优夏主动要求更刺激的玩法，小百将她带到无人的家政教室进行暴露与忍耐测试"
+        result = ActionTurnResult(
+            story_text="测试正文",
+            json_patch=[
+                {
+                    "op": "replace",
+                    "path": "/进程/当前事件/scene_event",
+                    "value": {
+                        "id": "free_action_760a5d15a7ac400eb73a9a43dc15e3da",
+                        "title": "家政教室的暴露调教——小百的忍耐测试",
+                        "reason": reason,
+                    },
+                },
+                {"op": "delta", "path": "/进程/当前事件/turn_count", "value": 1},
+                {
+                    "op": "replace",
+                    "path": "/进程/当前事件/selected_targets",
+                    "value": [{"id": "target", "name": "后台目标"}],
+                },
+                {"op": "replace", "path": "/进程/阶段", "value": "事件"},
+                {"op": "replace", "path": "/主角/临时状态", "value": "紧张"},
+            ],
+        )
+
+        html = generator._render_action_turn_html(result)
+
+        self.assertIn(reason, html)
+        self.assertNotIn(f"reason：{reason}", html)
+        self.assertNotIn("家政教室的暴露调教", html)
+        self.assertNotIn("free_action_760a5d15a7ac400eb73a9a43dc15e3da", html)
+        self.assertNotIn("turn_count", html)
+        self.assertNotIn("后台目标", html)
+        self.assertIn("阶段：事件", html)
+        self.assertIn("临时状态：紧张", html)
+
+    def test_action_card_supports_nested_current_event_reason_and_hides_empty_reason(self):
+        generator = ReportGenerator.__new__(ReportGenerator)
+        displayed = ReportGenerator._action_patch_display_items(
+            [
+                {
+                    "op": "replace",
+                    "path": "/进程/当前事件",
+                    "value": {
+                        "scene_event": {
+                            "id": "event",
+                            "title": "后台标题",
+                            "reason": "整体事件原因",
+                        },
+                        "turn_count": 2,
+                    },
+                },
+                {
+                    "op": "replace",
+                    "path": "/进程/当前事件/scene_event/reason",
+                    "value": "直接原因",
+                },
+                {
+                    "op": "replace",
+                    "path": "/进程/当前事件/scene_event",
+                    "value": {"id": "empty", "reason": "  "},
+                },
+                {"op": "replace", "path": "/进程/当前事件/scene_event/id", "value": "hidden"},
+            ]
+        )
+
+        self.assertEqual(
+            [generator._format_action_patch(item) for item in displayed],
+            ["整体事件原因", "直接原因"],
+        )
+
     def test_object_patch_is_saved_as_one_object(self):
         repo = PlayerSaveRepository.__new__(PlayerSaveRepository)
         state = {"主角": {"标签": {"旧字段": "旧值"}}}

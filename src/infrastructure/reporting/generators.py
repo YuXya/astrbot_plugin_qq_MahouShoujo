@@ -536,6 +536,8 @@ h1 {{
 
     @classmethod
     def _format_action_patch(cls, item: dict[str, Any]) -> str:
+        if item.get("_display_value_only"):
+            return html_lib.escape(cls._display_patch_value(item))
         delta_text = cls._format_numeric_delta_patch(item)
         if delta_text:
             return html_lib.escape(delta_text)
@@ -573,6 +575,12 @@ h1 {{
         for patch in patches if isinstance(patches, list) else []:
             if not isinstance(patch, dict) or not cls._should_display_action_patch(patch):
                 continue
+            parts = cls._json_path_parts(patch.get("path"))
+            if parts[:2] == ["进程", "当前事件"]:
+                reason_item = cls._current_event_reason_display_item(patch, parts)
+                if reason_item:
+                    displayed.append(reason_item)
+                continue
             value = patch.get("value")
             if isinstance(value, dict) and value:
                 base_path = str(patch.get("path") or "").rstrip("/")
@@ -590,6 +598,31 @@ h1 {{
             else:
                 displayed.append(patch)
         return displayed
+
+    @staticmethod
+    def _current_event_reason_display_item(
+        patch: dict[str, Any],
+        parts: list[str],
+    ) -> dict[str, Any] | None:
+        value = patch.get("value")
+        reason: object = None
+        if parts == ["进程", "当前事件"] and isinstance(value, dict):
+            scene_event = value.get("scene_event")
+            if isinstance(scene_event, dict):
+                reason = scene_event.get("reason")
+        elif parts == ["进程", "当前事件", "scene_event"] and isinstance(value, dict):
+            reason = value.get("reason")
+        elif parts == ["进程", "当前事件", "scene_event", "reason"]:
+            reason = value
+
+        reason_text = str(reason or "").strip()
+        if not reason_text:
+            return None
+        return {
+            **patch,
+            "_display_value_only": True,
+            "value": reason_text,
+        }
 
     @staticmethod
     def _should_display_action_patch(item: dict[str, Any]) -> bool:
