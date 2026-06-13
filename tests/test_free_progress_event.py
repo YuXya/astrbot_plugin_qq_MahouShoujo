@@ -137,7 +137,7 @@ class EventBookLookupTests(unittest.TestCase):
         self.assertEqual(candidates[0]["keys"], ["逛街"])
 
 
-class MagicalBattlePromptCandidateTests(unittest.TestCase):
+class SelectionPromptCandidateTests(unittest.TestCase):
     def test_candidate_views_only_keep_selection_fields(self):
         scene_events = BattleDiaryAnalyzer._prompt_scene_event_candidates(
             [
@@ -178,6 +178,50 @@ class MagicalBattlePromptCandidateTests(unittest.TestCase):
         self.assertNotIn("event_gimmick", compact)
         self.assertNotIn("battle_gimmick", compact)
         self.assertNotIn("\n", compact)
+
+    def test_daily_context_prompt_uses_compact_candidate_views(self):
+        template = "events={{scene_events_json}}\nmonsters={{monster_candidates_json}}"
+
+        def render_prompt(name, variables):
+            text = template
+            for key, value in variables.items():
+                text = text.replace("{{" + key + "}}", str(value))
+            return text
+
+        analyzer = BattleDiaryAnalyzer.__new__(BattleDiaryAnalyzer)
+        analyzer.editable_manager = SimpleNamespace(render_prompt=render_prompt)
+        prompt = analyzer.build_teammate_completion_prompt(
+            action_text="自由行动",
+            player_data={},
+            logs=[],
+            cameo_memories=[],
+            candidates=[],
+            scene_event_candidates=[
+                {
+                    "id": "event-1",
+                    "title": "事件名称",
+                    "keys": ["关键词"],
+                    "location_tags": ["地点"],
+                    "compatible_monsters": ["魔物"],
+                    "content": "事件正文",
+                    "event_gimmick": "不应传入",
+                }
+            ],
+            monster_candidates=[
+                {
+                    "id": "monster-1",
+                    "name": "魔物名称",
+                    "keys": ["关键词"],
+                    "content": "魔物正文",
+                    "battle_gimmick": "不应传入",
+                }
+            ],
+        )
+
+        self.assertNotIn("event_gimmick", prompt)
+        self.assertNotIn("battle_gimmick", prompt)
+        self.assertIn('"title":"事件名称"', prompt)
+        self.assertIn('"name":"魔物名称"', prompt)
 
 
 class PureLlmSelectionTests(unittest.IsolatedAsyncioTestCase):

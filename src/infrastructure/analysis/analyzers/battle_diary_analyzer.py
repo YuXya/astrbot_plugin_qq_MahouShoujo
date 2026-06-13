@@ -513,25 +513,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             [
                 prompt,
                 (
-                    "日常事件与魔物候选补充：\n"
-                    "从 scene_events 中选择一个适合本次指令和行动的 scene_event；"
-                    "没有合适事件时写 null。\n"
-                    "如果本次日常确实需要轻量异常、魔物、污染源或怪异参与，"
-                    "从 monsters 中选择 selected_targets；普通生活日常不需要额外目标时写 []。\n"
-                    "只能从候选中选择，不要编造。\n"
-                    + self._json_dump(
-                        {
-                            "scene_events": scene_event_candidates,
-                            "monsters": monster_candidates,
-                        }
-                    )
-                ),
-            ]
-        )
-        prompt = self._join_optional_prompt_parts(
-            [
-                prompt,
-                (
                     "请同时输出 action_target，用于【行动目标判断】。格式：\n"
                     "{\n"
                     '  "action_target": {\n'
@@ -625,8 +606,12 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "candidates_json": self._json_dump(
                     self._prompt_protagonist_profiles(candidates)
                 ),
-                "scene_events_json": self._json_dump(scene_event_candidates or []),
-                "monster_candidates_json": self._json_dump(monster_candidates or []),
+                "scene_events_json": self._compact_json_dump(
+                    self._prompt_scene_event_candidates(scene_event_candidates or [])
+                ),
+                "monster_candidates_json": self._compact_json_dump(
+                    self._prompt_monster_candidates(monster_candidates or [])
+                ),
             },
         )
 
