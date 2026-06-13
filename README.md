@@ -1,6 +1,6 @@
 # QQ 魔法少女转生人物卡
 
-这是一个 AstrBot 插件，用于在群聊中生成"魔法少女转生人物卡"和后续"战斗日记"。玩家可以先建档，再通过命令推进自己的魔法少女生活；插件会把角色档案、状态、战斗记录和其他玩家互动保存到本地存档中。
+这是一个 AstrBot 插件，用于在群聊中生成魔法少女转生人物卡并通过行动回合推进故事。插件会把角色档案、状态、行动记录和其他玩家互动保存到本地存档中。
 
 ## 玩家命令
 
@@ -8,19 +8,15 @@
 /魔法少女帮助
 /魔法少女转生
 /魔法少女转生 想成为会治疗魔法的小法师
-/魔法少女战斗
-/魔法少女战斗 去森林边缘采集草药
-/魔法少女日常
-/魔法少女日常 和某个参与对象一起去买甜点
+/魔法少女行动
+/魔法少女行动 和某个参与对象一起去买甜点
 /魔法少女存档删除
 /魔法少女存档删除 确认
 ```
 
 - `/魔法少女帮助`：显示玩家可用命令、新手用法和角色档案面板地址。
 - `/魔法少女转生`：创建角色档案。命令后可填写补充偏好，影响角色设定。
-- `/魔法少女战斗`：读取玩家自己的存档、状态、最近战斗日志、其他人与主角的交互、世界书/状态书/技能书/性癖书，然后生成一次战斗日记。命令后可写本次行动；不写行动时由 LLM 根据当前状态自由生成。
-- `/魔法少女日常`：与战斗日记共用存档、参与对象识别、关系总结和保存流程，但使用独立的日常 Prompt。命令后可写本次日常行动；不写行动时由 LLM 根据当前状态自由生成。
-- `/魔法少女战斗 行动目标`：生成正文前会先选择完整战斗上下文；本城市魔法少女、普通魔物、异常或污染源都可能作为本次行动目标，关系由正文自然呈现。
+- `/魔法少女行动`：读取玩家存档、行动记忆、其他人与主角的交互和设定书，按当前剧情阶段生成一次完整行动回合。
 - 公共魔物书是普通魔物目标图鉴。每个魔物使用正文、战斗机制、战斗胜利结尾和战斗失败结尾四个文本字段；关键词仍为列表。
 - 事件书按目标类型组织场景事件。每个事件使用正文、事件机制、顺利进行和受到阻碍四个文本字段；关键词、地点标签和兼容魔物仍为列表。
 - 每个群拥有独立的公元时间和行动对话序号。第一次行动发生在 `公元2020年4月1日`；每次成功保存 `/魔法少女行动` 都会记录群内连续的 `conversation_no`。事件完成时世界日期至少推进一天，剧情明确跨日时也可由行动结果推进多天。
@@ -32,7 +28,7 @@
 https://www.youxiajiang.com/Games/AIBot/
 ```
 
-创建完角色后，玩家可在面板中查看角色档案、状态、战斗记录和其他人与主角的交互。
+创建完角色后，玩家可在面板中查看角色档案、状态、行动记录和其他人与主角的交互。
 
 ## 管理员命令
 
@@ -57,8 +53,8 @@ data/plugin_data/astrbot_plugin_qq_MahouShoujo/saves/groups/{group_id}/users/{us
 
 - `index.json`：轻量索引，保存群号和角色名。列表和点名匹配优先读取它。
 - `profile.json`：转生人物卡、昵称等固定档案。
-- `battle_log.jsonl`：战斗日志。每一行是一条独立 JSON 记录。
-- `cameo_memory.jsonl`：客串记忆。别人日记中明确提到该角色时，会在这里追加一条互动记忆。
+- `daily_memory.jsonl`：行动记录与长期记忆摘要。每一行是一条独立 JSON 记录。
+- `cameo_memory.jsonl`：交互记忆。每次行动结束后，子任务 AI 会为正文中实际互动的其他玩家追加一条约 100 字客观摘要。
 - `world_clock.json`：群级世界时钟与绝对行动序号，保存 `next_day_offset` 和 `next_conversation_no`，位于群目录中，不属于单个玩家存档。
 
 同一个群的行动请求会通过群锁串行处理，确保世界日期和绝对行动序号不会重复；同一玩家的其他请求也会按玩家锁排队。
@@ -69,30 +65,11 @@ data/plugin_data/astrbot_plugin_qq_MahouShoujo/saves/groups/{group_id}/users/{us
 
 点名匹配第一版采用简单规则：`target_name in action_text`。为了降低成本，插件会先扫描同群玩家的 `index.json`；只有命中名字后，才读取该玩家完整的 `profile.json`、`state.json`、最近战斗和客串记忆。
 
-如果最终生成的 `encounter` 或 `result` 中出现某个 NPC 的名字，插件会给该 NPC 追加一条 `cameo_memory.jsonl`。这样即使该玩家没有主动战斗，也会因为其他人的日记逐渐积累互动记忆。
+每次 `/魔法少女行动` 结束后，插件会根据完整故事正文判断哪些候选玩家实际参与互动，并给这些玩家追加一条 `cameo_memory.jsonl` 客观摘要。
 
-## 战斗日记
+## 行动记录
 
-战斗日记要求 LLM 返回纯 JSON，并渲染成图片卡片。核心字段包括：
-
-```json
-{
-  "title": "魔法少女战斗日记",
-  "subtitle": "本次战斗副标题",
-  "target_name": "玩家角色名",
-  "action": "玩家本次行动",
-  "date_label": "第 N 次战斗",
-  "diary": "完整战斗日记正文",
-  "encounter": "本次主要遭遇",
-  "result": "本次事件结算",
-  "footer": "底部说明",
-  "update": {
-    "reason": "状态更新依据",
-    "changes": [
-    ]
-  }
-}
-```
+`/魔法少女行动` 要求 LLM 依次返回故事正文、`<行动选项>` 和 `<UpdateVariable>`。程序会把完整故事正文写入 `daily_memory.jsonl`，行动选项用于回复玩家，变量补丁用于更新当前状态。
 
 
 ## 世界书、状态书、技能书和性癖书
@@ -121,9 +98,9 @@ data/plugin_data/astrbot_plugin_qq_MahouShoujo/saves/groups/{group_id}/users/{us
 - 查看玩家列表。
 - 查看角色档案、状态概览、成长进度。
 - 技能、性癖和其他长期成长统一保存为 `{"进度": 0..100}`；达到 100 后封顶。
-- 查看战斗记录。
+- 查看行动记录。
 - 查看"其他人与主角的交互"。
-- 管理员删除玩家存档或删除单条战斗日志。
+- 管理员删除玩家存档或删除单条行动记录。
 - 管理员编辑、导出、导入玩家存档源码。
 - 管理员查看最近文本补全消息记录，并调整保留数量。默认保存最近 12 次发送给 AI 的完整消息和 AI 原始回复。
 
@@ -143,8 +120,9 @@ data/plugin_data/astrbot_plugin_qq_MahouShoujo/saves/groups/{group_id}/users/{us
 - `analysis_features.keep_original_persona`：是否保留原会话人格影响。
 - `analysis_features.use_plugin_specific_persona`：是否强制使用插件指定人格。
 - `analysis_features.plugin_specific_persona_id`：插件指定人格 ID。
-- `battle.diary_compress_interval` / `battle.diary_compress_count`：战斗记录压缩配置。默认每 10 条未压缩战斗，把最早 6 条交给 AI 压缩为一条"第 1-6 次战斗"范围摘要。
-- `battle.cameo_compress_interval` / `battle.cameo_compress_count`：其他人与主角的交互压缩配置。默认每 10 条交互记录，把最早 6 条交给 AI 压缩为一条范围摘要。
+- `battle.interaction_memory_target_chars`：每轮客观交互记忆的目标字数，默认 100。
+- `battle.memory_compaction_threshold_chars`：两类有效记忆正文合计达到该字数后触发长期记忆压缩，默认 20000，填 0 关闭。
+- `battle.memory_compaction_target_chars`：长期故事摘要目标字数，默认 2000。
 - `battle.use_mock_data`：静态假数据模式。
 - `t2i_rendering`：HTML 转图片策略。
 - `performance.max_concurrent_t2i`：最大并发渲染数。
@@ -161,5 +139,5 @@ data/plugin_data/astrbot_plugin_qq_MahouShoujo/saves/groups/{group_id}/users/{us
 4. 发送 `/魔法少女战斗 去森林边缘采集草药`，确认能生成日记卡并更新 `state.json`、`index.json` 和 `battle_log.jsonl`。
 5. 创建两个同出生地区玩家，确认日记 Prompt 能注入同地区 NPC。
 6. 使用 `/魔法少女战斗 去拯救某个角色名`，确认跨地区点名玩家也能被注入。
-7. 如果日记遭遇或结算里提到 NPC 名字，确认 NPC 的 `cameo_memory.jsonl` 有新增记录。
-8. 打开网页面板，确认能查看档案、战斗记录、其他人与主角的交互，并测试管理员导入/导出功能。
+7. 行动正文中让另一名玩家实际参与互动，确认该玩家的 `cameo_memory.jsonl` 有新增客观摘要。
+8. 打开网页面板，确认能查看档案、行动记录、其他人与主角的交互，并测试管理员导入/导出功能。

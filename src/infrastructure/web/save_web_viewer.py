@@ -2077,20 +2077,20 @@ class SaveWebViewer:
         log_note = (
             "删除单条记录只会移除 daily_memory.jsonl 中对应一行，不会回滚当前状态。"
             if is_admin
-            else "这里展示该存档最近的战斗记录。"
+            else "这里展示该存档的行动记录与长期记忆摘要。"
         )
         cameo_note = (
             "删除单条记录只会移除 cameo_memory.jsonl 中对应一行。"
             if is_admin
-            else "这里展示其他玩家日记里明确提到该角色的遭遇和结算。"
+            else "这里展示其他玩家与该角色实际互动后生成的客观摘要。"
         )
         log_clear_button = (
             self._player_clear_form(
                 group_id,
                 user_id,
                 "/player/log/clear",
-                "删除全部战斗记录",
-                "确定删除该玩家的全部战斗记录？当前状态不会自动回滚。",
+                "删除全部行动记录",
+                "确定删除该玩家的全部行动记录？当前状态不会自动回滚。",
             )
             if is_admin
             else ""
@@ -2143,7 +2143,7 @@ class SaveWebViewer:
             <section class="detail-panel">
               <div class="section-head">
                 <div>
-                  <h2>战斗记录</h2>
+                  <h2>行动记录</h2>
                   <p class="muted">{self._e(log_note)}</p>
                 </div>
                 {log_clear_button}
@@ -2839,18 +2839,17 @@ class SaveWebViewer:
         allow_delete: bool = False,
     ) -> str:
         if not logs:
-            return "<p class=\"muted empty-state\">还没有战斗记录。</p>"
+            return "<p class=\"muted empty-state\">还没有行动记录。</p>"
 
         cards: list[str] = []
         for display_index, log in enumerate(logs, start=1):
             log_index = int(log.get("_log_index", -1))
             raw_log_type = str(log.get("type", "log"))
             log_type = self._e(raw_log_type)
-            title = self._e(log.get("title") or log.get("message") or "战斗记录")
+            title = self._e(log.get("title") or log.get("message") or "行动记录")
             action = self._e(log.get("action") or "")
-            diary = self._e(log.get("diary") or "")
-            encounter = self._e(log.get("encounter") or "")
-            result = self._e(log.get("result") or log.get("message") or "")
+            diary = self._e(log.get("story_text") or log.get("summary") or "")
+            result = self._e(log.get("message") or "")
             changes = log.get("changes")
             if not isinstance(changes, list):
                 changes = log.get("rewards") if isinstance(log.get("rewards"), list) else []
@@ -2860,20 +2859,15 @@ class SaveWebViewer:
             world_date_html = f"<span>{self._e(world_date)}</span>" if world_date else ""
             action_html = f"<p class=\"log-action\">{action}</p>" if action else ""
             diary_html = f"<p class=\"log-result\">{diary}</p>" if diary else ""
-            encounter_html = (
-                f"<p class=\"log-action\">遭遇：{encounter}</p>"
-                if encounter
-                else ""
-            )
             changes_block = (
                 f"<div class=\"tag-row\">{change_html}</div>"
                 if change_html
                 else ""
             )
             delete_button = ""
-            if allow_delete and log_index >= 0 and raw_log_type == "battle_diary":
+            if allow_delete and log_index >= 0 and raw_log_type in {"action_turn", "memory_summary"}:
                 delete_button = f"""
-                  <form class="inline-form" method="post" action="{self._url('/player/log/delete')}" onsubmit="return confirm('确定删除这条战斗记录？当前 state 不会自动回滚。');">
+                  <form class="inline-form" method="post" action="{self._url('/player/log/delete')}" onsubmit="return confirm('确定删除这条行动记录？当前 state 不会自动回滚。');">
                     <input type="hidden" name="group_id" value="{self._e(group_id)}">
                     <input type="hidden" name="user_id" value="{self._e(user_id)}">
                     <input type="hidden" name="log_index" value="{log_index}">
@@ -2905,7 +2899,6 @@ class SaveWebViewer:
                     </div>
                     {action_html}
                     {diary_html}
-                    {encounter_html}
                     <p class="log-result">{result}</p>
                     {changes_block}
                   </div>
@@ -2927,21 +2920,11 @@ class SaveWebViewer:
         cards: list[str] = []
         for display_index, memory in enumerate(memories, start=1):
             title = self._e(memory.get("title") or "其他人与主角的交互")
-            source_name = self._e(
-                "多条交互摘要"
-                if memory.get("type") == "cameo_summary"
-                else self._cameo_source_label(memory) or "未知角色"
-            )
-            encounter = self._e(memory.get("encounter") or "")
-            result = self._e(memory.get("result") or "")
+            source_name = self._e(self._cameo_source_label(memory) or "未知角色")
+            summary = self._e(memory.get("summary") or "")
             created_at = self._format_time(memory.get("created_at"))
             world_date = self._world_date_display(memory)
             world_date_html = f"<span>{self._e(world_date)}</span>" if world_date else ""
-            encounter_html = (
-                f"<p class=\"log-action\">遭遇：{encounter}</p>"
-                if encounter
-                else ""
-            )
             delete_button = ""
             if allow_delete and memory.get("_log_index") is not None:
                 log_index = memory["_log_index"]
@@ -2976,8 +2959,7 @@ class SaveWebViewer:
                       {world_date_html}
                       <span>来源：{source_name}</span>
                     </div>
-                    {encounter_html}
-                    <p class="log-result">{result}</p>
+                    <p class="log-result">{summary}</p>
                   </div>
                 </details>
                 """

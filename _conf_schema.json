@@ -70,48 +70,37 @@
     "description": "魔法少女转生卡设置",
     "type": "object",
     "items": {
-      "diary_compress_interval": {
+      "interaction_memory_target_chars": {
         "type": "int",
-        "description": "每 N 次战斗触发一次战斗记录压缩",
-        "default": 10,
-        "hint": "普通未压缩战斗记录达到这个数量后，自动调用 AI 压缩更早的记录。填 0 表示关闭压缩。",
+        "description": "单轮交互记忆目标字数",
+        "default": 100,
+        "hint": "每次行动结束后，子任务 AI 为实际互动玩家生成的客观摘要目标字数。",
+        "slider": {
+          "min": 50,
+          "max": 500,
+          "step": 10
+        }
+      },
+      "memory_compaction_threshold_chars": {
+        "type": "int",
+        "description": "长期记忆大压缩触发字数",
+        "default": 20000,
+        "hint": "daily_memory.jsonl 与 cameo_memory.jsonl 的有效记忆正文合计超过该字数时触发。填 0 关闭。",
         "slider": {
           "min": 0,
-          "max": 100,
-          "step": 1
+          "max": 100000,
+          "step": 1000
         }
       },
-      "diary_compress_count": {
+      "memory_compaction_target_chars": {
         "type": "int",
-        "description": "每次压缩 M 条旧战斗记录",
-        "default": 6,
-        "hint": "触发压缩时，把最早的 M 条普通战斗日记压缩成一条范围摘要，例如第 1-6 次战斗。",
+        "description": "长期记忆摘要目标字数",
+        "default": 2000,
+        "hint": "触发大压缩后，子任务 AI 生成的长期故事摘要目标字数。",
         "slider": {
-          "min": 1,
-          "max": 50,
-          "step": 1
-        }
-      },
-      "cameo_compress_interval": {
-        "type": "int",
-        "description": "每 N 条交互记录触发一次压缩",
-        "default": 10,
-        "hint": "其他人与主角的交互记录达到这个数量后，自动调用 AI 压缩更早的记录。填 0 表示关闭压缩。",
-        "slider": {
-          "min": 0,
-          "max": 100,
-          "step": 1
-        }
-      },
-      "cameo_compress_count": {
-        "type": "int",
-        "description": "每次压缩 M 条旧交互记录",
-        "default": 6,
-        "hint": "触发压缩时，把最早的 M 条交互记录压缩成一条范围摘要。",
-        "slider": {
-          "min": 1,
-          "max": 50,
-          "step": 1
+          "min": 500,
+          "max": 10000,
+          "step": 100
         }
       },
       "teammate_recent_record_count": {

@@ -858,225 +858,113 @@ class PlayerSaveRepository:
         except Exception:
             return 0
 
-    # ── 日志压缩 ──────────────────────────────────
+    # ── 长期记忆压缩 ──────────────────────────────
 
-    def maybe_compress_battle_logs(
+    def prepare_memory_compaction(
         self,
         group_id: str,
         user_id: str,
         *,
-        interval: int,
-        compress_count: int,
+        threshold_chars: int,
+    ) -> dict[str, Any] | None:
+        if threshold_chars <= 0:
+            return None
+        user_dir = self.get_user_dir(group_id, user_id)
+        daily = self._memory_records(user_dir / "daily_memory.jsonl", "daily")
+        cameo = self._memory_records(user_dir / "cameo_memory.jsonl", "cameo")
+        total_chars = sum(len(item["text"]) for item in daily + cameo)
+        if total_chars <= threshold_chars:
+            return None
+
+        old_daily, latest_daily = daily[:-1], daily[-1:]
+        old_cameo, latest_cameo = cameo[:-1], cameo[-1:]
+        records = old_daily + old_cameo
+        if not records:
+            return None
+        records.sort(key=lambda item: self._memory_record_sort_key(item["record"]))
+        return {
+            "total_chars": total_chars,
+            "records": [
+                {
+                    "kind": item["kind"],
+                    "world_date": item["record"].get("world_date", ""),
+                    "title": item["record"].get("title", ""),
+                    "text": item["text"],
+                }
+                for item in records
+            ],
+            "latest_daily": [item["record"] for item in latest_daily],
+            "latest_cameo": [item["record"] for item in latest_cameo],
+            "compressed_count": len(records),
+            "first_record": records[0]["record"],
+            "last_record": records[-1]["record"],
+        }
+
+    def apply_memory_compaction(
+        self,
+        group_id: str,
+        user_id: str,
+        *,
+        prepared: dict[str, Any],
         summary_text: str,
     ) -> bool:
-        if interval <= 0 or compress_count <= 0 or compress_count >= interval:
+        summary = str(summary_text or "").strip()
+        if not summary or not prepared.get("records"):
             return False
-        text = str(summary_text or "").strip()
-        if not text:
-            return False
+        first = prepared.get("first_record", {})
+        last = prepared.get("last_record", {})
+        summary_record = {
+            "type": "memory_summary",
+            "created_at": self._now_ms(),
+            "title": self._world_date_range_title(first, last),
+            "summary": summary,
+            "compressed_count": int(prepared.get("compressed_count", 0) or 0),
+        }
+        self._copy_world_date_range(summary_record, first, last)
 
         user_dir = self.get_user_dir(group_id, user_id)
-        log_path = user_dir / "daily_memory.jsonl"
-        if not log_path.exists():
-            # 兼容旧文件名
-            log_path = user_dir / "battle_log.jsonl"
-        if not log_path.exists():
-            return False
+        user_dir.mkdir(parents=True, exist_ok=True)
+        self._atomic_write_jsonl(
+            user_dir / "daily_memory.jsonl",
+            [summary_record, *prepared.get("latest_daily", [])],
+        )
+        self._atomic_write_jsonl(
+            user_dir / "cameo_memory.jsonl",
+            prepared.get("latest_cameo", []),
+        )
+        return True
 
+    def _memory_records(self, path: Path, kind: str) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        for item in self._read_recent_logs(path, limit=0):
+            if kind == "daily":
+                text = str(item.get("story_text") or item.get("summary") or "").strip()
+                valid = item.get("type") in ("action_turn", "memory_summary")
+            else:
+                text = str(item.get("summary") or "").strip()
+                valid = item.get("type") == "interaction_memory"
+            if valid and text:
+                clean = {key: value for key, value in item.items() if key != "_log_index"}
+                records.append({"kind": kind, "text": text, "record": clean})
+        return records
+
+    @staticmethod
+    def _memory_record_sort_key(record: dict[str, Any]) -> tuple[int, int]:
+        day = record.get("world_day_offset_from", record.get("world_day_offset", 0))
         try:
-            raw_lines = log_path.read_text(encoding="utf-8").splitlines()
-        except Exception as exc:
-            logger.warning(f"读取战斗日志失败，跳过压缩: {log_path} {exc}")
-            return False
+            day_value = int(day or 0)
+        except (TypeError, ValueError):
+            day_value = 0
+        return day_value, int(record.get("created_at", 0) or 0)
 
-        parsed: list[dict[str, Any] | None] = []
-        compressible: list[tuple[int, dict[str, Any]]] = []
-        battle_ordinal = 0
-        for index, line in enumerate(raw_lines):
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError:
-                parsed.append(None)
-                continue
-            if not isinstance(item, dict):
-                parsed.append(None)
-                continue
-            parsed.append(item)
-            log_type = item.get("type")
-            if log_type == "battle_summary":
-                battle_ordinal = max(
-                    battle_ordinal,
-                    int(item.get("battle_to", 0) or 0),
-                )
-                compressible.append((index, item))
-            elif log_type == "battle_diary":
-                battle_ordinal += 1
-                compressible.append((index, item))
-
-        if len(compressible) < interval:
-            return False
-
-        selected = compressible[:compress_count]
-        selected_indices = {index for index, _item in selected}
-        first_ordinal = self._battle_ordinal_from_for_log(raw_lines, selected[0][0])
-        last_ordinal = self._battle_ordinal_to_for_log(raw_lines, selected[-1][0])
-        summary_record = {
-            "type": "battle_summary",
-            "created_at": self._now_ms(),
-            "title": self._world_date_range_title(selected[0][1], selected[-1][1]),
-            "date_label": self._world_date_range_title(selected[0][1], selected[-1][1]),
-            "battle_from": first_ordinal,
-            "battle_to": last_ordinal,
-            "compressed_count": len(selected),
-            "result": text,
-        }
-        self._copy_world_date_range(summary_record, selected[0][1], selected[-1][1])
-
-        next_lines: list[str] = []
-        inserted = False
-        for index, line in enumerate(raw_lines):
-            if index in selected_indices:
-                if not inserted:
-                    next_lines.append(json.dumps(summary_record, ensure_ascii=False))
-                    inserted = True
-                continue
-            next_lines.append(line)
-
-        tmp_path = log_path.with_suffix(log_path.suffix + ".tmp")
-        output = "\n".join(next_lines)
+    @staticmethod
+    def _atomic_write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
+        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        output = "\n".join(json.dumps(item, ensure_ascii=False) for item in records)
         if output:
             output += "\n"
         tmp_path.write_text(output, encoding="utf-8")
-        tmp_path.replace(log_path)
-        return True
-
-    def get_battle_logs_for_compression(
-        self,
-        group_id: str,
-        user_id: str,
-        *,
-        interval: int,
-        compress_count: int,
-    ) -> list[dict[str, Any]]:
-        if interval <= 0 or compress_count <= 0 or compress_count >= interval:
-            return []
-        user_dir = self.get_user_dir(group_id, user_id)
-        log_path = user_dir / "daily_memory.jsonl"
-        if not log_path.exists():
-            log_path = user_dir / "battle_log.jsonl"
-        logs = self._read_recent_logs(log_path, limit=0)
-        compressible = [
-            item
-            for item in logs
-            if isinstance(item, dict)
-            and item.get("type") in ("battle_diary", "battle_summary")
-        ]
-        if len(compressible) < interval:
-            return []
-        return compressible[:compress_count]
-
-    def maybe_compress_cameo_memories(
-        self,
-        group_id: str,
-        user_id: str,
-        *,
-        interval: int,
-        compress_count: int,
-        summary_text: str,
-    ) -> bool:
-        if interval <= 0 or compress_count <= 0 or compress_count >= interval:
-            return False
-        text = str(summary_text or "").strip()
-        if not text:
-            return False
-
-        log_path = self.get_user_dir(group_id, user_id) / "cameo_memory.jsonl"
-        if not log_path.exists():
-            return False
-
-        try:
-            raw_lines = log_path.read_text(encoding="utf-8").splitlines()
-        except Exception as exc:
-            logger.warning(f"读取互动记录失败，跳过压缩: {log_path} {exc}")
-            return False
-
-        compressible: list[tuple[int, dict[str, Any]]] = []
-        interaction_ordinal = 0
-        for index, line in enumerate(raw_lines):
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(item, dict):
-                continue
-            log_type = item.get("type")
-            if log_type == "cameo_summary":
-                interaction_ordinal = max(
-                    interaction_ordinal,
-                    int(item.get("interaction_to", 0) or 0),
-                )
-                compressible.append((index, item))
-            elif log_type == "cameo_memory":
-                interaction_ordinal += 1
-                compressible.append((index, item))
-
-        if len(compressible) < interval:
-            return False
-
-        selected = compressible[:compress_count]
-        selected_indices = {index for index, _item in selected}
-        first_ordinal = self._cameo_ordinal_from_for_log(raw_lines, selected[0][0])
-        last_ordinal = self._cameo_ordinal_to_for_log(raw_lines, selected[-1][0])
-        summary_record = {
-            "type": "cameo_summary",
-            "created_at": self._now_ms(),
-            "title": self._world_date_range_title(selected[0][1], selected[-1][1]),
-            "interaction_from": first_ordinal,
-            "interaction_to": last_ordinal,
-            "compressed_count": len(selected),
-            "result": text,
-        }
-        self._copy_world_date_range(summary_record, selected[0][1], selected[-1][1])
-
-        next_lines: list[str] = []
-        inserted = False
-        for index, line in enumerate(raw_lines):
-            if index in selected_indices:
-                if not inserted:
-                    next_lines.append(json.dumps(summary_record, ensure_ascii=False))
-                    inserted = True
-                continue
-            next_lines.append(line)
-
-        tmp_path = log_path.with_suffix(log_path.suffix + ".tmp")
-        output = "\n".join(next_lines)
-        if output:
-            output += "\n"
-        tmp_path.write_text(output, encoding="utf-8")
-        tmp_path.replace(log_path)
-        return True
-
-    def get_cameo_memories_for_compression(
-        self,
-        group_id: str,
-        user_id: str,
-        *,
-        interval: int,
-        compress_count: int,
-    ) -> list[dict[str, Any]]:
-        if interval <= 0 or compress_count <= 0 or compress_count >= interval:
-            return []
-        log_path = self.get_user_dir(group_id, user_id) / "cameo_memory.jsonl"
-        memories = self._read_recent_logs(log_path, limit=0)
-        compressible = [
-            item
-            for item in memories
-            if isinstance(item, dict)
-            and item.get("type") in ("cameo_memory", "cameo_summary")
-        ]
-        if len(compressible) < interval:
-            return []
-        return compressible[:compress_count]
+        tmp_path.replace(path)
 
     # ── 日志追加 ──────────────────────────────────
 
@@ -1089,7 +977,7 @@ class PlayerSaveRepository:
         with log_path.open("a", encoding="utf-8") as file:
             file.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
-    def append_cameo_memory(
+    def append_interaction_memory(
         self,
         group_id: str,
         npc_user_id: str,
@@ -1099,7 +987,7 @@ class PlayerSaveRepository:
         user_dir.mkdir(parents=True, exist_ok=True)
         log_path = user_dir / "cameo_memory.jsonl"
         payload = dict(record)
-        payload["type"] = "cameo_memory"
+        payload["type"] = "interaction_memory"
         payload.setdefault("created_at", self._now_ms())
         with log_path.open("a", encoding="utf-8") as file:
             file.write(json.dumps(payload, ensure_ascii=False) + "\n")
@@ -1706,7 +1594,7 @@ class PlayerSaveRepository:
                     continue
                 if (
                     isinstance(item, dict)
-                    and item.get("type") == "cameo_memory"
+                    and item.get("type") == "interaction_memory"
                     and self._safe_id(item.get("source_user_id", "")) == source_user
                 ):
                     removed_count += 1
@@ -2698,96 +2586,6 @@ class PlayerSaveRepository:
                 continue
         return logs
 
-    def _battle_ordinal_for_log(self, raw_lines: list[str], target_index: int) -> int:
-        ordinal = 0
-        for index, line in enumerate(raw_lines):
-            if index > target_index:
-                break
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(item, dict):
-                continue
-            if item.get("type") == "battle_summary":
-                ordinal = max(ordinal, int(item.get("battle_to", 0) or 0))
-            elif item.get("type") == "battle_diary":
-                ordinal += 1
-        return max(1, ordinal)
-
-    def _battle_ordinal_from_for_log(self, raw_lines: list[str], target_index: int) -> int:
-        try:
-            item = json.loads(raw_lines[target_index])
-            if isinstance(item, dict) and item.get("type") == "battle_summary":
-                from_val = int(item.get("battle_from", 0) or 0)
-                if from_val > 0:
-                    return from_val
-        except (json.JSONDecodeError, IndexError):
-            pass
-        return self._battle_ordinal_for_log(raw_lines, target_index)
-
-    def _battle_ordinal_to_for_log(self, raw_lines: list[str], target_index: int) -> int:
-        try:
-            item = json.loads(raw_lines[target_index])
-            if isinstance(item, dict) and item.get("type") == "battle_summary":
-                to_val = int(item.get("battle_to", 0) or 0)
-                if to_val > 0:
-                    return to_val
-        except (json.JSONDecodeError, IndexError):
-            pass
-        return self._battle_ordinal_for_log(raw_lines, target_index)
-
-    def _cameo_ordinal_for_log(self, raw_lines: list[str], target_index: int) -> int:
-        ordinal = 0
-        for index, line in enumerate(raw_lines):
-            if index > target_index:
-                break
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(item, dict):
-                continue
-            if item.get("type") == "cameo_summary":
-                ordinal = max(ordinal, int(item.get("interaction_to", 0) or 0))
-            elif item.get("type") == "cameo_memory":
-                ordinal += 1
-        return max(1, ordinal)
-
-    def _cameo_ordinal_from_for_log(self, raw_lines: list[str], target_index: int) -> int:
-        try:
-            item = json.loads(raw_lines[target_index])
-            if isinstance(item, dict) and item.get("type") == "cameo_summary":
-                from_val = int(item.get("interaction_from", 0) or 0)
-                if from_val > 0:
-                    return from_val
-        except (json.JSONDecodeError, IndexError):
-            pass
-        return self._cameo_ordinal_for_log(raw_lines, target_index)
-
-    def _cameo_ordinal_to_for_log(self, raw_lines: list[str], target_index: int) -> int:
-        try:
-            item = json.loads(raw_lines[target_index])
-            if isinstance(item, dict) and item.get("type") == "cameo_summary":
-                to_val = int(item.get("interaction_to", 0) or 0)
-                if to_val > 0:
-                    return to_val
-        except (json.JSONDecodeError, IndexError):
-            pass
-        return self._cameo_ordinal_for_log(raw_lines, target_index)
-
-    def _read_last_battle_summary(self, path: Path) -> dict[str, Any]:
-        for item in reversed(self._read_recent_logs(path, limit=80)):
-            if item.get("type") != "battle_diary":
-                continue
-            return {
-                "encounter": item.get("encounter", ""),
-                "result": item.get("result", ""),
-                "created_at": item.get("created_at", 0),
-                "world_date": item.get("world_date", ""),
-            }
-        return {}
-
     def _read_recent_cameo_memories(self, path: Path, limit: int = 5) -> list[dict[str, Any]]:
         memories = [
             {
@@ -2798,8 +2596,7 @@ class PlayerSaveRepository:
                 "source_age": item.get("source_age", ""),
                 "source_identity": item.get("source_identity", ""),
                 "source_magical_name": item.get("source_magical_name", ""),
-                "encounter": item.get("encounter", ""),
-                "result": item.get("result", ""),
+                "summary": item.get("summary", ""),
                 "title": item.get("title", ""),
                 "world_day_offset": item.get("world_day_offset"),
                 "world_date": item.get("world_date", ""),
@@ -2809,7 +2606,7 @@ class PlayerSaveRepository:
                 "_log_index": item.get("_log_index"),
             }
             for item in self._read_recent_logs(path, limit=max(limit * 4, limit))
-            if item.get("type") in ("cameo_memory", "cameo_summary")
+            if item.get("type") == "interaction_memory"
         ]
         return memories[-limit:]
 

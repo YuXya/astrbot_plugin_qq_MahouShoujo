@@ -22,6 +22,8 @@ class EditableResourceManager:
         "magical_battle_target_selection_prompt": "prompts/magical_girl/battle_target_selection_prompt.txt",
         "action_turn_prompt": "prompts/magical_girl/action_turn_prompt.txt",
         "relationship_summary_prompt": "prompts/relationship_summary_prompt.txt",
+        "interaction_memory_summary_prompt": "prompts/interaction_memory_summary_prompt.txt",
+        "memory_compaction_prompt": "prompts/memory_compaction_prompt.txt",
         "teammate_completion_prompt": "prompts/teammate_completion_prompt.txt",
         "default_system_prompt": "prompts/default_system_prompt.txt",
     }
@@ -294,6 +296,18 @@ class EditableResourceManager:
                 "category": "text_completion",
             },
             {
+                "id": self.PROMPT_FILES["interaction_memory_summary_prompt"],
+                "label": "交互记忆总结 Prompt",
+                "type": "text",
+                "category": "text_completion",
+            },
+            {
+                "id": self.PROMPT_FILES["memory_compaction_prompt"],
+                "label": "长期记忆压缩 Prompt",
+                "type": "text",
+                "category": "text_completion",
+            },
+            {
                 "id": self.PROMPT_FILES["teammate_completion_prompt"],
                 "label": "参与对象语义识别 Prompt",
                 "type": "text",
@@ -319,6 +333,8 @@ class EditableResourceManager:
             self.PROMPT_FILES["magical_battle_target_selection_prompt"]: defaults.MAGICAL_BATTLE_TARGET_SELECTION_PROMPT,
             self.PROMPT_FILES["action_turn_prompt"]: defaults.ACTION_TURN_PROMPT,
             self.PROMPT_FILES["relationship_summary_prompt"]: defaults.RELATIONSHIP_SUMMARY_PROMPT,
+            self.PROMPT_FILES["interaction_memory_summary_prompt"]: defaults.INTERACTION_MEMORY_SUMMARY_PROMPT,
+            self.PROMPT_FILES["memory_compaction_prompt"]: defaults.MEMORY_COMPACTION_PROMPT,
             self.PROMPT_FILES["teammate_completion_prompt"]: defaults.TEAMMATE_COMPLETION_PROMPT,
             self.PROMPT_FILES["default_system_prompt"]: defaults.DEFAULT_SYSTEM_PROMPT,
         }
@@ -366,6 +382,13 @@ class EditableResourceManager:
                 "可用变量：{{battle_title}}、{{world_date}}、{{participants_json}}、{{diary}}、{{encounter}}、{{result}}、"
                 "{{update_changes_json}}、{{participants_profile_json}}、{{existing_relationships_json}}、{{city_players_json}}。"
                 "要求 AI 返回纯 JSON，relationships 数组代表单向关系箭头，public_reputations 数组代表城市风评。"
+            ),
+            self.PROMPT_FILES["interaction_memory_summary_prompt"]: (
+                "用于每次 /魔法少女行动 后判断实际互动玩家，并生成约 100 字客观交互记忆。"
+                "要求返回 interactions JSON 数组。"
+            ),
+            self.PROMPT_FILES["memory_compaction_prompt"]: (
+                "用于玩家两类记忆正文超过阈值后的长期记忆大压缩。只输出客观摘要正文。"
             ),
             self.PROMPT_FILES["teammate_completion_prompt"]: (
                 "用于日常正文生成前的后台日常事件上下文识别；会判断 action_target、participant_names、scene_event 和 selected_targets。"

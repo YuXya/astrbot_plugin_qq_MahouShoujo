@@ -44,6 +44,10 @@ ACTION_TURN_PROMPT = _load_prompt("magical_girl/action_turn_prompt.txt")
 
 RELATIONSHIP_SUMMARY_PROMPT = _load_prompt("relationship_summary_prompt.txt")
 
+INTERACTION_MEMORY_SUMMARY_PROMPT = _load_prompt("interaction_memory_summary_prompt.txt")
+
+MEMORY_COMPACTION_PROMPT = _load_prompt("memory_compaction_prompt.txt")
+
 TEAMMATE_COMPLETION_PROMPT = _load_prompt("teammate_completion_prompt.txt")
 
 DEFAULT_SYSTEM_PROMPT = _load_prompt("default_system_prompt.txt")

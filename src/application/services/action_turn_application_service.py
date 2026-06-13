@@ -18,11 +18,13 @@ class ActionTurnApplicationService:
         llm_analyzer: Any,
         save_repository: Any,
         card_generator: Any | None = None,
+        memory_summary_analyzer: Any | None = None,
     ):
         self.config_manager = config_manager
         self.llm_analyzer = llm_analyzer
         self.save_repository = save_repository
         self.card_generator = card_generator
+        self.memory_summary_analyzer = memory_summary_analyzer
         editable_manager = getattr(getattr(llm_analyzer, "analyzer", None), "editable_manager", None)
         self.event_book_engine = EventBookEngine(editable_manager=editable_manager)
 
@@ -117,6 +119,21 @@ class ActionTurnApplicationService:
                 battle_odds=selection_context.get("battle_odds"),
             )
             result.state_snapshot = updated_state
+            affected_users = await self._append_interaction_memories(
+                group_id=group_id,
+                user_id=user_id,
+                player_data=player_data,
+                result=result,
+                participants=nearby_players,
+                umo=umo,
+                world_day_offset=world_day_offset,
+                world_date=current_world_date,
+            )
+            await self._compact_affected_memories(
+                group_id=group_id,
+                user_ids=[user_id, *affected_users],
+                umo=umo,
+            )
             image_path = None
             if self.card_generator is not None and html_render_func is not None:
                 image_path, _html = await self.card_generator.generate_action_turn_image_card(
@@ -137,6 +154,110 @@ class ActionTurnApplicationService:
                 text=f"魔法少女行动生成失败：{exc}",
                 error=str(exc),
             )
+
+    async def _append_interaction_memories(
+        self,
+        *,
+        group_id: str,
+        user_id: str,
+        player_data: dict,
+        result,
+        participants: list[dict],
+        umo: str | None,
+        world_day_offset: int,
+        world_date: str,
+    ) -> list[str]:
+        memory_analyzer = getattr(self, "memory_summary_analyzer", None)
+        if memory_analyzer is None or not participants:
+            return []
+        try:
+            protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+            interactions = await memory_analyzer.summarize_interactions(
+                action=result.action,
+                story_text=result.story_text,
+                world_date=world_date,
+                protagonist=protagonist if isinstance(protagonist, dict) else {},
+                participants=participants,
+                umo=umo,
+            )
+            by_name: dict[str, dict] = {}
+            for item in participants:
+                if not isinstance(item, dict):
+                    continue
+                canonical = str(item.get("target_name") or item.get("姓名") or "").strip()
+                if canonical:
+                    by_name[canonical] = item
+
+            source_info = protagonist.get("个人信息", {}) if isinstance(protagonist, dict) else {}
+            source_info = source_info if isinstance(source_info, dict) else {}
+            source_name = str(source_info.get("姓名") or user_id).strip()
+            affected: list[str] = []
+            for interaction in interactions:
+                participant = by_name.get(str(interaction.get("target") or "").strip())
+                target_user_id = str((participant or {}).get("_user_id") or "").strip()
+                summary = str(interaction.get("summary") or "").strip()
+                if not target_user_id or not summary:
+                    continue
+                self.save_repository.append_interaction_memory(
+                    group_id,
+                    target_user_id,
+                    {
+                        "source_group_id": str(group_id),
+                        "source_user_id": str(user_id),
+                        "source_target_name": source_name,
+                        "source_name": source_name,
+                        "source_age": source_info.get("年龄", ""),
+                        "source_identity": source_info.get("身份&职业", ""),
+                        "source_magical_name": source_info.get("魔法少女名", ""),
+                        "title": result.title,
+                        "summary": summary,
+                        "world_day_offset": world_day_offset,
+                        "world_date": world_date,
+                    },
+                )
+                affected.append(target_user_id)
+            return affected
+        except Exception as exc:
+            logger.warning(f"生成交互记忆失败，已跳过本轮交互记忆: {exc}")
+            return []
+
+    async def _compact_affected_memories(
+        self,
+        *,
+        group_id: str,
+        user_ids: list[str],
+        umo: str | None,
+    ) -> None:
+        memory_analyzer = getattr(self, "memory_summary_analyzer", None)
+        if memory_analyzer is None:
+            return
+        threshold = self.config_manager.get_memory_compaction_threshold_chars()
+        seen: set[str] = set()
+        for user_id in user_ids:
+            safe_user_id = str(user_id or "").strip()
+            if not safe_user_id or safe_user_id in seen:
+                continue
+            seen.add(safe_user_id)
+            prepared = self.save_repository.prepare_memory_compaction(
+                group_id,
+                safe_user_id,
+                threshold_chars=threshold,
+            )
+            if not prepared:
+                continue
+            try:
+                summary = await memory_analyzer.compact_memories(
+                    records=prepared["records"],
+                    umo=umo,
+                )
+                self.save_repository.apply_memory_compaction(
+                    group_id,
+                    safe_user_id,
+                    prepared=prepared,
+                    summary_text=summary,
+                )
+            except Exception as exc:
+                logger.warning(f"长期记忆压缩失败，保留原始记忆: {safe_user_id} {exc}")
 
     async def _select_context(
         self,

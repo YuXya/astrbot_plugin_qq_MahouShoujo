@@ -105,21 +105,17 @@ class ConfigManager:
     def get_llm_backoff(self) -> int:
         return int(self._get_group("llm").get("llm_backoff", 2) or 2)
 
-    def get_diary_compress_interval(self) -> int:
-        value = int(self._get_battle_group().get("diary_compress_interval", 10) or 0)
+    def get_interaction_memory_target_chars(self) -> int:
+        value = int(self._get_battle_group().get("interaction_memory_target_chars", 100) or 100)
+        return max(50, value)
+
+    def get_memory_compaction_threshold_chars(self) -> int:
+        value = int(self._get_battle_group().get("memory_compaction_threshold_chars", 20000) or 0)
         return max(0, value)
 
-    def get_diary_compress_count(self) -> int:
-        value = int(self._get_battle_group().get("diary_compress_count", 6) or 0)
-        return max(0, value)
-
-    def get_cameo_compress_interval(self) -> int:
-        value = int(self._get_battle_group().get("cameo_compress_interval", 10) or 0)
-        return max(0, value)
-
-    def get_cameo_compress_count(self) -> int:
-        value = int(self._get_battle_group().get("cameo_compress_count", 6) or 0)
-        return max(0, value)
+    def get_memory_compaction_target_chars(self) -> int:
+        value = int(self._get_battle_group().get("memory_compaction_target_chars", 2000) or 2000)
+        return max(500, value)
 
     def get_teammate_recent_record_count(self) -> int:
         value = int(self._get_battle_group().get("teammate_recent_record_count", 1) or 1)

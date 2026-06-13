@@ -25,6 +25,7 @@ from .src.infrastructure.analysis.llm_action_turn_analyzer import (
 from .src.infrastructure.analysis.llm_player_relationship_analyzer import (
     LLMPlayerRelationshipAnalyzer,
 )
+from .src.infrastructure.analysis.llm_memory_summary_analyzer import LLMMemorySummaryAnalyzer
 from .src.infrastructure.config.config_manager import ConfigManager
 from .src.infrastructure.editable_resources import EditableResourceManager
 from .src.infrastructure.messaging.avatar_service import QQAvatarService
@@ -64,6 +65,7 @@ class QQMahouShoujo(Star):
     llm_analyzer: LLMReincarnationAnalyzer
     action_turn_llm_analyzer: LLMActionTurnAnalyzer
     relationship_llm_analyzer: LLMPlayerRelationshipAnalyzer
+    memory_summary_llm_analyzer: LLMMemorySummaryAnalyzer
     report_generator: ReportGenerator
     reincarnation_service: ReincarnationApplicationService
     action_turn_service: ActionTurnApplicationService
@@ -97,6 +99,11 @@ class QQMahouShoujo(Star):
             self.config_manager,
             self.editable_manager,
         )
+        self.memory_summary_llm_analyzer = LLMMemorySummaryAnalyzer(
+            context,
+            self.config_manager,
+            self.editable_manager,
+        )
         self.report_generator = ReportGenerator(self.config_manager, self.editable_manager)
         self.reincarnation_service = ReincarnationApplicationService(
             self.config_manager,
@@ -114,6 +121,7 @@ class QQMahouShoujo(Star):
             self.action_turn_llm_analyzer,
             self.save_repository,
             self.report_generator,
+            memory_summary_analyzer=self.memory_summary_llm_analyzer,
         )
         self.player_queue = PlayerTaskQueue()
         self.web_viewer = SaveWebViewer(

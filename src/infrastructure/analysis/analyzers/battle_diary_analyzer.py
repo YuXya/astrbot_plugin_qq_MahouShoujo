@@ -719,78 +719,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         except Exception:
             return default
 
-    async def compress_battle_logs(
-        self,
-        *,
-        logs: list[dict],
-        umo: str | None = None,
-    ) -> str:
-        if not logs:
-            return ""
-        prompt = "\n".join(
-            [
-                "请把以下多次魔法少女战斗日记压缩成\u201c一次战斗记录\u201d的文字量。",
-                "要求：",
-                "1. 只输出压缩后的正文，不要输出 JSON，不要加解释。",
-                "2. 保留关键人物、地点、事件、收获、损失、关系变化和长期影响。",
-                "3. 不要创造原文没有的新事实。",
-                "4. 文字量约等于一条普通战斗日记，适合后续继续作为历史记录参考。",
-                "",
-                "待压缩战斗记录：",
-                self._format_logs_for_compression(logs),
-            ]
-        )
-        if self.config_manager.get_debug_mode():
-            self._save_debug_file("diary_compress_prompt", prompt)
-        response = await call_provider_with_retry(
-            self.context,
-            self.config_manager,
-            prompt=prompt,
-            umo=umo,
-            purpose="战斗记录压缩",
-            provider_id_override=self.config_manager.get_subtask_llm_provider_id(),
-        )
-        result_text = extract_response_text(response)
-        if self.config_manager.get_debug_mode():
-            self._save_debug_file("diary_compress_response", result_text)
-        return result_text.strip()
-
-    async def compress_cameo_memories(
-        self,
-        *,
-        memories: list[dict],
-        umo: str | None = None,
-    ) -> str:
-        if not memories:
-            return ""
-        prompt = "\n".join(
-            [
-                "请把以下多条\u201c其他人与主角的交互\u201d压缩成一条交互摘要。",
-                "要求：",
-                "1. 只输出压缩后的正文，不要输出 JSON，不要加解释。",
-                "2. 保留关键人物、地点、事件、关系变化和长期影响。",
-                "3. 不要创造原文没有的新事实。",
-                "4. 文字量约等于一条普通交互记录，适合后续继续作为记忆参考。",
-                "",
-                "待压缩交互记录：",
-                self._format_cameo_memories_for_compression(memories),
-            ]
-        )
-        if self.config_manager.get_debug_mode():
-            self._save_debug_file("cameo_compress_prompt", prompt)
-        response = await call_provider_with_retry(
-            self.context,
-            self.config_manager,
-            prompt=prompt,
-            umo=umo,
-            purpose="其他人与主角的交互压缩",
-            provider_id_override=self.config_manager.get_subtask_llm_provider_id(),
-        )
-        result_text = extract_response_text(response)
-        if self.config_manager.get_debug_mode():
-            self._save_debug_file("cameo_compress_response", result_text)
-        return result_text.strip()
-
     async def infer_teammate_names(
         self,
         *,
@@ -1388,55 +1316,40 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
     @staticmethod
     def _format_logs(logs: list[dict]) -> str:
         if not logs:
-            return "（暂无战斗日志。）"
+            return "（暂无行动记忆。）"
+        selected = [
+            item for item in logs if isinstance(item, dict) and item.get("type") == "memory_summary"
+        ]
+        latest_action = next(
+            (
+                item
+                for item in reversed(logs)
+                if isinstance(item, dict) and item.get("type") == "action_turn"
+            ),
+            None,
+        )
+        if latest_action:
+            selected.append(latest_action)
         lines = []
-        for index, item in enumerate(logs, start=1):
+        for index, item in enumerate(selected, start=1):
             title = BattleDiaryAnalyzer._world_diary_title(item)
-            action = item.get("action", "")
-            result = item.get("result", "")
-            line = f"{index}. {title}"
-            if action:
-                line += f"；行动：{action}"
-            if result:
-                line += f"；结果：{result}"
+            text = str(item.get("summary") or item.get("story_text") or "").strip()
+            line = f"{index}. {title}；{text}"
             lines.append(line)
-        return "\n".join(lines)
+        return "\n".join(lines) if lines else "（暂无行动记忆。）"
 
     @staticmethod
     def _format_logs_for_scan(logs: list[dict]) -> str:
         return "\n".join(
-            str(item.get("action") or item.get("result") or item.get("title") or "")
+            str(
+                item.get("story_text")
+                or item.get("summary")
+                or item.get("action")
+                or item.get("title")
+                or ""
+            )
             for item in logs
         )
-
-    @staticmethod
-    def _format_logs_for_compression(logs: list[dict]) -> str:
-        parts = []
-        for index, item in enumerate(logs, start=1):
-            title = BattleDiaryAnalyzer._world_diary_title(item)
-            if item.get("type") == "battle_summary":
-                parts.append(
-                    "\n".join(
-                        [
-                            f"【{title}】（压缩摘要）",
-                            f"结算：{item.get('result', '')}",
-                        ]
-                    )
-                )
-            else:
-                parts.append(
-                    "\n".join(
-                        [
-                            f"【{title}】",
-                            f"行动：{item.get('action', '')}",
-                            f"日记：{item.get('diary', '')}",
-                            f"遭遇：{item.get('encounter', '')}",
-                            f"结算：{item.get('result', '')}",
-                            f"变化：{json.dumps(item.get('changes', []), ensure_ascii=False)}",
-                        ]
-                    )
-                )
-        return "\n\n".join(parts)
 
     @staticmethod
     def _format_cameo_memories(cameo_memories: list[dict] | None) -> str:
@@ -1444,48 +1357,11 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             return "（暂无其他人与主角的交互。）"
         lines = []
         for index, item in enumerate(cameo_memories[-8:], start=1):
-            source_label = (
-                "多条交互摘要"
-                if item.get("type") == "cameo_summary"
-                else BattleDiaryAnalyzer._cameo_source_label(item)
-            )
+            source_label = BattleDiaryAnalyzer._cameo_source_label(item)
             title = BattleDiaryAnalyzer._world_diary_title(item)
-            encounter = item.get("encounter", "")
-            result = item.get("result", "")
-            line = f"{index}. {source_label or '未知'}在{title}"
-            if encounter:
-                line += f"；遭遇：{encounter}"
-            if result:
-                line += f"；结算：{result}"
-            lines.append(line[:360])
+            summary = str(item.get("summary") or "").strip()
+            lines.append(f"{index}. {source_label or '未知'}在{title}；{summary}")
         return "\n".join(lines)
-
-    @staticmethod
-    def _format_cameo_memories_for_compression(memories: list[dict]) -> str:
-        parts = []
-        for index, item in enumerate(memories, start=1):
-            title = BattleDiaryAnalyzer._world_diary_title(item)
-            if item.get("type") == "cameo_summary":
-                parts.append(
-                    "\n".join(
-                        [
-                            f"【{title}】（压缩摘要）",
-                            f"摘要：{item.get('result', '')}",
-                        ]
-                    )
-                )
-            else:
-                parts.append(
-                    "\n".join(
-                        [
-                            f"【{title}】",
-                            f"来源角色：{BattleDiaryAnalyzer._cameo_source_label(item)}",
-                            f"遭遇：{item.get('encounter', '')}",
-                            f"结算：{item.get('result', '')}",
-                        ]
-                    )
-                )
-        return "\n\n".join(parts)
 
     def _format_teammate_info(self, nearby_players: list[dict] | None) -> dict[str, object]:
         recent_record_count = self.config_manager.get_teammate_recent_record_count()
