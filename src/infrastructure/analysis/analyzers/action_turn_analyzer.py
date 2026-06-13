@@ -248,6 +248,10 @@ class ActionTurnAnalyzer(BattleDiaryAnalyzer):
                     current_world_date=current_world_date,
                 ),
                 "phase_protocol": self._phase_protocol(phase),
+                "event_completion_protocol": self._event_completion_protocol(
+                    phase,
+                    selection_context,
+                ),
                 "current_variables_json": self._json_dump(
                     self._visible_current_variables(player_data)
                 ),
@@ -370,6 +374,50 @@ class ActionTurnAnalyzer(BattleDiaryAnalyzer):
             ),
         }
         return protocols.get(phase, protocols["日常"])
+
+    @staticmethod
+    def _event_completion_protocol(
+        phase: str,
+        selection_context: dict[str, object] | None,
+    ) -> str:
+        if phase != "事件" or not isinstance(selection_context, dict):
+            return ""
+        runtime = selection_context.get("event_runtime")
+        if not isinstance(runtime, dict):
+            return ""
+        try:
+            turn_count = max(0, int(runtime.get("turn_count", 0) or 0))
+        except (TypeError, ValueError):
+            return ""
+        if turn_count <= 0:
+            return ""
+
+        common = (
+            "event_completion_protocol:\n"
+            f"  continued_turn: {turn_count + 1}\n"
+            "  audit: \"正文完成后必须检查当前事件的原始目标是否已经解决。\"\n"
+            "  finish: \"如果正文已经收束、目标已经解决或相关危机已经消失，"
+            "必须在本轮 JSONPatch 中移除 /进程/当前事件；不要因为忘记清理而让事件继续。\"\n"
+            "  continue: \"只有正文中仍存在具体、可指出的未解决事实时才能保留事件；"
+            "必须在 <Analysis> 的‘指令与事件审计’中写明该事实，"
+            "不能只写‘剧情仍需发展’。\"\n"
+            "  transition: \"玩家明确发起新目标时可以自然转场或更新当前目标，"
+            "但不能凭空添加无关冲突来拖延旧事件。\"\n"
+        )
+        if turn_count <= 2:
+            return common + (
+                "  priority: \"正常推进，并在本轮结尾认真判断继续或结束。\""
+            )
+        if turn_count <= 5:
+            return common + (
+                "  priority: \"事件已经持续多轮，本轮明显偏向推进和收束；"
+                "不得仅为续写而凭空制造敌人、任务、误会、转折或新阻碍。\""
+            )
+        return common + (
+            "  priority: \"事件已持续很久，本轮应优先解决当前目标并收束。"
+            "只有玩家明确要求继续，或已有剧情事实确实阻止结束时，才可以保留事件；"
+            "禁止新造阻碍延命。\""
+        )
 
     @staticmethod
     def _variable_api_document() -> str:

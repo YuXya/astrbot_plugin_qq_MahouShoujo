@@ -33,6 +33,8 @@
 
 {{phase_protocol}}
 
+{{event_completion_protocol}}
+
 ---
 # 3. 当前变量快照
 <status_current_variables>
@@ -108,7 +110,7 @@ UpdateVariable_block:
   format:
     <UpdateVariable>
       <Analysis>
-        - 指令与事件：
+        - 指令与事件审计：当前事件目标是否已经解决；若继续，正文中仍未解决的具体事实是什么：
         - 状态检查：
         - 物品/位置/关系变化：
         - 长期记忆：

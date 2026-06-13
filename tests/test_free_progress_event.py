@@ -229,6 +229,50 @@ class ActionPromptProjectionTests(unittest.TestCase):
             [{"role": "system", "content": "系统规则"}],
         )
 
+    def test_event_completion_protocol_is_hidden_for_new_or_non_event_turns(self):
+        self.assertEqual(
+            ActionTurnAnalyzer._event_completion_protocol(
+                "事件",
+                {"event_runtime": {"turn_count": 0}},
+            ),
+            "",
+        )
+        self.assertEqual(
+            ActionTurnAnalyzer._event_completion_protocol(
+                "日常",
+                {"event_runtime": {"turn_count": 4}},
+            ),
+            "",
+        )
+        self.assertEqual(
+            ActionTurnAnalyzer._event_completion_protocol("事件", {}),
+            "",
+        )
+
+    def test_event_completion_protocol_strengthens_with_turn_count(self):
+        early = ActionTurnAnalyzer._event_completion_protocol(
+            "事件",
+            {"event_runtime": {"turn_count": 1}},
+        )
+        middle = ActionTurnAnalyzer._event_completion_protocol(
+            "事件",
+            {"event_runtime": {"turn_count": 3}},
+        )
+        late = ActionTurnAnalyzer._event_completion_protocol(
+            "事件",
+            {"event_runtime": {"turn_count": 6}},
+        )
+
+        self.assertIn("正文已经收束", early)
+        self.assertIn("移除 /进程/当前事件", early)
+        self.assertIn("具体、可指出的未解决事实", early)
+        self.assertIn("不得仅为续写", middle)
+        self.assertIn("凭空制造敌人", middle)
+        self.assertIn("本轮应优先解决当前目标", late)
+        self.assertIn("禁止新造阻碍延命", late)
+        self.assertNotEqual(early, middle)
+        self.assertNotEqual(middle, late)
+
 
 class EventSaveTests(unittest.TestCase):
     def setUp(self):
