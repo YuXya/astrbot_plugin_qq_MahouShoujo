@@ -234,10 +234,7 @@ class ActionTurnAnalyzer(BattleDiaryAnalyzer):
                 self.change_book_engine.build_fetish_prompt_text(protagonist),
             ]
         )
-        context_participants = (selection_context or {}).get("selected_participants")
-        teammate_info = self._format_teammate_info(
-            context_participants if isinstance(context_participants, list) else nearby_players
-        )
+        teammate_info = self._format_teammate_info(nearby_players)
         return self.editable_manager.render_prompt(
             "action_turn_prompt",
             {

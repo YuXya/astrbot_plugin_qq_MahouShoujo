@@ -89,7 +89,19 @@ class ActionTurnApplicationService:
                         current_event,
                         battle_odds=selection_context.get("battle_odds"),
                     )
-            nearby_players = self._selected_participants(selection_context)
+            participant_names = self._participant_names(
+                self._selected_participants(selection_context)
+            )
+            nearby_players = (
+                self.save_repository.find_participant_npcs(
+                    group_id,
+                    user_id,
+                    participant_names,
+                    recent_record_count=self.config_manager.get_teammate_recent_record_count(),
+                )
+                if participant_names
+                else []
+            )
             analysis = await self.llm_analyzer.analyze_action_turn(
                 action_text=action_text,
                 player_data=player_data,
@@ -110,6 +122,16 @@ class ActionTurnApplicationService:
             if avatar_url:
                 result.avatar_url = avatar_url
 
+            interaction_result = await self._summarize_turn_memories(
+                player_data=player_data,
+                result=result,
+                participants=nearby_players,
+                umo=umo,
+                world_date=current_world_date,
+            )
+            result.memory_text = str(
+                interaction_result.get("current_player_memory") or ""
+            ).strip()
             updated_state = self.save_repository.save_action_turn_result(
                 group_id=group_id,
                 user_id=user_id,
@@ -125,7 +147,7 @@ class ActionTurnApplicationService:
                 player_data=player_data,
                 result=result,
                 participants=nearby_players,
-                umo=umo,
+                interactions=interaction_result.get("interactions", []),
                 world_day_offset=world_day_offset,
                 world_date=current_world_date,
             )
@@ -155,6 +177,32 @@ class ActionTurnApplicationService:
                 error=str(exc),
             )
 
+    async def _summarize_turn_memories(
+        self,
+        *,
+        player_data: dict,
+        result,
+        participants: list[dict],
+        umo: str | None,
+        world_date: str,
+    ) -> dict[str, Any]:
+        memory_analyzer = getattr(self, "memory_summary_analyzer", None)
+        if memory_analyzer is None:
+            return {"current_player_memory": "", "interactions": []}
+        try:
+            protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
+            return await memory_analyzer.summarize_interactions(
+                action=result.action,
+                story_text=result.story_text,
+                world_date=world_date,
+                protagonist=protagonist if isinstance(protagonist, dict) else {},
+                participants=participants,
+                umo=umo,
+            )
+        except Exception as exc:
+            logger.warning(f"生成本轮事件记忆失败，已跳过短事件记忆: {exc}")
+            return {"current_player_memory": "", "interactions": []}
+
     async def _append_interaction_memories(
         self,
         *,
@@ -163,23 +211,14 @@ class ActionTurnApplicationService:
         player_data: dict,
         result,
         participants: list[dict],
-        umo: str | None,
+        interactions: list[dict],
         world_day_offset: int,
         world_date: str,
     ) -> list[str]:
-        memory_analyzer = getattr(self, "memory_summary_analyzer", None)
-        if memory_analyzer is None or not participants:
+        if not participants or not interactions:
             return []
         try:
             protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
-            interactions = await memory_analyzer.summarize_interactions(
-                action=result.action,
-                story_text=result.story_text,
-                world_date=world_date,
-                protagonist=protagonist if isinstance(protagonist, dict) else {},
-                participants=participants,
-                umo=umo,
-            )
             by_name: dict[str, dict] = {}
             for item in participants:
                 if not isinstance(item, dict):
@@ -195,8 +234,8 @@ class ActionTurnApplicationService:
             for interaction in interactions:
                 participant = by_name.get(str(interaction.get("target") or "").strip())
                 target_user_id = str((participant or {}).get("_user_id") or "").strip()
-                summary = str(interaction.get("summary") or "").strip()
-                if not target_user_id or not summary:
+                memory_text = str(interaction.get("memory_text") or "").strip()
+                if not target_user_id or not memory_text:
                     continue
                 self.save_repository.append_interaction_memory(
                     group_id,
@@ -210,7 +249,8 @@ class ActionTurnApplicationService:
                         "source_identity": source_info.get("身份&职业", ""),
                         "source_magical_name": source_info.get("魔法少女名", ""),
                         "title": result.title,
-                        "summary": summary,
+                        "memory_text": memory_text,
+                        "conversation_no": result.conversation_no,
                         "world_day_offset": world_day_offset,
                         "world_date": world_date,
                     },
@@ -276,7 +316,7 @@ class ActionTurnApplicationService:
                 magical_girls = self.save_repository.build_city_magical_girl_candidates(
                     group_id,
                     user_id,
-                    recent_record_count=self.config_manager.get_teammate_recent_record_count(),
+                    recent_record_count=0,
                 )
                 monsters = self.save_repository.build_public_monster_candidates()
                 return await self.llm_analyzer.select_magical_battle_context(
@@ -292,7 +332,7 @@ class ActionTurnApplicationService:
             candidates = self.save_repository.build_city_teammate_candidates(
                 group_id,
                 user_id,
-                recent_record_count=self.config_manager.get_teammate_recent_record_count(),
+                recent_record_count=0,
             )
             monsters = self.save_repository.build_public_monster_candidates()
             return await self.llm_analyzer.select_daily_context(
@@ -436,3 +476,20 @@ class ActionTurnApplicationService:
     def _selected_participants(selection_context: dict[str, object]) -> list[dict]:
         value = selection_context.get("selected_participants") if isinstance(selection_context, dict) else []
         return value if isinstance(value, list) else []
+
+    @staticmethod
+    def _participant_names(participants: list[dict]) -> list[str]:
+        names: list[str] = []
+        for item in participants:
+            if not isinstance(item, dict):
+                continue
+            name = str(
+                item.get("target_name")
+                or item.get("magical_name")
+                or item.get("魔法少女名")
+                or item.get("姓名")
+                or ""
+            ).strip()
+            if name and name not in names:
+                names.append(name)
+        return names

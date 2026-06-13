@@ -1359,8 +1359,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         for index, item in enumerate(cameo_memories[-8:], start=1):
             source_label = BattleDiaryAnalyzer._cameo_source_label(item)
             title = BattleDiaryAnalyzer._world_diary_title(item)
-            summary = str(item.get("summary") or "").strip()
-            lines.append(f"{index}. {source_label or '未知'}在{title}；{summary}")
+            memory_text = str(item.get("memory_text") or "").strip()
+            lines.append(f"{index}. {source_label or '未知'}在{title}；{memory_text}")
         return "\n".join(lines)
 
     def _format_teammate_info(self, nearby_players: list[dict] | None) -> dict[str, object]:
@@ -1379,6 +1379,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             profile = self._prompt_protagonist_profile(item)
             if not isinstance(profile, dict):
                 continue
+            recent_events = item.get("最近事件")
+            if isinstance(recent_events, list) and recent_events:
+                profile["最近事件"] = recent_events
             personal_info = profile.get("个人信息", {})
             if not isinstance(personal_info, dict):
                 personal_info = {}

@@ -32,9 +32,7 @@ class MemorySummaryAnalyzer(BaseAnalyzer[dict[str, Any]]):
         protagonist: dict,
         participants: list[dict],
         umo: str | None = None,
-    ) -> list[dict[str, str]]:
-        if not participants:
-            return []
+    ) -> dict[str, Any]:
         prompt = self.editable_manager.render_prompt(
             "interaction_memory_summary_prompt",
             {
@@ -52,19 +50,27 @@ class MemorySummaryAnalyzer(BaseAnalyzer[dict[str, Any]]):
             mark_latest_llm_error(f"交互记忆 JSON parse failed: {error}")
             raise ValueError(f"交互记忆 JSON 解析失败: {error}")
         allowed = self._participant_names(participants)
+        current_player_memory = " ".join(
+            str(parsed.get("current_player_memory") or "").split()
+        )
         interactions: list[dict[str, str]] = []
         seen: set[str] = set()
         for item in parsed.get("interactions", []):
             if not isinstance(item, dict):
                 continue
             target = " ".join(str(item.get("target") or "").split())
-            summary = " ".join(str(item.get("summary") or "").split())
+            memory_text = " ".join(
+                str(item.get("memory_text") or item.get("summary") or "").split()
+            )
             canonical = allowed.get(target)
-            if not canonical or not summary or canonical in seen:
+            if not canonical or not memory_text or canonical in seen:
                 continue
             seen.add(canonical)
-            interactions.append({"target": canonical, "summary": summary})
-        return interactions
+            interactions.append({"target": canonical, "memory_text": memory_text})
+        return {
+            "current_player_memory": current_player_memory,
+            "interactions": interactions,
+        }
 
     async def compact_memories(
         self,

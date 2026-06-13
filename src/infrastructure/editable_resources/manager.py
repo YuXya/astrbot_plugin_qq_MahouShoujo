@@ -384,8 +384,8 @@ class EditableResourceManager:
                 "要求 AI 返回纯 JSON，relationships 数组代表单向关系箭头，public_reputations 数组代表城市风评。"
             ),
             self.PROMPT_FILES["interaction_memory_summary_prompt"]: (
-                "用于每次 /魔法少女行动 后判断实际互动玩家，并生成约 100 字客观交互记忆。"
-                "要求返回 interactions JSON 数组。"
+                "用于每次 /魔法少女行动 后生成当前玩家的客观事件记忆，并判断实际互动玩家、生成各自的客串交互记忆。"
+                "要求返回 current_player_memory 和 interactions。"
             ),
             self.PROMPT_FILES["memory_compaction_prompt"]: (
                 "用于玩家两类记忆正文超过阈值后的长期记忆大压缩。只输出客观摘要正文。"

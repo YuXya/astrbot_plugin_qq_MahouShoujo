@@ -36,6 +36,7 @@ from src.infrastructure.analysis.analyzers.memory_summary_analyzer import (  # n
 from src.application.services.action_turn_application_service import (  # noqa: E402
     ActionTurnApplicationService,
 )
+from src.domain.models.data_models import ActionTurnResult  # noqa: E402
 from src.infrastructure.storage.player_save_repository import (  # noqa: E402
     PlayerSaveRepository,
 )
@@ -84,6 +85,7 @@ class MemoryCompactionTests(unittest.TestCase):
                     "type": "action_turn",
                     "created_at": 1,
                     "story_text": "旧行动正文",
+                    "memory_text": "这段短记忆不应重复计数" * 20,
                     "action_options": ["这段很长但不应计数" * 20],
                     "world_date": "第一天",
                 },
@@ -101,13 +103,13 @@ class MemoryCompactionTests(unittest.TestCase):
                 {
                     "type": "interaction_memory",
                     "created_at": 2,
-                    "summary": "旧交互摘要",
+                    "memory_text": "旧交互摘要",
                     "world_date": "第二天",
                 },
                 {
                     "type": "interaction_memory",
                     "created_at": 4,
-                    "summary": "最新交互摘要",
+                    "memory_text": "最新交互摘要",
                     "world_date": "第四天",
                 },
             ],
@@ -135,37 +137,164 @@ class MemoryCompactionTests(unittest.TestCase):
         self.assertEqual(daily[0]["summary"], "长期客观摘要")
         self.assertEqual(daily[1]["story_text"], "最新行动正文")
         self.assertEqual(len(cameo), 1)
-        self.assertEqual(cameo[0]["summary"], "最新交互摘要")
+        self.assertEqual(cameo[0]["memory_text"], "最新交互摘要")
 
     def test_history_context_uses_summary_story_and_interaction_summary(self):
         logs = [
             {"type": "memory_summary", "summary": "长期摘要", "title": "过去"},
             {"type": "action_turn", "story_text": "旧正文", "title": "旧行动"},
-            {"type": "action_turn", "story_text": "最新正文", "title": "新行动"},
+            {
+                "type": "action_turn",
+                "story_text": "最新正文",
+                "memory_text": "当前玩家自己的短事件记忆不应重复发送",
+                "title": "新行动",
+            },
         ]
         formatted = BattleDiaryAnalyzer._format_logs(logs)
         self.assertIn("长期摘要", formatted)
         self.assertIn("最新正文", formatted)
         self.assertNotIn("旧正文", formatted)
+        self.assertNotIn("当前玩家自己的短事件记忆不应重复发送", formatted)
 
         cameo = BattleDiaryAnalyzer._format_cameo_memories(
-            [{"type": "interaction_memory", "source_name": "甲", "summary": "共同处理事件"}]
+            [{"type": "interaction_memory", "source_name": "甲", "memory_text": "共同处理事件"}]
         )
         self.assertIn("共同处理事件", cameo)
         self.assertNotIn("遭遇", cameo)
         self.assertNotIn("结算", cameo)
 
+    def test_participant_memories_merge_and_sort_by_conversation_no(self):
+        self._write_jsonl(
+            "daily_memory.jsonl",
+            [
+                {
+                    "type": "action_turn",
+                    "conversation_no": 3,
+                    "world_day_offset": 1,
+                    "memory_text": "自己主动处理了第三个事件。",
+                },
+                {
+                    "type": "action_turn",
+                    "conversation_no": 1,
+                    "world_day_offset": 0,
+                    "memory_text": "自己主动处理了第一个事件。",
+                },
+            ],
+        )
+        self._write_jsonl(
+            "cameo_memory.jsonl",
+            [
+                {
+                    "type": "interaction_memory",
+                    "conversation_no": 2,
+                    "world_day_offset": 0,
+                    "source_name": "另一名玩家",
+                    "memory_text": "被卷入第二个事件。",
+                }
+            ],
+        )
+
+        records = self.repo._read_recent_participant_memories(self.user_dir, limit=2)
+
+        self.assertEqual([item["conversation_no"] for item in records], [2, 3])
+        self.assertEqual(
+            [item["type"] for item in records],
+            ["interaction_memory", "action_turn_memory"],
+        )
+
+    def test_body_participant_info_includes_recent_events(self):
+        analyzer = BattleDiaryAnalyzer.__new__(BattleDiaryAnalyzer)
+        analyzer.config_manager = types.SimpleNamespace(
+            get_teammate_recent_record_count=lambda: 2
+        )
+        result = analyzer._format_teammate_info(
+            [
+                {
+                    "主角": {"个人信息": {"姓名": "洛洛"}},
+                    "最近事件": [
+                        {
+                            "conversation_no": 7,
+                            "memory_text": "洛洛刚刚完成了调查。",
+                        }
+                    ],
+                }
+            ]
+        )
+
+        self.assertIn("最近事件", result["json"])
+        self.assertIn("洛洛刚刚完成了调查", result["json"])
+
+    def test_selection_projection_drops_recent_events(self):
+        projected = BattleDiaryAnalyzer._prompt_protagonist_profiles(
+            [
+                {
+                    "主角": {"个人信息": {"姓名": "洛洛"}},
+                    "最近事件": [{"conversation_no": 7, "memory_text": "不应发送"}],
+                }
+            ]
+        )
+
+        self.assertEqual(projected, [{"个人信息": {"姓名": "洛洛"}}])
+
+    def test_action_turn_saves_short_memory_with_conversation_no(self):
+        (self.user_dir / "player_data_update.json").write_text(
+            json.dumps({"进程": {"阶段": "日常"}, "主角": {}}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        result = ActionTurnResult(
+            story_text="完整正文",
+            memory_text="当前玩家的短事件记忆",
+        )
+
+        self.repo.save_action_turn_result(
+            group_id="g1",
+            user_id="u1",
+            result=result,
+        )
+        saved = self.repo._read_recent_logs(
+            self.user_dir / "daily_memory.jsonl",
+            limit=1,
+        )[0]
+
+        self.assertEqual(result.conversation_no, 1)
+        self.assertEqual(saved["conversation_no"], 1)
+        self.assertEqual(saved["memory_text"], "当前玩家的短事件记忆")
+
 
 class InteractionSummaryTests(unittest.TestCase):
+    def test_current_player_memory_is_created_without_participants(self):
+        analyzer = MemorySummaryAnalyzer(None, _Config(), _Editable())
+
+        async def fake_call(prompt, *, umo, purpose):
+            return json.dumps(
+                {"current_player_memory": "主角独自完成了本轮调查。", "interactions": []},
+                ensure_ascii=False,
+            )
+
+        analyzer._call = fake_call
+        result = asyncio.run(
+            analyzer.summarize_interactions(
+                action="调查",
+                story_text="主角独自完成调查。",
+                world_date="今天",
+                protagonist={},
+                participants=[],
+            )
+        )
+
+        self.assertEqual(result["current_player_memory"], "主角独自完成了本轮调查。")
+        self.assertEqual(result["interactions"], [])
+
     def test_only_accepts_candidate_participants(self):
         analyzer = MemorySummaryAnalyzer(None, _Config(), _Editable())
 
         async def fake_call(prompt, *, umo, purpose):
             return json.dumps(
                 {
+                    "current_player_memory": "主角处理了本轮事件。",
                     "interactions": [
-                        {"target": "小洛", "summary": "与主角共同处理了事件。"},
-                        {"target": "路人", "summary": "不应写入。"},
+                        {"target": "小洛", "memory_text": "与主角共同处理了事件。"},
+                        {"target": "路人", "memory_text": "不应写入。"},
                     ]
                 },
                 ensure_ascii=False,
@@ -181,7 +310,13 @@ class InteractionSummaryTests(unittest.TestCase):
                 participants=[{"target_name": "洛洛", "魔法少女名": "小洛"}],
             )
         )
-        self.assertEqual(result, [{"target": "洛洛", "summary": "与主角共同处理了事件。"}])
+        self.assertEqual(
+            result,
+            {
+                "current_player_memory": "主角处理了本轮事件。",
+                "interactions": [{"target": "洛洛", "memory_text": "与主角共同处理了事件。"}],
+            },
+        )
 
     def test_summary_failure_skips_interaction_write(self):
         class FailingAnalyzer:
@@ -196,18 +331,75 @@ class InteractionSummaryTests(unittest.TestCase):
         service.memory_summary_analyzer = FailingAnalyzer()
         service.save_repository = Repository()
         result = asyncio.run(
-            service._append_interaction_memories(
-                group_id="g1",
-                user_id="u1",
+            service._summarize_turn_memories(
                 player_data={"主角": {"个人信息": {"姓名": "主角"}}},
                 result=types.SimpleNamespace(action="行动", story_text="正文", title="行动"),
                 participants=[{"_user_id": "u2", "target_name": "洛洛"}],
                 umo=None,
-                world_day_offset=0,
                 world_date="今天",
             )
         )
-        self.assertEqual(result, [])
+        self.assertEqual(result, {"current_player_memory": "", "interactions": []})
+
+    def test_interaction_memory_keeps_source_conversation_no(self):
+        written = []
+
+        class Repository:
+            def append_interaction_memory(self, group_id, user_id, payload):
+                written.append((group_id, user_id, payload))
+
+        service = ActionTurnApplicationService.__new__(ActionTurnApplicationService)
+        service.save_repository = Repository()
+        affected = asyncio.run(
+            service._append_interaction_memories(
+                group_id="g1",
+                user_id="u1",
+                player_data={"主角": {"个人信息": {"姓名": "主角"}}},
+                result=types.SimpleNamespace(title="行动", conversation_no=19),
+                participants=[{"_user_id": "u2", "target_name": "洛洛"}],
+                interactions=[{"target": "洛洛", "memory_text": "洛洛协助主角完成调查。"}],
+                world_day_offset=3,
+                world_date="第三天",
+            )
+        )
+
+        self.assertEqual(affected, ["u2"])
+        self.assertEqual(written[0][2]["conversation_no"], 19)
+        self.assertEqual(written[0][2]["memory_text"], "洛洛协助主角完成调查。")
+
+
+class ParticipantSelectionMemoryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_selection_candidates_are_loaded_without_recent_events(self):
+        calls = []
+
+        class Repository:
+            def build_city_teammate_candidates(self, group_id, user_id, *, recent_record_count):
+                calls.append(recent_record_count)
+                return []
+
+            def build_public_monster_candidates(self):
+                return []
+
+        class Analyzer:
+            async def select_daily_context(self, **kwargs):
+                return {}
+
+        service = ActionTurnApplicationService.__new__(ActionTurnApplicationService)
+        service.save_repository = Repository()
+        service.llm_analyzer = Analyzer()
+
+        await service._select_context(
+            group_id="g1",
+            user_id="u1",
+            player_data={},
+            logs=[],
+            cameo_memories=[],
+            action_text="行动",
+            phase="日常",
+            umo=None,
+        )
+
+        self.assertEqual(calls, [0])
 
 
 if __name__ == "__main__":

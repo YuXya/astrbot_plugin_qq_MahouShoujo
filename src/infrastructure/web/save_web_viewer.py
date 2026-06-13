@@ -2075,14 +2075,14 @@ class SaveWebViewer:
         )
         progress_overview = self._progress_overview_html(player_data)
         log_note = (
-            "删除单条记录只会移除 daily_memory.jsonl 中对应一行，不会回滚当前状态。"
+            "这里展示完整行动正文、短事件记忆与长期记忆摘要。删除单条记录只会移除 daily_memory.jsonl 中对应一行，不会回滚当前状态。"
             if is_admin
-            else "这里展示该存档的行动记录与长期记忆摘要。"
+            else "这里展示该存档的完整行动正文、短事件记忆与长期记忆摘要。"
         )
         cameo_note = (
-            "删除单条记录只会移除 cameo_memory.jsonl 中对应一行。"
+            "这里展示其他玩家与该角色实际互动后生成的客串交互记忆。删除单条记录只会移除 cameo_memory.jsonl 中对应一行。"
             if is_admin
-            else "这里展示其他玩家与该角色实际互动后生成的客观摘要。"
+            else "这里展示其他玩家与该角色实际互动后生成的客串交互记忆。"
         )
         log_clear_button = (
             self._player_clear_form(
@@ -2371,6 +2371,7 @@ class SaveWebViewer:
                     <span>Diary</span>
                     <h2>最近冒险记录</h2>
                   </div>
+                  <p class="muted">完整行动正文、短事件记忆与长期记忆摘要。</p>
                   <div class="log-list">{logs_html}</div>
                 </article>
                 <article class="player-site-section player-memory-row">
@@ -2378,6 +2379,7 @@ class SaveWebViewer:
                     <span>Connections</span>
                     <h2>城市中的交互</h2>
                   </div>
+                  <p class="muted">其他玩家与你实际互动后生成的客串交互记忆。</p>
                   <div class="log-list">{cameo_html}</div>
                 </article>
 
@@ -2849,6 +2851,7 @@ class SaveWebViewer:
             title = self._e(log.get("title") or log.get("message") or "行动记录")
             action = self._e(log.get("action") or "")
             diary = self._e(log.get("story_text") or log.get("summary") or "")
+            memory_text = self._e(log.get("memory_text") or "")
             result = self._e(log.get("message") or "")
             changes = log.get("changes")
             if not isinstance(changes, list):
@@ -2857,8 +2860,19 @@ class SaveWebViewer:
             created_at = self._format_time(log.get("created_at"))
             world_date = self._world_date_display(log)
             world_date_html = f"<span>{self._e(world_date)}</span>" if world_date else ""
+            conversation_no = self._positive_int(log.get("conversation_no"))
+            conversation_html = (
+                f"<span>事件序号 #{conversation_no}</span>"
+                if conversation_no > 0
+                else ""
+            )
             action_html = f"<p class=\"log-action\">{action}</p>" if action else ""
             diary_html = f"<p class=\"log-result\">{diary}</p>" if diary else ""
+            memory_html = (
+                f"<p class=\"log-result\"><strong>短事件记忆：</strong>{memory_text}</p>"
+                if raw_log_type == "action_turn" and memory_text
+                else ""
+            )
             changes_block = (
                 f"<div class=\"tag-row\">{change_html}</div>"
                 if change_html
@@ -2888,6 +2902,7 @@ class SaveWebViewer:
                     <div class="log-meta summary-meta">
                       <span>{self._e(created_at)}</span>
                       {world_date_html}
+                      {conversation_html}
                       <span>{log_type}</span>
                     </div>
                   </summary>
@@ -2895,10 +2910,12 @@ class SaveWebViewer:
                     <div class="log-meta">
                       <span>{self._e(created_at)}</span>
                       {world_date_html}
+                      {conversation_html}
                       <span>{log_type}</span>
                     </div>
                     {action_html}
                     {diary_html}
+                    {memory_html}
                     <p class="log-result">{result}</p>
                     {changes_block}
                   </div>
@@ -2921,10 +2938,16 @@ class SaveWebViewer:
         for display_index, memory in enumerate(memories, start=1):
             title = self._e(memory.get("title") or "其他人与主角的交互")
             source_name = self._e(self._cameo_source_label(memory) or "未知角色")
-            summary = self._e(memory.get("summary") or "")
+            summary = self._e(memory.get("memory_text") or "")
             created_at = self._format_time(memory.get("created_at"))
             world_date = self._world_date_display(memory)
             world_date_html = f"<span>{self._e(world_date)}</span>" if world_date else ""
+            conversation_no = self._positive_int(memory.get("conversation_no"))
+            conversation_html = (
+                f"<span>事件序号 #{conversation_no}</span>"
+                if conversation_no > 0
+                else ""
+            )
             delete_button = ""
             if allow_delete and memory.get("_log_index") is not None:
                 log_index = memory["_log_index"]
@@ -2950,6 +2973,7 @@ class SaveWebViewer:
                     <div class="log-meta summary-meta">
                       <span>{self._e(created_at)}</span>
                       {world_date_html}
+                      {conversation_html}
                       <span>来源：{source_name}</span>
                     </div>
                   </summary>
@@ -2957,6 +2981,7 @@ class SaveWebViewer:
                     <div class="log-meta">
                       <span>{self._e(created_at)}</span>
                       {world_date_html}
+                      {conversation_html}
                       <span>来源：{source_name}</span>
                     </div>
                     <p class="log-result">{summary}</p>
@@ -3966,6 +3991,13 @@ class SaveWebViewer:
             return dt.datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
         except Exception:
             return ""
+
+    @staticmethod
+    def _positive_int(value: object) -> int:
+        try:
+            return max(0, int(value or 0))
+        except (TypeError, ValueError):
+            return 0
 
     @staticmethod
     def _world_date_display(item: dict[str, Any]) -> str:

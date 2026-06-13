@@ -120,9 +120,10 @@ data/plugin_data/astrbot_plugin_qq_MahouShoujo/saves/groups/{group_id}/users/{us
 - `analysis_features.keep_original_persona`：是否保留原会话人格影响。
 - `analysis_features.use_plugin_specific_persona`：是否强制使用插件指定人格。
 - `analysis_features.plugin_specific_persona_id`：插件指定人格 ID。
-- `battle.interaction_memory_target_chars`：每轮客观交互记忆的目标字数，默认 100。
+- `battle.interaction_memory_target_chars`：每轮当前玩家事件记忆及客串交互记忆的目标字数，默认 100。
 - `battle.memory_compaction_threshold_chars`：两类有效记忆正文合计达到该字数后触发长期记忆压缩，默认 20000，填 0 关闭。
 - `battle.memory_compaction_target_chars`：长期故事摘要目标字数，默认 2000。
+- `battle.teammate_recent_record_count`：参与对象确定后，正文主 LLM 接收该玩家最近多少条短事件记忆，默认 1，范围 1–5；选择子 LLM 不接收这些记忆。
 - `battle.use_mock_data`：静态假数据模式。
 - `t2i_rendering`：HTML 转图片策略。
 - `performance.max_concurrent_t2i`：最大并发渲染数。

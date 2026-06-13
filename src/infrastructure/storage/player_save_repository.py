@@ -153,7 +153,7 @@ class PlayerSaveRepository:
                 if not log_path.exists():
                     log_path = user_dir / "battle_log.jsonl"
                 for index, item in enumerate(self._read_recent_logs(log_path, limit=0)):
-                    if item.get("type") not in {"battle_diary", "battle_summary"}:
+                    if item.get("type") != "battle_diary":
                         continue
                     records.append(
                         (
@@ -170,13 +170,6 @@ class PlayerSaveRepository:
             records,
             key=lambda value: (value[0], str(value[1]), value[2]),
         ):
-            if item.get("type") == "battle_summary":
-                if "world_date_from" not in item and "world_date_to" not in item:
-                    item["world_date_unknown"] = True
-                    changed_paths.setdefault(log_path, log_path.read_text(encoding="utf-8").splitlines())
-                    changed_paths[log_path][line_index] = json.dumps(item, ensure_ascii=False)
-                next_day_offset += max(1, int(item.get("compressed_count", 1) or 1))
-                continue
             if "world_day_offset" not in item:
                 item["world_day_offset"] = next_day_offset
                 item["world_date"] = self.format_world_date(next_day_offset)
@@ -538,6 +531,7 @@ class PlayerSaveRepository:
         )
         world_date = self.format_world_date(world_day_offset)
         result.date_label = world_date
+        result.conversation_no = conversation_no
 
         player_data = self._load_current_player_data(user_dir)
         if not isinstance(player_data, dict) or not player_data:
@@ -603,6 +597,7 @@ class PlayerSaveRepository:
                 "conversation_no": conversation_no,
                 "action": result.action,
                 "story_text": result.story_text,
+                "memory_text": result.memory_text,
                 "action_options": result.action_options,
                 "analysis": result.analysis,
                 "json_patch": applied_patch,
@@ -941,7 +936,7 @@ class PlayerSaveRepository:
                 text = str(item.get("story_text") or item.get("summary") or "").strip()
                 valid = item.get("type") in ("action_turn", "memory_summary")
             else:
-                text = str(item.get("summary") or "").strip()
+                text = str(item.get("memory_text") or "").strip()
                 valid = item.get("type") == "interaction_memory"
             if valid and text:
                 clean = {key: value for key, value in item.items() if key != "_log_index"}
@@ -1768,11 +1763,7 @@ class PlayerSaveRepository:
         role_name = magical_name or target_name
         battle_count = self._ensure_battle_count(player_data)
 
-        log_path = user_dir / "daily_memory.jsonl"
-        if not log_path.exists():
-            log_path = user_dir / "battle_log.jsonl"
-
-        return {
+        package = {
             "_user_id": user_dir.name,
             "_source": source,
             "target_name": target_name,
@@ -1792,11 +1783,13 @@ class PlayerSaveRepository:
             "身材细节": self._public_nested_value(protagonist.get("身材细节")),
             "性器官特征": self._public_nested_value(protagonist.get("性器官特征")),
             "战斗次数": battle_count,
-            "最近记录": self._read_recent_battle_summaries(
-                log_path,
-                limit=recent_record_count,
-            ),
         }
+        if recent_record_count > 0:
+            package["最近事件"] = self._read_recent_participant_memories(
+                user_dir,
+                limit=recent_record_count,
+            )
+        return package
 
     def build_relationship_participants_context(
         self,
@@ -2132,32 +2125,51 @@ class PlayerSaveRepository:
             return [self._replace_protagonist_key(item, target_name) for item in value]
         return value
 
-    def _read_recent_battle_summaries(
+    def _read_recent_participant_memories(
         self,
-        path: Path,
+        user_dir: Path,
         *,
         limit: int,
     ) -> list[dict[str, Any]]:
         count = max(1, min(int(limit or 1), 5))
         records: list[dict[str, Any]] = []
-        for item in reversed(self._read_recent_logs(path, limit=0)):
-            if item.get("type") != "battle_diary":
+        for item in self._read_recent_logs(user_dir / "daily_memory.jsonl", limit=0):
+            memory_text = str(item.get("memory_text") or "").strip()
+            if item.get("type") != "action_turn" or not memory_text:
                 continue
             records.append(
                 {
+                    "type": "action_turn_memory",
+                    "conversation_no": item.get("conversation_no", 0),
                     "world_day_offset": item.get("world_day_offset"),
                     "world_date": item.get("world_date", ""),
                     "title": item.get("title", ""),
-                    "participants": item.get("participants", []),
-                    "monster_name": item.get("monster_name", ""),
-                    "action": item.get("action", ""),
-                    "encounter": item.get("encounter", ""),
-                    "result": item.get("result", ""),
+                    "memory_text": memory_text,
                 }
             )
-            if len(records) >= count:
-                break
-        return records
+        for item in self._read_recent_logs(user_dir / "cameo_memory.jsonl", limit=0):
+            memory_text = str(item.get("memory_text") or "").strip()
+            if item.get("type") != "interaction_memory" or not memory_text:
+                continue
+            records.append(
+                {
+                    "type": "interaction_memory",
+                    "conversation_no": item.get("conversation_no", 0),
+                    "world_day_offset": item.get("world_day_offset"),
+                    "world_date": item.get("world_date", ""),
+                    "title": item.get("title", ""),
+                    "source_name": item.get("source_name", ""),
+                    "source_magical_name": item.get("source_magical_name", ""),
+                    "memory_text": memory_text,
+                }
+            )
+        records.sort(
+            key=lambda item: (
+                int(item.get("conversation_no", 0) or 0),
+                int(item.get("world_day_offset", 0) or 0),
+            )
+        )
+        return records[-count:]
 
     @classmethod
     def _public_nested_value(cls, value: Any) -> Any:
@@ -2596,7 +2608,8 @@ class PlayerSaveRepository:
                 "source_age": item.get("source_age", ""),
                 "source_identity": item.get("source_identity", ""),
                 "source_magical_name": item.get("source_magical_name", ""),
-                "summary": item.get("summary", ""),
+                "memory_text": item.get("memory_text", ""),
+                "conversation_no": item.get("conversation_no", 0),
                 "title": item.get("title", ""),
                 "world_day_offset": item.get("world_day_offset"),
                 "world_date": item.get("world_date", ""),
