@@ -9,8 +9,6 @@
           "id": "classroom_familiar_alert",
           "name": "课堂上的使魔警报",
           "enabled": true,
-          "recursive": true,
-          "strategy": "keyword",
           "keys": [
             "上课",
             "课堂",
@@ -44,8 +42,6 @@
           "id": "crowded_shopping_alert",
           "name": "闹市逛街中的魔物",
           "enabled": true,
-          "recursive": true,
-          "strategy": "keyword",
           "keys": [
             "逛街",
             "朋友",
@@ -78,8 +74,6 @@
           "id": "rumor_investigation",
           "name": "调查传闻",
           "enabled": true,
-          "recursive": true,
-          "strategy": "keyword",
           "keys": [
             "传闻",
             "调查传闻",
@@ -109,8 +103,6 @@
           "id": "public_street_target_rescue",
           "name": "街头受困与意外救援",
           "enabled": true,
-          "recursive": true,
-          "strategy": "keyword",
           "keys": [
             "大街",
             "街上",
@@ -153,8 +145,6 @@
           "id": "direct_challenge_duel",
           "name": "直接挑战决斗",
           "enabled": true,
-          "recursive": true,
-          "strategy": "keyword",
           "keys": [
             "挑战",
             "决斗",
@@ -179,8 +169,6 @@
           "id": "magical_girl_prank",
           "name": "恶作剧其他魔法少女",
           "enabled": true,
-          "recursive": true,
-          "strategy": "keyword",
           "keys": [
             "恶作剧",
             "捉弄",
@@ -207,8 +195,6 @@
           "id": "cooperative_training_monster",
           "name": "共同训练遭遇魔物",
           "enabled": true,
-          "recursive": true,
-          "strategy": "keyword",
           "keys": [
             "共同训练",
             "一起训练",
@@ -246,8 +232,6 @@
           "id": "magical_girl_daily_encounter",
           "name": "魔法少女日常偶遇",
           "enabled": true,
-          "recursive": true,
-          "strategy": "keyword",
           "keys": [
             "日常遇见",
             "日常偶遇",
@@ -281,8 +265,6 @@
           "id": "magical_girl_daily",
           "name": "魔法少女的日常",
           "enabled": true,
-          "recursive": true,
-          "strategy": "keyword",
           "keys": [
             "日常",
             "逛街",

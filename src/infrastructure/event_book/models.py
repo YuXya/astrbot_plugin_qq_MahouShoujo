@@ -9,9 +9,7 @@ class EventBookEntry:
     category_name: str = ""
     title: str = ""
     enabled: bool = True
-    strategy: str = "keyword"
     keys: list[str] = field(default_factory=list)
-    recursive: bool = True
     content: str = ""
     allowed_commands: list[str] = field(default_factory=list)
     location_tags: list[str] = field(default_factory=list)
@@ -41,9 +39,7 @@ class EventBookEntry:
             category_name=str(raw.get("category_name") or category_name or "").strip(),
             title=str(raw.get("title") or "").strip(),
             enabled=bool(raw.get("enabled", True)),
-            strategy=str(raw.get("strategy") or "keyword").strip().lower(),
             keys=[str(key).strip() for key in keys if str(key).strip()],
-            recursive=raw.get("recursive", True) is not False,
             content=str(raw.get("content") or "").strip(),
             allowed_commands=cls._normalize_text_list(raw.get("allowed_commands")),
             location_tags=cls._normalize_text_list(raw.get("location_tags")),
@@ -76,9 +72,7 @@ class EventBookEvent:
     command: str = ""
     name: str = ""
     enabled: bool = True
-    strategy: str = "keyword"
     keys: list[str] = field(default_factory=list)
-    recursive: bool = True
     content: str = ""
     allowed_commands: list[str] = field(default_factory=list)
     location_tags: list[str] = field(default_factory=list)
@@ -129,9 +123,7 @@ class EventBookEvent:
             command=str(raw.get("command") or "").strip(),
             name=str(raw.get("name") or "").strip(),
             enabled=bool(raw.get("enabled", True)),
-            strategy=str(raw.get("strategy") or "keyword").strip().lower(),
             keys=EventBookEntry._normalize_text_list(raw.get("keys")),
-            recursive=raw.get("recursive", True) is not False,
             content=str(raw.get("content") or "").strip(),
             allowed_commands=EventBookEntry._normalize_text_list(
                 raw.get("allowed_commands")
@@ -166,9 +158,7 @@ class EventBookEvent:
             category_name=self.category_name,
             title=self.name,
             enabled=self.enabled,
-            strategy=self.strategy,
             keys=self.keys,
-            recursive=self.recursive,
             content=self.content,
             allowed_commands=self.allowed_commands or ([self.command] if self.command else []),
             location_tags=self.location_tags,

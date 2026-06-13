@@ -359,10 +359,11 @@ class EditableResourceManager:
             ),
             "event_book/default.json": (
                 "事件书 v4 按 monster_enemy 和 character_enemy 分类。每个事件包含正文、事件机制、"
-                "顺利进行和受到阻碍；关键词、地点标签和兼容魔物仍使用列表。"
+                "顺利进行和受到阻碍；关键词、地点标签和兼容魔物仅供 LLM 理解和选择候选。"
             ),
             "monster_book/default.json": (
-                "魔物书文件。公共魔物书是普通魔物目标图鉴；正文、战斗机制、胜利结尾和失败结尾均为单个文本字段。"
+                "魔物书文件。公共魔物书是普通魔物目标图鉴；正文、战斗机制、胜利结尾和失败结尾均为单个文本字段，"
+                "关键词仅供 LLM 理解候选语义。"
             ),
             self.PROMPT_FILES["reincarnation_prompt"]: (
                 "用于 /魔法少女转生 的完整 Prompt。发给 AI 的 user message 就是这个模板渲染后的结果。"

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import random
 
 from ....domain.models.data_models import BattleDiaryCard, TokenUsage
 from ....domain.services.battle_outcome_service import resolve_battle_outcome
@@ -248,36 +247,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             self._format_logs(logs),
             self._format_cameo_memories(cameo_memories),
         ]
-        category_ids = self._battle_event_category_ids(
-            action_text,
-            character_keywords=["魔法少女", "少女对手", "决斗", "切磋"],
-        )
-        event_monster_candidates = self._event_monster_candidates(
-            monster_candidates,
-            action_text=action_text,
-            require_monster_pool=category_ids == ["monster_enemy"],
-        )
         scene_event_candidates = self.event_book_engine.build_scene_event_candidates(
-            text_parts,
             current_event="/魔法少女战斗",
-            category_ids=category_ids,
-            monster_candidates=event_monster_candidates,
             limit=80,
-        )
-        if category_ids == ["monster_enemy"]:
-            scene_event_candidates = self._filter_scene_events_for_monsters(
-                scene_event_candidates,
-                event_monster_candidates,
-            )
-        scene_event_candidates = self._prepare_scene_event_candidates(
-            scene_event_candidates,
-            action_text=action_text,
-            memory_text=self._selection_memory_text(logs, cameo_memories),
-        )
-        prompt_monster_candidates = self._prepare_monster_candidates(
-            monster_candidates,
-            action_text=action_text,
-            memory_text=self._selection_memory_text(logs, cameo_memories),
         )
         prompt = self.editable_manager.render_prompt(
             "magical_battle_target_selection_prompt",
@@ -296,7 +268,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                                 magical_girl_candidates
                             ),
                             "monsters": self._prompt_monster_candidates(
-                                prompt_monster_candidates
+                                monster_candidates
                             ),
                         },
                         "scene_events": self._prompt_scene_event_candidates(
@@ -329,9 +301,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             logger.warning(f"魔法少女战斗目标判断 JSON 解析失败，按魔物战斗处理: {error}")
             return self._magical_monster_context(
                 player_data=player_data,
-                monster_candidates=prompt_monster_candidates,
+                monster_candidates=monster_candidates,
                 scene_event_candidates=scene_event_candidates,
-                text_parts=text_parts,
                 teammate_candidates=teammate_candidates,
             )
 
@@ -343,9 +314,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         if not targets:
             return self._magical_monster_context(
                 player_data=player_data,
-                monster_candidates=prompt_monster_candidates,
+                monster_candidates=monster_candidates,
                 scene_event_candidates=scene_event_candidates,
-                text_parts=text_parts,
                 selected_targets=selected_target_payload,
                 scene_event=parsed.get("scene_event"),
                 ai_win_rate=parsed.get("ai_win_rate"),
@@ -364,10 +334,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             "selected_targets": targets,
             "scene_event": self._resolve_selected_scene_event(
                 parsed.get("scene_event"), scene_event_candidates
-            ) or self._select_scene_event(
-                scene_event_candidates,
-                selected_target=None,
-                text_parts=text_parts,
             ),
             "battle_odds": self._build_battle_odds_context(
                 player_data=player_data,
@@ -379,249 +345,12 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             ),
         }
 
-    @staticmethod
-    def _battle_event_category_ids(
-        action_text: str,
-        *,
-        character_keywords: list[str],
-    ) -> list[str]:
-        text = str(action_text or "")
-        monster_keywords = [
-            "魔物",
-            "怪物",
-            "污染源",
-            "污染",
-            "异常",
-            "怪异",
-            "普通魔物",
-            "路过怪物",
-            "与魔物战斗",
-        ]
-        if any(keyword and keyword in text for keyword in monster_keywords):
-            return ["monster_enemy"]
-        if any(keyword and keyword in text for keyword in character_keywords):
-            return ["character_enemy"]
-        return ["monster_enemy", "character_enemy"]
-
-    def _event_monster_candidates(
-        self,
-        candidates: list[dict],
-        *,
-        action_text: str,
-        require_monster_pool: bool,
-        limit: int = 12,
-    ) -> list[dict]:
-        if not require_monster_pool:
-            return candidates
-        if not candidates:
-            return []
-
-        text = str(action_text or "")
-        if not text.strip():
-            return candidates[:limit]
-        folded = text.casefold()
-        explicit: list[dict] = []
-        for candidate in candidates:
-            if not isinstance(candidate, dict):
-                continue
-            values = [
-                str(candidate.get("id") or "").strip(),
-                str(candidate.get("name") or "").strip(),
-                *[str(key or "").strip() for key in candidate.get("keys", [])],
-            ]
-            if any(value and (value in text or value.casefold() in folded) for value in values):
-                explicit.append(candidate)
-        if explicit:
-            return explicit[:limit]
-        return candidates
-
-    def _filter_scene_events_for_monsters(
-        self,
-        scene_events: list[dict],
-        monster_candidates: list[dict],
-    ) -> list[dict]:
-        if not scene_events:
-            return []
-        monster_names: set[str] = set()
-        for monster in monster_candidates:
-            if not isinstance(monster, dict):
-                continue
-            monster_name = str(monster.get("name") or "").strip()
-            if monster_name:
-                monster_names.add(monster_name)
-
-        filtered: list[dict] = []
-        for event in scene_events:
-            if not isinstance(event, dict):
-                continue
-            compatible_monsters = self._text_set(event.get("compatible_monsters"))
-            if not compatible_monsters:
-                filtered.append(event)
-                continue
-            if not monster_names or compatible_monsters & monster_names:
-                filtered.append(event)
-        return filtered or scene_events
-
-    def _prepare_scene_event_candidates(
-        self,
-        candidates: list[dict],
-        *,
-        action_text: str,
-        memory_text: str,
-        limit: int = 8,
-    ) -> list[dict]:
-        if not candidates:
-            return []
-
-        explicit = [
-            candidate
-            for candidate in candidates
-            if self._scene_event_explicitly_requested(candidate, action_text)
-        ]
-        pool = explicit or candidates
-        fresh = [
-            candidate
-            for candidate in pool
-            if not self._candidate_seen_in_memory(
-                candidate,
-                memory_text,
-                fields=("id", "title", "source_event"),
-            )
-        ]
-        return self._random_candidate_sample(fresh or pool, limit=limit)
-
-    def _prepare_monster_candidates(
-        self,
-        candidates: list[dict],
-        *,
-        action_text: str,
-        memory_text: str,
-        limit: int = 8,
-    ) -> list[dict]:
-        if not candidates:
-            return []
-        explicit = [
-            candidate
-            for candidate in candidates
-            if self._monster_explicitly_requested(candidate, action_text)
-        ]
-        if explicit:
-            return explicit[:limit]
-        fresh = [
-            candidate
-            for candidate in candidates
-            if not self._candidate_seen_in_memory(
-                candidate,
-                memory_text,
-                fields=("id", "name"),
-            )
-        ]
-        return self._random_candidate_sample(fresh or candidates, limit=limit)
-
-    @staticmethod
-    def _selection_memory_text(
-        logs: list[dict],
-        cameo_memories: list[dict] | None,
-    ) -> str:
-        return "\n".join(
-            [
-                BattleDiaryAnalyzer._json_dump_static(logs),
-                BattleDiaryAnalyzer._json_dump_static(cameo_memories or []),
-            ]
-        )
-
-    @staticmethod
-    def _json_dump_static(value: object) -> str:
-        try:
-            return json.dumps(value, ensure_ascii=False)
-        except Exception:
-            return str(value or "")
-
-    def _scene_event_explicitly_requested(
-        self,
-        candidate: dict,
-        action_text: str,
-    ) -> bool:
-        text = str(action_text or "")
-        if not text.strip():
-            return False
-        folded = text.casefold()
-        generic_terms = {
-            "魔物",
-            "怪物",
-            "战斗",
-            "找",
-            "寻找",
-            "挑战",
-            "魔法少女",
-            "目标",
-            "对象",
-            "自由战斗",
-        }
-        values: set[str] = set()
-        for field in ("keys",):
-            values.update(self._text_set(candidate.get(field)))
-        for value in values:
-            token = str(value or "").strip()
-            if not token or token in generic_terms:
-                continue
-            if token in text or token.casefold() in folded:
-                return True
-        return False
-
-    def _monster_explicitly_requested(
-        self,
-        candidate: dict,
-        action_text: str,
-    ) -> bool:
-        text = str(action_text or "")
-        if not text.strip():
-            return False
-        folded = text.casefold()
-        values = {
-            str(candidate.get("id") or "").strip(),
-            str(candidate.get("name") or "").strip(),
-            *self._text_set(candidate.get("keys")),
-        }
-        generic_terms = {"魔物", "怪物", "污染", "异常", "战斗"}
-        for value in values:
-            if not value or value in generic_terms:
-                continue
-            if value in text or value.casefold() in folded:
-                return True
-        return False
-
-    @staticmethod
-    def _candidate_seen_in_memory(
-        candidate: dict,
-        memory_text: str,
-        *,
-        fields: tuple[str, ...],
-    ) -> bool:
-        if not memory_text:
-            return False
-        folded = memory_text.casefold()
-        for field in fields:
-            value = str(candidate.get(field) or "").strip()
-            if value and (value in memory_text or value.casefold() in folded):
-                return True
-        return False
-
-    @staticmethod
-    def _random_candidate_sample(candidates: list[dict], *, limit: int) -> list[dict]:
-        clean = [dict(candidate) for candidate in candidates if isinstance(candidate, dict)]
-        if len(clean) <= max(1, limit):
-            random.shuffle(clean)
-            return clean
-        return random.sample(clean, max(1, limit))
-
     def _magical_monster_context(
         self,
         *,
         player_data: dict,
         monster_candidates: list[dict],
         scene_event_candidates: list[dict],
-        text_parts: list[str],
         selected_targets: object = None,
         scene_event: object = None,
         ai_win_rate: object = None,
@@ -631,29 +360,11 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
     ) -> dict[str, object]:
         resolved_scene = self._resolve_selected_scene_event(
             scene_event, scene_event_candidates
-        ) or self._select_scene_event(
-            scene_event_candidates,
-            selected_target=None,
-            text_parts=text_parts,
         )
         resolved_targets = self._resolve_selected_targets(
             selected_targets,
             monster_candidates,
-            action_text="\n".join(text_parts),
         )
-        primary_target = (resolved_targets[0] if resolved_targets else None) or self._select_public_monster(
-            monster_candidates,
-            text_parts=text_parts,
-            scene_event=resolved_scene,
-        )
-        if not resolved_targets and primary_target:
-            resolved_targets = [primary_target]
-        if not resolved_scene:
-            resolved_scene = self._select_scene_event(
-                scene_event_candidates,
-                selected_target=primary_target,
-                text_parts=text_parts,
-            )
         participants = self._resolve_selected_profiles(
             selected_participants,
             teammate_candidates or [],
@@ -787,9 +498,7 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             self._format_cameo_memories(cameo_memories),
         ]
         scene_event_candidates = self.event_book_engine.build_scene_event_candidates(
-            text_parts,
             current_event=event_command,
-            monster_candidates=monster_candidates,
         )
         prompt = self.build_teammate_completion_prompt(
             action_text=action_text,
@@ -866,15 +575,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         selected_targets = self._resolve_selected_targets(
             parsed.get("selected_targets"),
             monster_candidates,
-            action_text="\n".join(text_parts),
         )
-        primary_target = selected_targets[0] if selected_targets else None
         scene_event = self._resolve_selected_scene_event(
             parsed.get("scene_event"), scene_event_candidates
-        ) or self._select_scene_event(
-            scene_event_candidates,
-            selected_target=primary_target,
-            text_parts=text_parts,
         )
         participants = self._resolve_selected_profiles(
             [
@@ -971,110 +674,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         text = str(value or "").strip()
         return {"type": "", "target": text, "reason": ""} if text else {}
 
-    def _select_public_monster(
-        self,
-        candidates: list[dict],
-        *,
-        text_parts: list[str],
-        scene_event: dict | None = None,
-    ) -> dict | None:
-        if not candidates:
-            return None
-
-        scan_text = "\n".join(str(part or "") for part in text_parts)
-        scored: list[tuple[int, dict]] = []
-        for index, candidate in enumerate(candidates):
-            if not isinstance(candidate, dict):
-                continue
-            score = max(0, 100 - index)
-            names = [
-                str(candidate.get("id") or "").strip(),
-                str(candidate.get("name") or "").strip(),
-                *[str(key or "").strip() for key in candidate.get("keys", [])],
-            ]
-            explicit = False
-            for name in names:
-                if name and name in scan_text:
-                    score += 1000
-                    explicit = True
-            score += self._monster_scene_score(candidate, scene_event, scan_text)
-            resolved = self._resolve_selected_target(
-                {"id": candidate.get("id"), "reason": "玩家行动或公共魔物书匹配"},
-                candidates,
-                action_text=scan_text if explicit else "",
-            )
-            if resolved:
-                scored.append((score, resolved))
-
-        if not scored:
-            return None
-        scored.sort(key=lambda item: item[0], reverse=True)
-        return scored[0][1]
-
-    @staticmethod
-    def _monster_scene_score(
-        monster: dict,
-        scene_event: dict | None,
-        scan_text: str,
-    ) -> int:
-        score = 0
-        monster_keys = BattleDiaryAnalyzer._text_set(monster.get("keys"))
-        if scan_text:
-            folded = scan_text.casefold()
-            for value in monster_keys:
-                if value and (value in scan_text or value.casefold() in folded):
-                    score += 8
-        if scene_event:
-            compatible = BattleDiaryAnalyzer._text_set(scene_event.get("compatible_monsters"))
-            monster_name = str(monster.get("name") or "").strip()
-            if monster_name and monster_name in compatible:
-                score += 20
-        return score
-
-    @staticmethod
-    def _text_set(value: object) -> set[str]:
-        if isinstance(value, str):
-            raw_items = [value]
-        elif isinstance(value, list):
-            raw_items = value
-        else:
-            raw_items = []
-        return {
-            str(item or "").strip()
-            for item in raw_items
-            if str(item or "").strip()
-        }
-
-    def _select_scene_event(
-        self,
-        candidates: list[dict],
-        *,
-        selected_target: dict | None,
-        text_parts: list[str],
-    ) -> dict | None:
-        if not candidates:
-            return None
-        action_text = str(text_parts[0] if text_parts else "")
-        compatible = [candidate for candidate in candidates if isinstance(candidate, dict)]
-        if not compatible:
-            return None
-
-        explicit = [
-            candidate
-            for candidate in compatible
-            if self._scene_event_explicitly_requested(candidate, action_text)
-        ]
-        pool = explicit or compatible
-        if selected_target:
-            related = [
-                candidate
-                for candidate in pool
-                if self._scene_target_score(candidate, selected_target) > 0
-            ]
-            if related:
-                pool = related
-        return dict(random.choice(pool))
-
     def _resolve_selected_scene_event(
         self,
         selected: object,
@@ -1097,23 +696,10 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 return resolved
         return None
 
-    def _scene_target_score(
-        self,
-        scene_event: dict,
-        selected_target: dict | None,
-    ) -> int:
-        if not selected_target:
-            return 0
-        compatible = self._text_set(scene_event.get("compatible_monsters"))
-        target_name = str(selected_target.get("name") or "").strip()
-        return 20 if target_name and target_name in compatible else 0
-
     def _resolve_selected_target(
         self,
         selected: object,
         candidates: list[dict],
-        *,
-        action_text: str,
     ) -> dict | None:
         if not selected or not isinstance(selected, dict):
             return None
@@ -1136,8 +722,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         self,
         selected: object,
         candidates: list[dict],
-        *,
-        action_text: str,
     ) -> list[dict]:
         selected_items = self._as_list(selected)
         resolved: list[dict] = []
@@ -1146,7 +730,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             monster = self._resolve_selected_target(
                 item,
                 candidates,
-                action_text=action_text,
             )
             if not monster:
                 continue
@@ -1156,24 +739,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             seen.add(key)
             resolved.append(monster)
         return resolved[:5]
-
-    def _resolve_default_monster(
-        self,
-        candidates: list[dict],
-        *,
-        action_text: str,
-    ) -> dict | None:
-        for candidate in candidates:
-            if not isinstance(candidate, dict):
-                continue
-            resolved = self._resolve_selected_target(
-                {"id": candidate.get("id")},
-                candidates,
-                action_text=action_text,
-            )
-            if resolved:
-                return resolved
-        return None
 
     @staticmethod
     def _resolve_selected_magical_girl(

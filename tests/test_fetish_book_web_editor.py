@@ -106,5 +106,22 @@ class FetishBookWebEditorTests(unittest.TestCase):
         self.assertIn('class="content-editor"', response.text)
 
 
+class EventBookWebEditorTests(unittest.TestCase):
+    def test_event_normalization_drops_removed_strategy_fields(self):
+        normalized = SaveWebViewer._normalize_event_book_entry(
+            {
+                "id": "event",
+                "strategy": "always",
+                "recursive": True,
+                "keys": ["关键词"],
+            },
+            0,
+        )
+
+        self.assertNotIn("strategy", normalized)
+        self.assertNotIn("recursive", normalized)
+        self.assertEqual(normalized["keys"], ["关键词"])
+
+
 if __name__ == "__main__":
     unittest.main()

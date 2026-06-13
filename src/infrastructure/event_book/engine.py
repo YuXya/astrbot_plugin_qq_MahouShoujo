@@ -33,11 +33,8 @@ class EventBookEngine:
 
     def build_scene_event_candidates(
         self,
-        text_parts: list[str] | None,
         *,
         current_event: str,
-        category_ids: list[str] | None = None,
-        monster_candidates: list[dict] | None = None,
         limit: int = 8,
     ) -> list[dict[str, object]]:
         events = self._load_events()
@@ -45,15 +42,8 @@ class EventBookEngine:
             return []
 
         current_event_key = self._normalize_event_key(current_event)
-        allowed_category_ids = {
-            str(item or "").strip()
-            for item in (category_ids or [])
-            if str(item or "").strip()
-        }
         candidates: list[dict[str, object]] = []
         for event in events:
-            if allowed_category_ids and event.category_id not in allowed_category_ids:
-                continue
             event_commands = event.allowed_commands or [event.command]
             entries = [event.as_entry()] if event.is_scene_event else event.entries
             for entry in entries:

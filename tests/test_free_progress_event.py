@@ -7,7 +7,7 @@ import types
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 
 class _Logger:
@@ -93,6 +93,49 @@ class EventBookLookupTests(unittest.TestCase):
         self.assertEqual(event["content"], "事件正文")
         self.assertEqual(event["obstacle_ending"], "受阻指导")
 
+    def test_candidates_only_filter_by_enabled_state_and_command(self):
+        root = Path(tempfile.mkdtemp())
+        path = root / "event_book.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "categories": [
+                        {
+                            "id": "monster_enemy",
+                            "events": [
+                                {
+                                    "id": "keyword_miss",
+                                    "name": "关键词未命中也保留",
+                                    "enabled": True,
+                                    "command": "/魔法少女行动",
+                                    "keys": ["逛街"],
+                                },
+                                {
+                                    "id": "disabled",
+                                    "enabled": False,
+                                    "command": "/魔法少女行动",
+                                },
+                                {
+                                    "id": "other_command",
+                                    "enabled": True,
+                                    "command": "/魔法少女战斗",
+                                },
+                            ],
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        candidates = EventBookEngine(book_path=path).build_scene_event_candidates(
+            current_event="/魔法少女行动"
+        )
+
+        self.assertEqual([candidate["id"] for candidate in candidates], ["keyword_miss"])
+        self.assertEqual(candidates[0]["keys"], ["逛街"])
+
 
 class MagicalBattlePromptCandidateTests(unittest.TestCase):
     def test_candidate_views_only_keep_selection_fields(self):
@@ -135,6 +178,91 @@ class MagicalBattlePromptCandidateTests(unittest.TestCase):
         self.assertNotIn("event_gimmick", compact)
         self.assertNotIn("battle_gimmick", compact)
         self.assertNotIn("\n", compact)
+
+
+class PureLlmSelectionTests(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def _analyzer(scene_events):
+        analyzer = BattleDiaryAnalyzer.__new__(BattleDiaryAnalyzer)
+        analyzer.context = None
+        analyzer.event_book_engine = SimpleNamespace(
+            build_scene_event_candidates=lambda **kwargs: scene_events
+        )
+        analyzer.editable_manager = SimpleNamespace(
+            render_prompt=lambda *args, **kwargs: "",
+            get_prompt=lambda *args, **kwargs: "",
+        )
+        analyzer.config_manager = SimpleNamespace(
+            get_debug_mode=lambda: False,
+            get_subtask_llm_provider_id=lambda: None,
+        )
+        return analyzer
+
+    async def test_daily_empty_llm_selection_stays_empty_even_when_keys_match(self):
+        analyzer = self._analyzer(
+            [{"id": "shopping", "title": "逛街魔物", "keys": ["逛街"]}]
+        )
+        response = SimpleNamespace(
+            completion_text=json.dumps(
+                {
+                    "action_target": {"type": "daily_life", "target": "逛街"},
+                    "participant_names": [],
+                    "scene_event": None,
+                    "selected_targets": [],
+                },
+                ensure_ascii=False,
+            )
+        )
+
+        with patch(
+            "src.infrastructure.analysis.analyzers.battle_diary_analyzer.call_provider_with_retry",
+            new=AsyncMock(return_value=response),
+        ):
+            context = await analyzer.select_daily_context(
+                action_text="逛街",
+                player_data={},
+                logs=[],
+                cameo_memories=[],
+                candidates=[],
+                monster_candidates=[
+                    {"id": "monster", "name": "逛街魔物", "keys": ["逛街"]}
+                ],
+                event_command="/魔法少女行动",
+            )
+
+        self.assertIsNone(context["scene_event"])
+        self.assertEqual(context["selected_targets"], [])
+        self.assertNotIn("battle_odds", context)
+
+    async def test_daily_explicit_llm_selection_resolves_candidates(self):
+        analyzer = self._analyzer([{"id": "shopping", "title": "逛街事件"}])
+        response = SimpleNamespace(
+            completion_text=json.dumps(
+                {
+                    "participant_names": [],
+                    "scene_event": {"id": "shopping", "reason": "LLM 选择"},
+                    "selected_targets": [{"id": "monster", "reason": "LLM 选择"}],
+                },
+                ensure_ascii=False,
+            )
+        )
+
+        with patch(
+            "src.infrastructure.analysis.analyzers.battle_diary_analyzer.call_provider_with_retry",
+            new=AsyncMock(return_value=response),
+        ):
+            context = await analyzer.select_daily_context(
+                action_text="普通日常",
+                player_data={},
+                logs=[],
+                cameo_memories=[],
+                candidates=[],
+                monster_candidates=[{"id": "monster", "name": "测试魔物"}],
+                event_command="/魔法少女行动",
+            )
+
+        self.assertEqual(context["scene_event"]["id"], "shopping")
+        self.assertEqual(context["selected_targets"][0]["id"], "monster")
 
 
 class EventContextTests(unittest.TestCase):

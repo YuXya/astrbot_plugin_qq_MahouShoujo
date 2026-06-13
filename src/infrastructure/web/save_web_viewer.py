@@ -1242,8 +1242,6 @@ class SaveWebViewer:
                   id: `event_${{index + 1}}`,
                   name: "",
                   enabled: true,
-                  recursive: true,
-                  strategy: "keyword",
                   keys: [],
                   location_tags: [],
                   compatible_monsters: [],
@@ -1264,8 +1262,6 @@ class SaveWebViewer:
                   id: String(entry.id || `event_${{index + 1}}`).trim(),
                   name: String(entry.name || entry.title || "").trim(),
                   enabled: entry.enabled !== false,
-                  recursive: entry.recursive !== false,
-                  strategy: entry.strategy === "always" ? "always" : "keyword",
                   keys: eventSplitList(entry.keys),
                   location_tags: eventSplitList(entry.location_tags),
                   compatible_monsters: eventSplitList(entry.compatible_monsters),
@@ -1394,8 +1390,6 @@ class SaveWebViewer:
                       id: card.querySelector("[data-field='id']").value,
                       name: card.querySelector("[data-field='name']").value,
                       enabled: card.querySelector("[data-field='enabled']").checked,
-                      recursive: card.querySelector("[data-field='recursive']").checked,
-                      strategy: card.querySelector("[data-field='strategy']").value,
                       keys: card.querySelector("[data-field='keys']").value,
                       location_tags: card.querySelector("[data-field='location_tags']").value,
                       compatible_monsters: eventGetCardMonsters(card),
@@ -1454,8 +1448,6 @@ class SaveWebViewer:
                           <div class="world-entry-grid">
                             <label class="title-field">ID<input data-field="id" type="text" value="${{eventEscapeAttr(entry.id)}}" spellcheck="false"></label>
                             <label class="title-field">名称<input data-field="name" type="text" value="${{eventEscapeAttr(entry.name)}}" spellcheck="false"></label>
-                            <label class="compact-field"><span>策略</span><select data-field="strategy"><option value="keyword"${{entry.strategy !== "always" ? " selected" : ""}}>keyword</option><option value="always"${{entry.strategy === "always" ? " selected" : ""}}>always</option></select></label>
-                            <label class="summary-check"><input data-field="recursive" type="checkbox"${{entry.recursive ? " checked" : ""}}> 递归关键词</label>
                           </div>
                           ${{eventTextarea("keys", entry.keys, "关键词", "keys-editor")}}
                           ${{eventTextarea("location_tags", entry.location_tags, "地点标签", "keys-editor")}}
@@ -1679,8 +1671,6 @@ class SaveWebViewer:
             "id": str(entry.get("id") or f"event_{idx + 1}").strip(),
             "name": str(entry.get("name") or entry.get("title") or "").strip(),
             "enabled": entry.get("enabled", True) is not False,
-            "recursive": entry.get("recursive", True) is not False,
-            "strategy": "always" if str(entry.get("strategy") or "").strip().lower() == "always" else "keyword",
             "keys": cls._normalize_editor_text_list(entry.get("keys")),
             "location_tags": cls._normalize_editor_text_list(entry.get("location_tags")),
             "content": str(entry.get("content") or "").strip(),
