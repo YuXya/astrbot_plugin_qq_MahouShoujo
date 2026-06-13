@@ -260,6 +260,9 @@ class EventSaveTests(unittest.TestCase):
             started["进程"]["当前事件"]["selected_targets"][0]["id"],
             "monster",
         )
+        clock = self.repo._read_json(self.repo._world_clock_path("g1"))
+        self.assertEqual(clock["next_conversation_no"], 2)
+        self.assertEqual(clock["next_day_offset"], 0)
 
         continued = self._save([])
         self.assertEqual(continued["进程"]["当前事件"]["turn_count"], 2)
@@ -267,6 +270,9 @@ class EventSaveTests(unittest.TestCase):
             continued["进程"]["当前事件"]["selected_targets"][0]["id"],
             "monster",
         )
+        clock = self.repo._read_json(self.repo._world_clock_path("g1"))
+        self.assertEqual(clock["next_conversation_no"], 3)
+        self.assertEqual(clock["next_day_offset"], 0)
 
         ended = self._save(
             [
@@ -276,6 +282,141 @@ class EventSaveTests(unittest.TestCase):
         )
         self.assertEqual(ended["进程"]["阶段"], "日常")
         self.assertNotIn("当前事件", ended["进程"])
+        clock = self.repo._read_json(self.repo._world_clock_path("g1"))
+        self.assertEqual(clock["next_conversation_no"], 4)
+        self.assertEqual(clock["next_day_offset"], 1)
+
+        logs = self.repo._read_recent_logs(
+            self.repo.get_user_dir("g1", "u1") / "daily_memory.jsonl",
+            limit=0,
+        )
+        self.assertEqual([item["conversation_no"] for item in logs], [1, 2, 3])
+        self.assertEqual([item["event_started"] for item in logs], [True, False, False])
+        self.assertEqual([item["event_ended"] for item in logs], [False, False, True])
+        self.assertEqual([item["day_advanced"] for item in logs], [False, False, True])
+        self.assertEqual({item["world_day_offset"] for item in logs}, {0})
+
+    def test_event_can_start_and_end_in_same_turn(self):
+        ended = self._save(
+            [{"op": "remove", "path": "/进程/当前事件"}],
+            runtime=_runtime(turn_count=0),
+        )
+
+        self.assertEqual(ended["进程"]["阶段"], "日常")
+        clock = self.repo._read_json(self.repo._world_clock_path("g1"))
+        self.assertEqual(clock["next_conversation_no"], 2)
+        self.assertEqual(clock["next_day_offset"], 1)
+        log = self.repo._read_recent_logs(
+            self.repo.get_user_dir("g1", "u1") / "daily_memory.jsonl",
+            limit=1,
+        )[0]
+        self.assertTrue(log["event_started"])
+        self.assertTrue(log["event_ended"])
+        self.assertTrue(log["day_advanced"])
+        self.assertEqual(log["days_advanced"], 1)
+        self.assertEqual(log["conversation_no"], 1)
+
+    def test_active_event_can_advance_multiple_days_without_ending(self):
+        state = self._save(
+            [{"op": "delta", "path": "/世界/日期", "value": 3}],
+            runtime=_runtime(turn_count=0),
+        )
+
+        self.assertIn("当前事件", state["进程"])
+        self.assertEqual(self.repo.get_current_world_day_offset("g1"), 3)
+        self.assertEqual(self.repo.get_current_conversation_no("g1"), 2)
+        log = self.repo._read_recent_logs(
+            self.repo.get_user_dir("g1", "u1") / "daily_memory.jsonl",
+            limit=1,
+        )[0]
+        self.assertFalse(log["event_ended"])
+        self.assertTrue(log["day_advanced"])
+        self.assertEqual(log["days_advanced"], 3)
+        self.assertEqual(
+            log["json_patch"][-1],
+            {"op": "delta", "path": "/世界/日期", "value": 3},
+        )
+        self.assertNotIn("日期", state.get("世界", {}))
+
+    def test_event_end_uses_explicit_day_advance_without_extra_day(self):
+        self._save([], runtime=_runtime(turn_count=0))
+        self._save(
+            [
+                {"op": "delta", "path": "/世界/日期", "value": 3},
+                {"op": "remove", "path": "/进程/当前事件"},
+            ]
+        )
+
+        self.assertEqual(self.repo.get_current_world_day_offset("g1"), 3)
+        log = self.repo._read_recent_logs(
+            self.repo.get_user_dir("g1", "u1") / "daily_memory.jsonl",
+            limit=1,
+        )[0]
+        self.assertTrue(log["event_ended"])
+        self.assertEqual(log["days_advanced"], 3)
+
+    def test_invalid_world_date_patch_does_not_consume_conversation(self):
+        invalid_patches = [
+            [{"op": "replace", "path": "/世界/日期", "value": "2020-04-02"}],
+            [{"op": "delta", "path": "/世界/日期", "value": 0}],
+            [{"op": "delta", "path": "/世界/日期", "value": -1}],
+            [{"op": "delta", "path": "/世界/日期", "value": 1.5}],
+        ]
+        for invalid_patch in invalid_patches:
+            with self.subTest(patch=invalid_patch):
+                with self.assertRaises(ValueError):
+                    self._save(invalid_patch, runtime=_runtime(turn_count=0))
+                self.assertEqual(self.repo.get_current_conversation_no("g1"), 1)
+                self.assertEqual(self.repo.get_current_world_day_offset("g1"), 0)
+                self.assertFalse(
+                    (self.repo.get_user_dir("g1", "u1") / "daily_memory.jsonl").exists()
+                )
+
+    def test_multiple_players_share_one_conversation_sequence(self):
+        second_user_dir = self.repo.get_user_dir("g1", "u2")
+        second_user_dir.mkdir(parents=True)
+        (second_user_dir / "player_data_update.json").write_text(
+            json.dumps({"进程": {"阶段": "日常"}, "主角": {}}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        self._save([], runtime=_runtime(turn_count=0))
+        self.repo.save_action_turn_result(
+            group_id="g1",
+            user_id="u2",
+            result=ActionTurnResult(story_text="第二名玩家", json_patch=[]),
+            event_runtime=_runtime(turn_count=0),
+        )
+        self._save([])
+
+        u1_logs = self.repo._read_recent_logs(
+            self.repo.get_user_dir("g1", "u1") / "daily_memory.jsonl",
+            limit=0,
+        )
+        u2_logs = self.repo._read_recent_logs(
+            second_user_dir / "daily_memory.jsonl",
+            limit=0,
+        )
+        self.assertEqual([item["conversation_no"] for item in u1_logs], [1, 3])
+        self.assertEqual([item["conversation_no"] for item in u2_logs], [2])
+        self.assertEqual(self.repo.get_current_conversation_no("g1"), 4)
+        self.assertEqual(self.repo.get_current_world_day_offset("g1"), 0)
+
+    def test_validation_failure_does_not_consume_conversation_number(self):
+        with self.assertRaises(ValueError):
+            self.repo.save_action_turn_result(
+                group_id="g1",
+                user_id="u1",
+                result=ActionTurnResult(story_text="失败", json_patch=[]),
+                world_day_offset=3,
+                event_runtime=_runtime(turn_count=0),
+            )
+
+        self.assertEqual(self.repo.get_current_conversation_no("g1"), 1)
+        self.assertEqual(self.repo.get_current_world_day_offset("g1"), 0)
+        self.assertFalse(
+            (self.repo.get_user_dir("g1", "u1") / "daily_memory.jsonl").exists()
+        )
 
     def test_allows_event_swap_and_normalizes_unpaired_removal(self):
         self._save([], runtime=_runtime(turn_count=0))
@@ -327,6 +468,81 @@ class EventSaveTests(unittest.TestCase):
         self.assertEqual(log_entry["event_win_rate"], 70)
         self.assertEqual(log_entry["event_dice_roll"], 71)
         self.assertEqual(log_entry["event_outcome"], "obstacle")
+        self.assertEqual(log_entry["conversation_no"], 1)
+        self.assertTrue(log_entry["event_started"])
+        self.assertFalse(log_entry["day_advanced"])
+
+
+class ConversationSequenceMigrationTests(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.repo = PlayerSaveRepository.__new__(PlayerSaveRepository)
+        self.repo.root_dir = self.root
+        self.repo.editable_manager = None
+
+    def test_backfills_group_sequence_across_players_once(self):
+        group_dir = self.root / "groups" / "g1"
+        (group_dir / "users" / "u1").mkdir(parents=True)
+        (group_dir / "users" / "u2").mkdir(parents=True)
+        (group_dir / "world_clock.json").write_text(
+            json.dumps({"schema_version": 1, "next_day_offset": 4}),
+            encoding="utf-8",
+        )
+        (group_dir / "users" / "u1" / "daily_memory.jsonl").write_text(
+            json.dumps({"type": "action_turn", "created_at": 20}, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        (group_dir / "users" / "u2" / "daily_memory.jsonl").write_text(
+            "\n".join(
+                [
+                    json.dumps({"type": "action_turn", "created_at": 10}, ensure_ascii=False),
+                    json.dumps({"type": "action_turn", "created_at": 30}, ensure_ascii=False),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        self.assertEqual(self.repo.get_current_conversation_no("g1"), 4)
+        self.assertEqual(self.repo.get_current_conversation_no("g1"), 4)
+        self.assertEqual(self.repo.get_current_world_day_offset("g1"), 4)
+
+        u1_logs = self.repo._read_recent_logs(
+            group_dir / "users" / "u1" / "daily_memory.jsonl",
+            limit=0,
+        )
+        u2_logs = self.repo._read_recent_logs(
+            group_dir / "users" / "u2" / "daily_memory.jsonl",
+            limit=0,
+        )
+        self.assertEqual(u1_logs[0]["conversation_no"], 2)
+        self.assertEqual(
+            [item["conversation_no"] for item in u2_logs],
+            [1, 3],
+        )
+        self.assertNotIn(
+            "_log_index",
+            (group_dir / "users" / "u1" / "daily_memory.jsonl").read_text(
+                encoding="utf-8"
+            ),
+        )
+
+
+class EventFallbackTests(unittest.TestCase):
+    def test_missing_scene_event_becomes_unique_free_action_event(self):
+        first = ActionTurnApplicationService._ensure_event_context(
+            {"selected_participants": [], "selected_targets": []},
+            action_text="去学校看看",
+        )
+        second = ActionTurnApplicationService._ensure_event_context(
+            {},
+            action_text="",
+        )
+
+        self.assertTrue(first["scene_event"]["id"].startswith("free_action_"))
+        self.assertNotEqual(first["scene_event"]["id"], second["scene_event"]["id"])
+        self.assertIn("去学校看看", first["scene_event"]["reason"])
+        self.assertEqual(second["scene_event"]["title"], "自由行动")
 
 
 class _ActiveEventRepository:

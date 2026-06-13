@@ -67,27 +67,81 @@ class PlayerSaveRepository:
         return f"公元{value.year}年{value.month}月{value.day}日"
 
     def get_current_world_day_offset(self, group_id: str) -> int:
-        clock_path = self._world_clock_path(group_id)
-        clock = self._read_json(clock_path)
-        if not clock:
-            clock = self._migrate_world_clock(group_id)
-            self._atomic_write_json(clock_path, clock)
+        clock = self._load_world_clock(group_id)
         return max(0, int(clock.get("next_day_offset", 0) or 0))
 
     def get_current_world_date(self, group_id: str) -> str:
         return self.format_world_date(self.get_current_world_day_offset(group_id))
 
-    def advance_world_clock(self, group_id: str, *, expected_day_offset: int) -> None:
+    def get_current_conversation_no(self, group_id: str) -> int:
+        clock = self._load_world_clock(group_id)
+        return max(1, int(clock.get("next_conversation_no", 1) or 1))
+
+    def _load_world_clock(self, group_id: str) -> dict[str, Any]:
         clock_path = self._world_clock_path(group_id)
         clock = self._read_json(clock_path)
         if not clock:
             clock = self._migrate_world_clock(group_id)
+            self._atomic_write_json(clock_path, clock)
+            return clock
+        if "next_conversation_no" not in clock:
+            clock["next_conversation_no"] = self._migrate_conversation_sequence(group_id)
+            clock["schema_version"] = max(2, int(clock.get("schema_version", 1) or 1))
+            clock["updated_at"] = self._now_ms()
+            self._atomic_write_json(clock_path, clock)
+        return clock
+
+    def advance_world_clock(self, group_id: str, *, expected_day_offset: int) -> None:
+        clock_path = self._world_clock_path(group_id)
+        clock = self._load_world_clock(group_id)
         current = max(0, int(clock.get("next_day_offset", 0) or 0))
         if current != int(expected_day_offset):
             raise ValueError(f"群世界时间已变化: expected={expected_day_offset}, actual={current}")
         clock["next_day_offset"] = current + 1
         clock["updated_at"] = self._now_ms()
         self._atomic_write_json(clock_path, clock)
+
+    def commit_action_turn_clock(
+        self,
+        group_id: str,
+        *,
+        expected_day_offset: int,
+        expected_conversation_no: int,
+        days_to_advance: int,
+    ) -> None:
+        clock_path = self._world_clock_path(group_id)
+        clock = self._load_world_clock(group_id)
+        self._validate_action_turn_clock(
+            clock,
+            expected_day_offset=expected_day_offset,
+            expected_conversation_no=expected_conversation_no,
+        )
+        current_day = max(0, int(clock.get("next_day_offset", 0) or 0))
+        current_conversation = max(1, int(clock.get("next_conversation_no", 1) or 1))
+        clock["next_conversation_no"] = current_conversation + 1
+        clock["next_day_offset"] = current_day + max(0, int(days_to_advance))
+        clock["schema_version"] = max(2, int(clock.get("schema_version", 1) or 1))
+        clock["updated_at"] = self._now_ms()
+        self._atomic_write_json(clock_path, clock)
+
+    @staticmethod
+    def _validate_action_turn_clock(
+        clock: dict[str, Any],
+        *,
+        expected_day_offset: int,
+        expected_conversation_no: int,
+    ) -> None:
+        current_day = max(0, int(clock.get("next_day_offset", 0) or 0))
+        current_conversation = max(1, int(clock.get("next_conversation_no", 1) or 1))
+        if current_day != int(expected_day_offset):
+            raise ValueError(
+                f"群世界时间已变化: expected={expected_day_offset}, actual={current_day}"
+            )
+        if current_conversation != int(expected_conversation_no):
+            raise ValueError(
+                "群对话序号已变化: "
+                f"expected={expected_conversation_no}, actual={current_conversation}"
+            )
 
     def _migrate_world_clock(self, group_id: str) -> dict[str, Any]:
         group_dir = self.root_dir / "groups" / self._safe_id(group_id)
@@ -138,10 +192,52 @@ class PlayerSaveRepository:
             self._write_jsonl_lines(path, lines)
         self._migrate_cameo_world_dates(group_id)
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "next_day_offset": next_day_offset,
+            "next_conversation_no": self._migrate_conversation_sequence(group_id),
             "updated_at": self._now_ms(),
         }
+
+    def _migrate_conversation_sequence(self, group_id: str) -> int:
+        users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
+        if not users_dir.exists():
+            return 1
+
+        records: list[tuple[int, Path, int, dict[str, Any]]] = []
+        for user_dir in sorted(path for path in users_dir.iterdir() if path.is_dir()):
+            log_path = user_dir / "daily_memory.jsonl"
+            if not log_path.exists():
+                continue
+            for index, item in enumerate(self._read_recent_logs(log_path, limit=0)):
+                if item.get("type") != "action_turn":
+                    continue
+                records.append(
+                    (
+                        int(item.get("created_at", 0) or 0),
+                        log_path,
+                        int(item.get("_log_index", index)),
+                        item,
+                    )
+                )
+
+        changed_paths: dict[Path, list[str]] = {}
+        for conversation_no, (_created_at, log_path, line_index, item) in enumerate(
+            sorted(records, key=lambda value: (value[0], str(value[1]), value[2])),
+            start=1,
+        ):
+            if int(item.get("conversation_no", 0) or 0) == conversation_no:
+                continue
+            migrated_item = dict(item)
+            migrated_item.pop("_log_index", None)
+            migrated_item["conversation_no"] = conversation_no
+            changed_paths.setdefault(
+                log_path,
+                log_path.read_text(encoding="utf-8").splitlines(),
+            )[line_index] = json.dumps(migrated_item, ensure_ascii=False)
+
+        for path, lines in changed_paths.items():
+            self._write_jsonl_lines(path, lines)
+        return len(records) + 1
 
     def _migrate_cameo_world_dates(self, group_id: str) -> None:
         users_dir = self.root_dir / "groups" / self._safe_id(group_id) / "users"
@@ -434,6 +530,12 @@ class PlayerSaveRepository:
         if world_day_offset is None:
             world_day_offset = self.get_current_world_day_offset(group_id)
         world_day_offset = max(0, int(world_day_offset))
+        conversation_no = self.get_current_conversation_no(group_id)
+        self._validate_action_turn_clock(
+            self._load_world_clock(group_id),
+            expected_day_offset=world_day_offset,
+            expected_conversation_no=conversation_no,
+        )
         world_date = self.format_world_date(world_day_offset)
         result.date_label = world_date
 
@@ -450,7 +552,16 @@ class PlayerSaveRepository:
         previous_event = deepcopy(self._current_story_event(player_data))
         normalized_patch = self._normalize_story_event_patch(player_data, result.json_patch)
         result.json_patch = normalized_patch
-        applied_patch = self.apply_json_patch(player_data, normalized_patch)
+        state_patch, requested_day_advance = self._extract_world_day_advance(normalized_patch)
+        applied_patch = self.apply_json_patch(player_data, state_patch)
+        if requested_day_advance:
+            applied_patch.append(
+                {
+                    "op": "delta",
+                    "path": "/世界/日期",
+                    "value": requested_day_advance,
+                }
+            )
         current_event = self._current_story_event(player_data)
         self._validate_story_event_state(previous_event, player_data)
         if current_event and not self._patch_updates_event_turn(result.json_patch):
@@ -474,7 +585,10 @@ class PlayerSaveRepository:
             event_outcome = "obstacle"
         else:
             event_outcome = self._event_outcome_from_runtime(previous_event or current_event)
+        event_started = bool(event_runtime and previous_event)
         event_ended = bool(previous_event and not current_event)
+        days_advanced = max(requested_day_advance, 1 if event_ended else 0)
+        day_advanced = days_advanced > 0
         self.append_log(
             group_id,
             user_id,
@@ -486,6 +600,7 @@ class PlayerSaveRepository:
                 "date_label": world_date,
                 "world_day_offset": world_day_offset,
                 "world_date": world_date,
+                "conversation_no": conversation_no,
                 "action": result.action,
                 "story_text": result.story_text,
                 "action_options": result.action_options,
@@ -495,11 +610,43 @@ class PlayerSaveRepository:
                 "event_outcome": event_outcome,
                 "event_win_rate": event_win_rate,
                 "event_dice_roll": event_dice_roll,
+                "event_started": event_started,
                 "event_ended": event_ended,
+                "day_advanced": day_advanced,
+                "days_advanced": days_advanced,
             },
         )
-        self.advance_world_clock(group_id, expected_day_offset=world_day_offset)
+        self.commit_action_turn_clock(
+            group_id,
+            expected_day_offset=world_day_offset,
+            expected_conversation_no=conversation_no,
+            days_to_advance=days_advanced,
+        )
         return player_data
+
+    @staticmethod
+    def _extract_world_day_advance(
+        patch: list[dict[str, Any]],
+    ) -> tuple[list[dict[str, Any]], int]:
+        state_patch: list[dict[str, Any]] = []
+        days_to_advance = 0
+        for item in patch or []:
+            if not isinstance(item, dict) or str(item.get("path") or "") != "/世界/日期":
+                state_patch.append(item)
+                continue
+            if str(item.get("op") or "").strip() != "delta":
+                raise ValueError("/世界/日期 只允许使用 delta 增加天数")
+            value = item.get("value")
+            if isinstance(value, bool):
+                raise ValueError("/世界/日期 的 delta 必须是正整数")
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                raise ValueError("/世界/日期 的 delta 必须是正整数") from None
+            if not numeric.is_integer() or numeric <= 0:
+                raise ValueError("/世界/日期 的 delta 必须是正整数")
+            days_to_advance += int(numeric)
+        return state_patch, days_to_advance
 
     @staticmethod
     def _current_story_event(state: dict[str, Any]) -> dict[str, Any] | None:

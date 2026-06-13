@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any
+from uuid import uuid4
 
 from ...domain.services.battle_outcome_service import resolve_battle_outcome
 from ...infrastructure.event_book import EventBookEngine
@@ -67,6 +68,10 @@ class ActionTurnApplicationService:
                     action_text=action_text,
                     phase=phase,
                     umo=umo,
+                )
+                selection_context = self._ensure_event_context(
+                    selection_context,
+                    action_text=action_text,
                 )
                 current_event = self._build_event_runtime(
                     selection_context,
@@ -182,6 +187,34 @@ class ActionTurnApplicationService:
         except Exception as exc:
             logger.warning(f"魔法少女行动上下文选择失败，降级为空上下文: {exc}")
             return {}
+
+    @staticmethod
+    def _ensure_event_context(
+        selection_context: dict[str, object] | None,
+        *,
+        action_text: str,
+    ) -> dict[str, object]:
+        context = dict(selection_context) if isinstance(selection_context, dict) else {}
+        scene = context.get("scene_event")
+        event_id = str(scene.get("id") or "").strip() if isinstance(scene, dict) else ""
+        if event_id:
+            return context
+
+        action = str(action_text or "").strip() or "自由行动"
+        fallback_id = f"free_action_{uuid4().hex}"
+        context["battle_type"] = str(context.get("battle_type") or "daily")
+        context["scene_event"] = {
+            "id": fallback_id,
+            "title": "自由行动",
+            "reason": f"玩家发起行动：{action}",
+            "content": "根据玩家行动自然推进本次事件，目标完成后结束事件。",
+            "event_gimmick": "事件可以在一轮内完成，也可以根据剧情需要持续多轮。",
+            "success_ending": "本次行动的目标得到解决，事件自然收束。",
+            "obstacle_ending": "本次行动遇到阻碍，事件继续推进。",
+        }
+        context.setdefault("selected_participants", [])
+        context.setdefault("selected_targets", [])
+        return context
 
     @staticmethod
     def _current_phase(player_data: dict) -> str:
