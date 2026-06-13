@@ -172,14 +172,14 @@ class SelectionPromptCandidateTests(unittest.TestCase):
             {"id", "title", "keys", "location_tags", "compatible_monsters", "content"},
         )
         self.assertEqual(set(monsters[0]), {"id", "name", "keys", "content"})
-        compact = BattleDiaryAnalyzer._compact_json_dump(
+        prompt_json = BattleDiaryAnalyzer._json_dump(
             {"scene_events": scene_events, "monsters": monsters}
         )
-        self.assertNotIn("event_gimmick", compact)
-        self.assertNotIn("battle_gimmick", compact)
-        self.assertNotIn("\n", compact)
+        self.assertNotIn("event_gimmick", prompt_json)
+        self.assertNotIn("battle_gimmick", prompt_json)
+        self.assertIn("\n", prompt_json)
 
-    def test_daily_context_prompt_uses_compact_candidate_views(self):
+    def test_daily_context_prompt_uses_filtered_candidate_views(self):
         template = "events={{scene_events_json}}\nmonsters={{monster_candidates_json}}"
 
         def render_prompt(name, variables):
@@ -220,8 +220,8 @@ class SelectionPromptCandidateTests(unittest.TestCase):
 
         self.assertNotIn("event_gimmick", prompt)
         self.assertNotIn("battle_gimmick", prompt)
-        self.assertIn('"title":"事件名称"', prompt)
-        self.assertIn('"name":"魔物名称"', prompt)
+        self.assertIn('"title": "事件名称"', prompt)
+        self.assertIn('"name": "魔物名称"', prompt)
 
 
 class PureLlmSelectionTests(unittest.IsolatedAsyncioTestCase):
