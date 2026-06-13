@@ -204,12 +204,7 @@ class ReportGenerator(ICardGenerator):
         )
         patch_items = "".join(
             f'<span class="patch-chip">{self._format_action_patch(item)}</span>'
-            for item in [
-                patch
-                for patch in result.json_patch
-                if isinstance(patch, dict)
-                and self._should_display_action_patch(patch)
-            ][:8]
+            for item in self._action_patch_display_items(result.json_patch)
         )
         patch_section = (
             f"""
@@ -541,9 +536,60 @@ h1 {{
 
     @classmethod
     def _format_action_patch(cls, item: dict[str, Any]) -> str:
-        label = cls._json_path_leaf(item.get("path"))
+        delta_text = cls._format_numeric_delta_patch(item)
+        if delta_text:
+            return html_lib.escape(delta_text)
+        label = str(item.get("_display_label") or cls._json_path_leaf(item.get("path")))
         value = cls._display_patch_value(item)
         return html_lib.escape(f"{label}：{value}")
+
+    @classmethod
+    def _format_numeric_delta_patch(cls, item: dict[str, Any]) -> str:
+        value = item.get("value")
+        if item.get("op") != "delta" or not isinstance(value, (int, float)):
+            return ""
+        parts = cls._json_path_parts(item.get("path"))
+        if not parts:
+            return ""
+        leaf = parts[-1]
+        if leaf in {"经验", "进度"} and len(parts) > 1:
+            label = f"{parts[-2]}经验"
+        elif leaf in {"当前", "数值"} and len(parts) > 1:
+            label = parts[-2]
+        else:
+            label = leaf
+        if value > 0:
+            return f"{label}增加了！"
+        if value < 0:
+            return f"{label}减少了！"
+        return f"{label}没有变化。"
+
+    @classmethod
+    def _action_patch_display_items(
+        cls,
+        patches: object,
+    ) -> list[dict[str, Any]]:
+        displayed: list[dict[str, Any]] = []
+        for patch in patches if isinstance(patches, list) else []:
+            if not isinstance(patch, dict) or not cls._should_display_action_patch(patch):
+                continue
+            value = patch.get("value")
+            if isinstance(value, dict) and value:
+                base_path = str(patch.get("path") or "").rstrip("/")
+                displayed.extend(
+                    [
+                        {
+                            **patch,
+                            "path": f"{base_path}/{key}",
+                            "_display_label": str(key),
+                            "value": child,
+                        }
+                        for key, child in value.items()
+                    ]
+                )
+            else:
+                displayed.append(patch)
+        return displayed
 
     @staticmethod
     def _should_display_action_patch(item: dict[str, Any]) -> bool:
@@ -554,8 +600,16 @@ h1 {{
 
     @staticmethod
     def _json_path_leaf(path: object) -> str:
-        parts = [part for part in str(path or "").split("/") if part]
+        parts = ReportGenerator._json_path_parts(path)
         return parts[-1] if parts else "变量"
+
+    @staticmethod
+    def _json_path_parts(path: object) -> list[str]:
+        return [
+            part.replace("~1", "/").replace("~0", "~")
+            for part in str(path or "").split("/")
+            if part
+        ]
 
     @staticmethod
     def _display_patch_value(item: dict[str, Any]) -> str:

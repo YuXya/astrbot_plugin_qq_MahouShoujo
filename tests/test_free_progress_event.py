@@ -413,8 +413,16 @@ class ActionTurnCardTests(unittest.TestCase):
                 },
                 {"op": "insert", "path": "/主角/快感状态/性癖", "value": []},
                 {"op": "insert", "path": "/主角/快感状态/性癖/恶堕", "value": 1},
-                {"op": "insert", "path": "/主角/标签", "value": {"状态": "警觉"}},
+                {
+                    "op": "insert",
+                    "path": "/主角/标签",
+                    "value": {
+                        "状态": "警觉",
+                        "详情": {"来源": "直觉"},
+                    },
+                },
                 {"op": "replace", "path": "/主角/临时状态", "value": {}},
+                {"op": "replace", "path": "/主角/效果列表", "value": ["警觉", "专注"]},
             ],
         )
 
@@ -426,8 +434,103 @@ class ActionTurnCardTests(unittest.TestCase):
         self.assertNotIn("性癖：[]", html)
         self.assertIn("手腕：淡红勒痕", html)
         self.assertIn("恶堕：1", html)
-        self.assertIn('标签：{&quot;状态&quot;:&quot;警觉&quot;}', html)
+        self.assertIn("状态：警觉", html)
+        self.assertIn('详情：{&quot;来源&quot;:&quot;直觉&quot;}', html)
+        self.assertNotIn("标签：", html)
         self.assertIn("临时状态：{}", html)
+        self.assertIn('效果列表：[&quot;警觉&quot;,&quot;专注&quot;]', html)
+
+    def test_action_card_expands_object_patch_without_display_limit(self):
+        generator = ReportGenerator.__new__(ReportGenerator)
+        body_parts = {
+            "嘴": "状态1",
+            "小穴": "状态2",
+            "屁穴": "状态3",
+            "胸部": "状态4",
+            "小腹": "状态5",
+            "皮肤": "状态6",
+        }
+        result = ActionTurnResult(
+            story_text="测试正文",
+            json_patch=[
+                {"op": "replace", "path": "/主角/普通字段1", "value": "值1"},
+                {"op": "replace", "path": "/主角/普通字段2", "value": "值2"},
+                {"op": "replace", "path": "/主角/普通字段3", "value": "值3"},
+                {
+                    "op": "replace",
+                    "path": "/主角/身体部位状况",
+                    "value": body_parts,
+                },
+                {"op": "replace", "path": "/主角/额外状态", "value": "仍然显示"},
+            ],
+        )
+
+        html = generator._render_action_turn_html(result)
+
+        for label, value in body_parts.items():
+            self.assertIn(f"{label}：{value}", html)
+        self.assertNotIn("身体部位状况：", html)
+        self.assertIn("额外状态：仍然显示", html)
+
+    def test_action_card_formats_numeric_delta_as_change_message(self):
+        generator = ReportGenerator.__new__(ReportGenerator)
+        result = ActionTurnResult(
+            story_text="测试正文",
+            json_patch=[
+                {
+                    "op": "delta",
+                    "path": "/主角/快感状态/性癖/触手play/进度",
+                    "value": 10,
+                },
+                {
+                    "op": "delta",
+                    "path": "/主角/技能/闪避/经验",
+                    "value": -5,
+                },
+                {
+                    "op": "delta",
+                    "path": "/主角/核心状态/体力值/当前",
+                    "value": -8,
+                },
+                {"op": "delta", "path": "/主角/名声", "value": 0},
+                {"op": "replace", "path": "/主角/等级", "value": 10},
+            ],
+        )
+
+        html = generator._render_action_turn_html(result)
+
+        self.assertIn("触手play经验增加了！", html)
+        self.assertIn("闪避经验减少了！", html)
+        self.assertIn("体力值减少了！", html)
+        self.assertIn("名声没有变化。", html)
+        self.assertIn("等级：10", html)
+        self.assertNotIn("进度：10", html)
+
+    def test_object_patch_is_saved_as_one_object(self):
+        repo = PlayerSaveRepository.__new__(PlayerSaveRepository)
+        state = {"主角": {"标签": {"旧字段": "旧值"}}}
+        value = {
+            "状态": "警觉",
+            "详情": {"来源": "直觉"},
+        }
+        response = (
+            "测试正文\n"
+            "<行动选项>继续观察</行动选项>\n"
+            "<UpdateVariable><Analysis>测试</Analysis><JSONPatch>"
+            + json.dumps(
+                [{"op": "replace", "path": "/主角/标签", "value": value}],
+                ensure_ascii=False,
+            )
+            + "</JSONPatch></UpdateVariable>"
+        )
+
+        result = ActionTurnAnalyzer.parse_action_turn_response(response)
+
+        applied = repo.apply_json_patch(state, result.json_patch)
+
+        self.assertEqual(state["主角"]["标签"], value)
+        self.assertNotIn("旧字段", state["主角"]["标签"])
+        self.assertEqual(applied[0]["value"], value)
 
 
 if __name__ == "__main__":
