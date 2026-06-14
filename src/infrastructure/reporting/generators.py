@@ -215,6 +215,20 @@ class ReportGenerator(ICardGenerator):
             if patch_items
             else ""
         )
+        progress_items = "".join(
+            f'<span class="patch-chip">{html_lib.escape(item.label)}：'
+            f'{html_lib.escape(self._action_progress_rank(item.percent))}</span>'
+            for item in self._action_progress_items(result.state_snapshot)
+        )
+        progress_section = (
+            f"""
+    <section class="section">
+      <div class="section-title">技能&amp;性癖</div>
+      <div class="patch-grid">{progress_items}</div>
+    </section>"""
+            if progress_items
+            else ""
+        )
         options_section = (
             f"""
     <section class="section">
@@ -477,10 +491,33 @@ h1 {{
     <section class="story">{current_time_html}{story_html}</section>
     {options_section}
     {patch_section}
+    {progress_section}
     <div class="footer">{html_lib.escape(result.footer or "行动记录已写入存档。")}</div>
   </article>
 </body>
 </html>"""
+
+    @staticmethod
+    def _action_progress_items(state: dict[str, Any]) -> list[Any]:
+        sections = build_progress_sections(
+            state,
+            "/主角/技能/",
+            "/主角/快感状态/性癖/",
+            limit=10_000,
+        )
+        return [*sections.skill_items, *sections.status_items]
+
+    @staticmethod
+    def _action_progress_rank(percent: int) -> str:
+        if percent <= 20:
+            return "入门"
+        if percent <= 40:
+            return "熟练"
+        if percent <= 60:
+            return "进阶"
+        if percent <= 80:
+            return "精通"
+        return "大师"
 
     @classmethod
     def _highlight_action_quotes(cls, text: object) -> str:

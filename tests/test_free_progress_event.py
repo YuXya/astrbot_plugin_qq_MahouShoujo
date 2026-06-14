@@ -1489,6 +1489,68 @@ class ActionTurnCardTests(unittest.TestCase):
         self.assertIn("等级：10", html)
         self.assertNotIn("进度：10", html)
 
+    def test_action_card_displays_all_skill_and_fetish_ranks_as_patch_chips(self):
+        generator = ReportGenerator.__new__(ReportGenerator)
+        skills = {
+            f"技能{index}": {"进度": progress}
+            for index, progress in enumerate(
+                [0, 20, 21, 40, 41, 60, 61, 80, 81, 100, 55, 75, 95],
+                start=1,
+            )
+        }
+        result = ActionTurnResult(
+            story_text="测试正文",
+            json_patch=[
+                {"op": "replace", "path": "/主角/临时状态", "value": "专注"},
+            ],
+            state_snapshot={
+                "主角": {
+                    "技能": skills,
+                    "快感状态": {
+                        "性癖": {
+                            "恶堕": {"进度": 18},
+                        },
+                    },
+                },
+            },
+        )
+
+        html = generator._render_action_turn_html(result)
+
+        self.assertIn('<div class="section-title">技能&amp;性癖</div>', html)
+        self.assertLess(html.index("状态变化"), html.index("技能&amp;性癖"))
+        self.assertLess(html.index("技能&amp;性癖"), html.index("行动记录已写入存档。"))
+        self.assertIn('<span class="patch-chip">技能1：入门</span>', html)
+        self.assertIn('<span class="patch-chip">技能2：入门</span>', html)
+        self.assertIn('<span class="patch-chip">技能3：熟练</span>', html)
+        self.assertIn('<span class="patch-chip">技能4：熟练</span>', html)
+        self.assertIn('<span class="patch-chip">技能5：进阶</span>', html)
+        self.assertIn('<span class="patch-chip">技能6：进阶</span>', html)
+        self.assertIn('<span class="patch-chip">技能7：精通</span>', html)
+        self.assertIn('<span class="patch-chip">技能8：精通</span>', html)
+        self.assertIn('<span class="patch-chip">技能9：大师</span>', html)
+        self.assertIn('<span class="patch-chip">技能10：大师</span>', html)
+        self.assertIn('<span class="patch-chip">技能13：大师</span>', html)
+        self.assertIn('<span class="patch-chip">恶堕：入门</span>', html)
+        self.assertNotIn("技能1：0", html)
+        self.assertNotIn("恶堕：18", html)
+
+    def test_action_card_hides_skill_and_fetish_section_when_empty(self):
+        generator = ReportGenerator.__new__(ReportGenerator)
+        result = ActionTurnResult(
+            story_text="测试正文",
+            state_snapshot={
+                "主角": {
+                    "技能": {},
+                    "快感状态": {"性癖": {}},
+                },
+            },
+        )
+
+        html = generator._render_action_turn_html(result)
+
+        self.assertNotIn('<div class="section-title">技能&amp;性癖</div>', html)
+
     def test_action_card_only_displays_current_event_reason(self):
         generator = ReportGenerator.__new__(ReportGenerator)
         reason = "优夏主动要求更刺激的玩法，小百将她带到无人的家政教室进行暴露与忍耐测试"
