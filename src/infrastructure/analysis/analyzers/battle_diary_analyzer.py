@@ -185,7 +185,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             "action_context_selection_prompt",
             {
                 "action": action_text.strip() or "自由行动",
-                "player_data_update_json": self._json_dump(player_data),
+                "player_data_update_json": self._json_dump(
+                    self._prompt_player_data(player_data)
+                ),
                 "logs_text": self._format_logs(logs),
                 "cameo_memories_text": self._format_cameo_memories(cameo_memories),
                 "current_event_json": self._json_dump(current_event),
@@ -355,7 +357,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         return self.editable_manager.render_prompt(
             prompt_name,
             {
-                "player_data_update_json": self._json_dump(player_data),
+                "player_data_update_json": self._json_dump(
+                    self._prompt_player_data(player_data)
+                ),
                 "player_name": self._get_nested(protagonist, ["个人信息", "姓名"], "") or "主角",
                 "logs_text": logs_text,
                 "cameo_memories_text": cameo_memories_text,
@@ -819,6 +823,14 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
         if not isinstance(protagonist, dict):
             return None
         return dict(protagonist)
+
+    @staticmethod
+    def _prompt_player_data(player_data: object) -> dict[str, object]:
+        if not isinstance(player_data, dict):
+            return {}
+        visible = dict(player_data)
+        visible.pop("player_clock", None)
+        return visible
 
     @classmethod
     def _prompt_protagonist_profiles(cls, items: list[dict] | None) -> list[dict[str, object]]:

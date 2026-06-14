@@ -236,9 +236,28 @@ class MemoryCompactionTests(unittest.TestCase):
 
         self.assertEqual(projected, [{"个人信息": {"姓名": "洛洛"}}])
 
+    def test_prompt_player_data_hides_personal_clock(self):
+        player_data = {
+            "player_clock": {"day_offset": 2, "minute_of_day": 600},
+            "visible_marker": {"transformation_time": "2020-04-01 8:00"},
+        }
+
+        projected = BattleDiaryAnalyzer._prompt_player_data(player_data)
+
+        self.assertNotIn("player_clock", projected)
+        self.assertEqual(projected["visible_marker"], player_data["visible_marker"])
+        self.assertIn("player_clock", player_data)
+
     def test_action_turn_saves_short_memory_with_conversation_no(self):
         (self.user_dir / "player_data_update.json").write_text(
-            json.dumps({"进程": {"阶段": "日常"}, "主角": {}}, ensure_ascii=False),
+            json.dumps(
+                {
+                    "player_clock": {"day_offset": 0, "minute_of_day": 8 * 60},
+                    "进程": {"阶段": "日常"},
+                    "主角": {},
+                },
+                ensure_ascii=False,
+            ),
             encoding="utf-8",
         )
         result = ActionTurnResult(

@@ -23,6 +23,7 @@ HIDDEN_CURRENT_VARIABLE_KEYS = {
     "user_id",
     "nickname",
     "avatar_url",
+    "player_clock",
     "created_at",
     "updated_at",
 }

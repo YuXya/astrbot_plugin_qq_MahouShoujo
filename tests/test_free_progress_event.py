@@ -31,7 +31,11 @@ sys.modules.setdefault("astrbot.api.star", astrbot_star)
 from src.application.services.action_turn_application_service import (  # noqa: E402
     ActionTurnApplicationService,
 )
-from src.domain.models.data_models import ActionTurnResult, BattleDiaryCard  # noqa: E402
+from src.domain.models.data_models import (  # noqa: E402
+    ActionTurnResult,
+    BattleDiaryCard,
+    ReincarnationCard,
+)
 from src.domain.services.battle_outcome_service import (  # noqa: E402
     resolve_battle_outcome,
 )
@@ -528,7 +532,14 @@ class EventSaveTests(unittest.TestCase):
         user_dir = self.repo.get_user_dir("g1", "u1")
         user_dir.mkdir(parents=True)
         (user_dir / "player_data_update.json").write_text(
-            json.dumps({"进程": {"阶段": "日常"}, "主角": {}}, ensure_ascii=False),
+            json.dumps(
+                {
+                    "player_clock": {"day_offset": 0, "minute_of_day": 8 * 60},
+                    "进程": {"阶段": "日常"},
+                    "主角": {},
+                },
+                ensure_ascii=False,
+            ),
             encoding="utf-8",
         )
 
@@ -539,7 +550,7 @@ class EventSaveTests(unittest.TestCase):
         runtime=None,
         battle_odds=None,
         ensure_time=True,
-        world_minute_of_day=None,
+        player_minute_of_day=None,
     ):
         patch = list(patch)
         if ensure_time and not any(
@@ -551,7 +562,7 @@ class EventSaveTests(unittest.TestCase):
             group_id="g1",
             user_id="u1",
             result=ActionTurnResult(story_text="测试正文", json_patch=patch),
-            world_minute_of_day=world_minute_of_day,
+            player_minute_of_day=player_minute_of_day,
             event_runtime=runtime,
             battle_odds=battle_odds,
         )
@@ -754,9 +765,13 @@ class EventSaveTests(unittest.TestCase):
                 "next_conversation_no": 1,
             },
         )
+        user_dir = self.repo.get_user_dir("g1", "u1")
+        player_data = self.repo._load_current_player_data(user_dir)
+        player_data["player_clock"] = {"day_offset": 0, "minute_of_day": 23 * 60}
+        self.repo._save_current_player_data(user_dir, player_data)
         self._save(
             [{"op": "delta", "path": "/世界/时间", "value": "1:30"}],
-            world_minute_of_day=23 * 60,
+            player_minute_of_day=23 * 60,
         )
 
         clock = self.repo._read_json(self.repo._world_clock_path("g1"))
@@ -774,10 +789,10 @@ class EventSaveTests(unittest.TestCase):
     def test_stale_world_minute_does_not_consume_conversation(self):
         self.repo.get_current_world_datetime("g1")
 
-        with self.assertRaisesRegex(ValueError, "群世界时刻已变化"):
+        with self.assertRaisesRegex(ValueError, "玩家个人时间已变化"):
             self._save(
                 [{"op": "delta", "path": "/世界/时间", "value": "0:10"}],
-                world_minute_of_day=9 * 60,
+                player_minute_of_day=9 * 60,
             )
 
         self.assertEqual(self.repo.get_current_conversation_no("g1"), 1)
@@ -786,7 +801,14 @@ class EventSaveTests(unittest.TestCase):
         second_user_dir = self.repo.get_user_dir("g1", "u2")
         second_user_dir.mkdir(parents=True)
         (second_user_dir / "player_data_update.json").write_text(
-            json.dumps({"进程": {"阶段": "日常"}, "主角": {}}, ensure_ascii=False),
+            json.dumps(
+                {
+                    "player_clock": {"day_offset": 0, "minute_of_day": 8 * 60},
+                    "进程": {"阶段": "日常"},
+                    "主角": {},
+                },
+                ensure_ascii=False,
+            ),
             encoding="utf-8",
         )
 
@@ -815,13 +837,88 @@ class EventSaveTests(unittest.TestCase):
         self.assertEqual(self.repo.get_current_conversation_no("g1"), 4)
         self.assertEqual(self.repo.get_current_world_day_offset("g1"), 0)
 
+    def test_linked_players_each_advance_from_their_own_clock(self):
+        second_dir = self.repo.get_user_dir("g1", "u2")
+        second_dir.mkdir(parents=True)
+        self.repo._atomic_write_json(
+            second_dir / "player_data_update.json",
+            {
+                "player_clock": {"day_offset": 1, "minute_of_day": 10 * 60},
+                "进程": {"阶段": "日常"},
+                "主角": {},
+            },
+        )
+
+        self.repo.save_action_turn_result(
+            group_id="g1",
+            user_id="u1",
+            result=ActionTurnResult(
+                story_text="联动正文",
+                json_patch=[{"op": "delta", "path": "/世界/时间", "value": "1:30"}],
+            ),
+            linked_user_ids=["u2"],
+        )
+
+        self.assertEqual(self.repo.get_player_clock("g1", "u1"), (0, 9 * 60 + 30))
+        self.assertEqual(self.repo.get_player_clock("g1", "u2"), (1, 11 * 60 + 30))
+        self.assertEqual(self.repo.get_current_world_datetime("g1"), "公元2020年4月2日 11:30")
+
+    def test_lagging_player_does_not_move_world_high_water_backward(self):
+        self.repo._atomic_write_json(
+            self.repo._world_clock_path("g1"),
+            {
+                "schema_version": 3,
+                "next_day_offset": 3,
+                "next_minute_of_day": 12 * 60,
+                "next_conversation_no": 1,
+            },
+        )
+
+        self._save([{"op": "delta", "path": "/世界/时间", "value": "1:00"}])
+
+        self.assertEqual(self.repo.get_player_clock("g1", "u1"), (0, 9 * 60))
+        self.assertEqual(self.repo.get_current_world_datetime("g1"), "公元2020年4月4日 12:00")
+
+    def test_broken_linked_clock_is_skipped(self):
+        broken_dir = self.repo.get_user_dir("g1", "broken")
+        broken_dir.mkdir(parents=True)
+        self.repo._atomic_write_json(
+            broken_dir / "player_data_update.json",
+            {"进程": {"阶段": "日常"}, "主角": {}},
+        )
+
+        self.repo.save_action_turn_result(
+            group_id="g1",
+            user_id="u1",
+            result=ActionTurnResult(
+                story_text="联动正文",
+                json_patch=[{"op": "delta", "path": "/世界/时间", "value": "0:20"}],
+            ),
+            linked_user_ids=["broken"],
+        )
+
+        self.assertEqual(self.repo.get_player_clock("g1", "u1"), (0, 8 * 60 + 20))
+        self.assertNotIn(
+            "player_clock",
+            self.repo._load_current_player_data(broken_dir),
+        )
+
+    def test_missing_caller_clock_fails_action(self):
+        user_dir = self.repo.get_user_dir("g1", "u1")
+        player_data = self.repo._load_current_player_data(user_dir)
+        player_data.pop("player_clock")
+        self.repo._save_current_player_data(user_dir, player_data)
+
+        with self.assertRaisesRegex(ValueError, "缺少 player_clock"):
+            self._save([])
+
     def test_validation_failure_does_not_consume_conversation_number(self):
         with self.assertRaises(ValueError):
             self.repo.save_action_turn_result(
                 group_id="g1",
                 user_id="u1",
                 result=ActionTurnResult(story_text="失败", json_patch=[]),
-                world_day_offset=3,
+                player_day_offset=3,
                 event_runtime=_runtime(turn_count=0),
             )
 
@@ -965,6 +1062,88 @@ class ConversationSequenceMigrationTests(unittest.TestCase):
         )
 
 
+class PlayerClockLifecycleTests(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.repo = PlayerSaveRepository.__new__(PlayerSaveRepository)
+        self.repo.root_dir = self.root
+        self.repo.editable_manager = None
+
+    @staticmethod
+    def _card(name="测试角色"):
+        return ReincarnationCard(
+            info=[
+                {
+                    "field": "姓名",
+                    "path": "/主角/个人信息/姓名",
+                    "description": name,
+                }
+            ]
+        )
+
+    def test_reincarnation_starts_at_world_high_water(self):
+        self.repo._atomic_write_json(
+            self.repo._world_clock_path("g1"),
+            {
+                "schema_version": 3,
+                "next_day_offset": 2,
+                "next_minute_of_day": 13 * 60 + 15,
+                "next_conversation_no": 1,
+            },
+        )
+
+        self.repo.save_reincarnation("g1", "u1", self._card())
+        player_data = self.repo._load_current_player_data(
+            self.repo.get_user_dir("g1", "u1")
+        )
+
+        self.assertEqual(self.repo._player_clock(player_data), (2, 13 * 60 + 15))
+        self.assertEqual(
+            player_data["主角"]["时间信息"]["成为魔法少女时间"],
+            "公元2020年4月3日 13:15",
+        )
+
+    def test_reset_catches_up_but_preserves_transformation_time(self):
+        self.repo.save_reincarnation("g1", "u1", self._card())
+        user_dir = self.repo.get_user_dir("g1", "u1")
+        current = self.repo._load_current_player_data(user_dir)
+        current["主角"]["时间信息"]["成为魔法少女时间"] = "公元2020年4月1日 8:00"
+        self.repo._save_current_player_data(user_dir, current)
+        self.repo._atomic_write_json(
+            self.repo._world_clock_path("g1"),
+            {
+                "schema_version": 3,
+                "next_day_offset": 4,
+                "next_minute_of_day": 17 * 60,
+                "next_conversation_no": 1,
+            },
+        )
+
+        self.repo.reset_player_state("g1", "u1")
+        refreshed = self.repo._load_current_player_data(user_dir)
+
+        self.assertEqual(self.repo._player_clock(refreshed), (4, 17 * 60))
+        self.assertEqual(
+            refreshed["主角"]["时间信息"]["成为魔法少女时间"],
+            "公元2020年4月1日 8:00",
+        )
+
+    def test_player_clock_and_transformation_time_are_readonly(self):
+        state = {
+            "player_clock": {"day_offset": 0, "minute_of_day": 480},
+            "主角": {"时间信息": {"成为魔法少女时间": "公元2020年4月1日 8:00"}},
+        }
+        for path in (
+            "/player_clock/minute_of_day",
+            "/主角/时间信息/成为魔法少女时间",
+        ):
+            with self.subTest(path=path), self.assertRaisesRegex(ValueError, "禁止修改"):
+                self.repo.apply_json_patch(
+                    state,
+                    [{"op": "replace", "path": path, "value": "非法修改"}],
+                )
+
+
 class EventFallbackTests(unittest.TestCase):
     def test_only_continuous_selection_builds_event_runtime(self):
         service = ActionTurnApplicationService.__new__(ActionTurnApplicationService)
@@ -1004,19 +1183,16 @@ class _ActiveEventRepository:
 
     def load_player_save(self, group_id, user_id):
         return {
-            "player_data": {"进程": {"阶段": "事件", "当前事件": _runtime()}},
+            "player_data": {
+                "player_clock": {"day_offset": 0, "minute_of_day": 8 * 60},
+                "进程": {"阶段": "事件", "当前事件": _runtime()},
+            },
             "logs": [],
             "cameo_memories": [],
         }
 
-    def get_current_world_day_offset(self, group_id):
-        return 0
-
-    def format_world_date(self, offset):
-        return "公元2020年4月1日"
-
-    def get_current_world_minute_of_day(self, group_id):
-        return 8 * 60
+    def get_player_clock(self, group_id, user_id):
+        return 0, 8 * 60
 
     def format_world_datetime(self, offset, minute_of_day):
         return "公元2020年4月1日 8:00"
@@ -1431,6 +1607,7 @@ class ActionTurnCardTests(unittest.TestCase):
     def test_visible_variables_hide_legacy_world_clock_fields(self):
         visible = ActionTurnAnalyzer._visible_current_variables(
             {
+                "player_clock": {"day_offset": 9, "minute_of_day": 600},
                 "世界": {
                     "日期": "旧日期",
                     "时间": "旧时间",
@@ -1440,6 +1617,27 @@ class ActionTurnCardTests(unittest.TestCase):
         )
 
         self.assertEqual(visible["世界"], {"世界观备注": {"地点": "保留"}})
+        self.assertNotIn("player_clock", visible)
+
+    def test_actual_interactions_choose_linked_player_ids(self):
+        linked = ActionTurnApplicationService._interaction_user_ids(
+            [
+                {"_user_id": "u2", "target_name": "洛洛"},
+                {"_user_id": "u3", "target_name": "小夏"},
+            ],
+            [{"target": "洛洛", "memory_text": "实际互动"}],
+        )
+
+        self.assertEqual(linked, ["u2"])
+
+
+    def test_interaction_without_memory_does_not_link_player_clock(self):
+        linked = ActionTurnApplicationService._interaction_user_ids(
+            [{"_user_id": "u2", "target_name": "player-two"}],
+            [{"target": "player-two", "memory_text": "  "}],
+        )
+
+        self.assertEqual(linked, [])
 
 
 if __name__ == "__main__":

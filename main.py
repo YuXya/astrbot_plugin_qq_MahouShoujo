@@ -290,16 +290,17 @@ class QQMahouShoujo(Star):
         preference_text = "\n".join(f"{k}：{v}" for k, v in parsed_fields.items())
 
         async with self.player_queue.lock_for(group_id, user_id):
-            async for result in self._run_reincarnation(
-                event,
-                group_id,
-                user_id,
-                preference_text,
-                event_command=event_command,
-                prompt_name=prompt_name,
-                card_label=card_label,
-            ):
-                yield result
+            async with self.player_queue.group_lock_for(group_id):
+                async for result in self._run_reincarnation(
+                    event,
+                    group_id,
+                    user_id,
+                    preference_text,
+                    event_command=event_command,
+                    prompt_name=prompt_name,
+                    card_label=card_label,
+                ):
+                    yield result
 
     async def _run_reincarnation(
         self,

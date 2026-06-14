@@ -47,8 +47,9 @@ class ActionTurnApplicationService:
                     error="player_save_not_found",
                 )
 
-            world_day_offset = self.save_repository.get_current_world_day_offset(group_id)
-            world_minute_of_day = self.save_repository.get_current_world_minute_of_day(group_id)
+            world_day_offset, world_minute_of_day = self.save_repository.get_player_clock(
+                group_id, user_id
+            )
             current_world_date = self.save_repository.format_world_datetime(
                 world_day_offset,
                 world_minute_of_day,
@@ -161,12 +162,17 @@ class ActionTurnApplicationService:
             result.memory_text = str(
                 interaction_result.get("current_player_memory") or ""
             ).strip()
+            linked_user_ids = self._interaction_user_ids(
+                nearby_players,
+                interaction_result.get("interactions", []),
+            )
             updated_state = self.save_repository.save_action_turn_result(
                 group_id=group_id,
                 user_id=user_id,
                 result=result,
-                world_day_offset=world_day_offset,
-                world_minute_of_day=world_minute_of_day,
+                player_day_offset=world_day_offset,
+                player_minute_of_day=world_minute_of_day,
+                linked_user_ids=linked_user_ids,
                 event_runtime=current_event if event_started else None,
                 battle_odds=selection_context.get("battle_odds"),
             )
@@ -290,6 +296,29 @@ class ActionTurnApplicationService:
         except Exception as exc:
             logger.warning(f"生成交互记忆失败，已跳过本轮交互记忆: {exc}")
             return []
+
+    @staticmethod
+    def _interaction_user_ids(
+        participants: list[dict],
+        interactions: list[dict],
+    ) -> list[str]:
+        by_name = {
+            str(item.get("target_name") or item.get("姓名") or "").strip(): str(
+                item.get("_user_id") or ""
+            ).strip()
+            for item in participants
+            if isinstance(item, dict)
+        }
+        linked: list[str] = []
+        for interaction in interactions if isinstance(interactions, list) else []:
+            if not isinstance(interaction, dict):
+                continue
+            if not str(interaction.get("memory_text") or "").strip():
+                continue
+            linked_id = by_name.get(str(interaction.get("target") or "").strip(), "")
+            if linked_id and linked_id not in linked:
+                linked.append(linked_id)
+        return linked
 
     async def _compact_affected_memories(
         self,

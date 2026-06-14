@@ -2669,6 +2669,16 @@ class SaveWebViewer:
         protagonist = player_data.get("主角", {}) if isinstance(player_data, dict) else {}
         created_at = player_data.get("created_at", "")
         updated_at = player_data.get("updated_at", "")
+        try:
+            player_day, player_minute = self.repository._player_clock(player_data)
+            player_time = self.repository.format_world_datetime(player_day, player_minute)
+        except ValueError:
+            player_time = "未初始化"
+        transformation_time = self._get_nested(
+            protagonist,
+            ["时间信息", "成为魔法少女时间"],
+            "未记录",
+        )
 
         # 构建可编辑的人物卡字段
         profile_sections = self._build_profile_edit_sections(protagonist, can_edit)
@@ -2713,6 +2723,8 @@ class SaveWebViewer:
                 <div class="meta-list">
                   <div><span>创建</span><strong>{self._e(created_at)}</strong></div>
                   <div><span>更新</span><strong>{self._e(updated_at)}</strong></div>
+                  <div><span>个人当前时间</span><strong>{self._e(player_time)}</strong></div>
+                  <div><span>成为魔法少女时间</span><strong>{self._e(transformation_time)}</strong></div>
                 </div>
               </article>
             </section>

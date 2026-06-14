@@ -100,6 +100,51 @@ class PlayerSaveRepository:
         clock = self._load_world_clock(group_id)
         return max(1, int(clock.get("next_conversation_no", 1) or 1))
 
+    def get_player_clock(self, group_id: str, user_id: str) -> tuple[int, int]:
+        player_data = self._load_current_player_data(self.get_user_dir(group_id, user_id))
+        return self._player_clock(player_data)
+
+    @classmethod
+    def _player_clock(cls, player_data: dict[str, Any]) -> tuple[int, int]:
+        clock = player_data.get("player_clock") if isinstance(player_data, dict) else None
+        if not isinstance(clock, dict):
+            raise ValueError("玩家存档缺少 player_clock，请重新进行魔法少女转生")
+        try:
+            day_offset = int(clock["day_offset"])
+            minute_of_day = int(clock["minute_of_day"])
+        except (KeyError, TypeError, ValueError):
+            raise ValueError("玩家存档的 player_clock 已损坏，请重新进行魔法少女转生") from None
+        if day_offset < 0 or not 0 <= minute_of_day < 24 * 60:
+            raise ValueError("玩家存档的 player_clock 已损坏，请重新进行魔法少女转生")
+        return day_offset, minute_of_day
+
+    @staticmethod
+    def _clock_total_minutes(day_offset: int, minute_of_day: int) -> int:
+        return max(0, int(day_offset)) * 24 * 60 + max(0, int(minute_of_day))
+
+    @classmethod
+    def _advanced_clock(
+        cls,
+        day_offset: int,
+        minute_of_day: int,
+        elapsed_minutes: int,
+    ) -> tuple[int, int]:
+        total = cls._clock_total_minutes(day_offset, minute_of_day) + max(
+            0, int(elapsed_minutes)
+        )
+        return divmod(total, 24 * 60)
+
+    @staticmethod
+    def _set_player_clock(
+        player_data: dict[str, Any],
+        day_offset: int,
+        minute_of_day: int,
+    ) -> None:
+        player_data["player_clock"] = {
+            "day_offset": max(0, int(day_offset)),
+            "minute_of_day": max(0, min(24 * 60 - 1, int(minute_of_day))),
+        }
+
     def _load_world_clock(self, group_id: str) -> dict[str, Any]:
         clock_path = self._world_clock_path(group_id)
         clock = self._read_json(clock_path)
@@ -126,18 +171,14 @@ class PlayerSaveRepository:
         self,
         group_id: str,
         *,
-        expected_day_offset: int,
-        expected_minute_of_day: int,
         expected_conversation_no: int,
-        minutes_to_advance: int,
+        high_water_day_offset: int,
+        high_water_minute_of_day: int,
     ) -> None:
         clock_path = self._world_clock_path(group_id)
         clock = self._load_world_clock(group_id)
-        self._validate_action_turn_clock(
-            clock,
-            expected_day_offset=expected_day_offset,
-            expected_minute_of_day=expected_minute_of_day,
-            expected_conversation_no=expected_conversation_no,
+        self._validate_conversation_clock(
+            clock, expected_conversation_no=expected_conversation_no
         )
         current_day = max(0, int(clock.get("next_day_offset", 0) or 0))
         current_minute = max(
@@ -148,41 +189,25 @@ class PlayerSaveRepository:
             ),
         )
         current_conversation = max(1, int(clock.get("next_conversation_no", 1) or 1))
-        elapsed = max(0, int(minutes_to_advance))
-        total_minutes = current_minute + elapsed
+        current_total = self._clock_total_minutes(current_day, current_minute)
+        proposed_total = self._clock_total_minutes(
+            high_water_day_offset, high_water_minute_of_day
+        )
+        next_day, next_minute = divmod(max(current_total, proposed_total), 24 * 60)
         clock["next_conversation_no"] = current_conversation + 1
-        clock["next_day_offset"] = current_day + total_minutes // (24 * 60)
-        clock["next_minute_of_day"] = total_minutes % (24 * 60)
+        clock["next_day_offset"] = next_day
+        clock["next_minute_of_day"] = next_minute
         clock["schema_version"] = 3
         clock["updated_at"] = self._now_ms()
         self._atomic_write_json(clock_path, clock)
 
     @staticmethod
-    def _validate_action_turn_clock(
+    def _validate_conversation_clock(
         clock: dict[str, Any],
         *,
-        expected_day_offset: int,
-        expected_minute_of_day: int,
         expected_conversation_no: int,
     ) -> None:
-        current_day = max(0, int(clock.get("next_day_offset", 0) or 0))
-        current_minute = max(
-            0,
-            min(
-                24 * 60 - 1,
-                int(clock.get("next_minute_of_day", PlayerSaveRepository.DEFAULT_WORLD_MINUTE_OF_DAY)),
-            ),
-        )
         current_conversation = max(1, int(clock.get("next_conversation_no", 1) or 1))
-        if current_day != int(expected_day_offset):
-            raise ValueError(
-                f"群世界时间已变化: expected={expected_day_offset}, actual={current_day}"
-            )
-        if current_minute != int(expected_minute_of_day):
-            raise ValueError(
-                "群世界时刻已变化: "
-                f"expected={expected_minute_of_day}, actual={current_minute}"
-            )
         if current_conversation != int(expected_conversation_no):
             raise ValueError(
                 "群对话序号已变化: "
@@ -385,11 +410,19 @@ class PlayerSaveRepository:
 
         protagonist_tree = card.build_protagonist_tree()
         protagonist_tree.setdefault("主角", {}).setdefault("阵营", {})["身份"] = "魔法少女"
+        world_day_offset = self.get_current_world_day_offset(group_id)
+        world_minute_of_day = self.get_current_world_minute_of_day(group_id)
+        transformation_time = self.format_world_datetime(
+            world_day_offset, world_minute_of_day
+        )
+        protagonist_tree.setdefault("主角", {}).setdefault("时间信息", {})[
+            "成为魔法少女时间"
+        ] = transformation_time
 
         self._ensure_battle_count(protagonist_tree)
 
         player_data: dict[str, Any] = {
-            "schema_version": 2,
+            "schema_version": 3,
             "group_id": str(group_id),
             "user_id": str(user_id),
             "nickname": nickname or card.target_name,
@@ -403,6 +436,7 @@ class PlayerSaveRepository:
             "名声": {"知名度": 0, "风评": 0},
         }
         player_data.update(protagonist_tree)
+        self._set_player_clock(player_data, world_day_offset, world_minute_of_day)
 
         player_data_path = user_dir / "player_data.json"
         self._atomic_write_json(player_data_path, player_data)
@@ -556,35 +590,39 @@ class PlayerSaveRepository:
         group_id: str,
         user_id: str,
         result: ActionTurnResult,
-        world_day_offset: int | None = None,
-        world_minute_of_day: int | None = None,
+        player_day_offset: int | None = None,
+        player_minute_of_day: int | None = None,
+        linked_user_ids: list[str] | None = None,
         event_runtime: dict[str, Any] | None = None,
         battle_odds: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         user_dir = self.get_user_dir(group_id, user_id)
         user_dir.mkdir(parents=True, exist_ok=True)
         now = self._now_ms()
-        if world_day_offset is None:
-            world_day_offset = self.get_current_world_day_offset(group_id)
-        world_day_offset = max(0, int(world_day_offset))
-        if world_minute_of_day is None:
-            world_minute_of_day = self.get_current_world_minute_of_day(group_id)
-        world_minute_of_day = max(0, min(24 * 60 - 1, int(world_minute_of_day)))
         conversation_no = self.get_current_conversation_no(group_id)
-        self._validate_action_turn_clock(
-            self._load_world_clock(group_id),
-            expected_day_offset=world_day_offset,
-            expected_minute_of_day=world_minute_of_day,
-            expected_conversation_no=conversation_no,
-        )
-        world_date = self.format_world_date(world_day_offset)
-        world_time = self.format_world_datetime(world_day_offset, world_minute_of_day)
-        result.date_label = world_time
-        result.conversation_no = conversation_no
-
         player_data = self._load_current_player_data(user_dir)
         if not isinstance(player_data, dict) or not player_data:
             raise ValueError("还没有你的魔法少女转生存档，请先使用 /魔法少女转生 建档。")
+        current_player_day, current_player_minute = self._player_clock(player_data)
+        if player_day_offset is None:
+            player_day_offset = current_player_day
+        if player_minute_of_day is None:
+            player_minute_of_day = current_player_minute
+        if (
+            current_player_day != int(player_day_offset)
+            or current_player_minute != int(player_minute_of_day)
+        ):
+            raise ValueError("玩家个人时间已变化，请重新生成本轮行动")
+        self._validate_conversation_clock(
+            self._load_world_clock(group_id),
+            expected_conversation_no=conversation_no,
+        )
+        player_day_offset = current_player_day
+        player_minute_of_day = current_player_minute
+        world_date = self.format_world_date(player_day_offset)
+        world_time = self.format_world_datetime(player_day_offset, player_minute_of_day)
+        result.date_label = world_time
+        result.conversation_no = conversation_no
         player_data["updated_at"] = _now_date_str()
         if event_runtime and not self._current_story_event(player_data):
             process = player_data.setdefault("进程", {})
@@ -633,8 +671,6 @@ class PlayerSaveRepository:
         current_phase = str(player_data.get("进程", {}).get("阶段") or "日常").strip()
         result.phase = current_phase if current_phase in {"日常", "战斗", "事件"} else "日常"
         self._ensure_battle_count(player_data)
-        result.state_snapshot = dict(player_data)
-        self._save_current_player_data(user_dir, player_data)
 
         event_id = current_event_id if event_switched else self._story_event_id(
             previous_event or current_event
@@ -650,11 +686,39 @@ class PlayerSaveRepository:
             event_outcome = self._event_outcome_from_runtime(previous_event or current_event)
         event_started = bool(event_runtime and previous_event)
         event_ended = bool(previous_event and not current_event)
-        total_minutes = world_minute_of_day + elapsed_minutes
-        days_advanced = total_minutes // (24 * 60)
+        ending_day_offset, ending_minute_of_day = self._advanced_clock(
+            player_day_offset,
+            player_minute_of_day,
+            elapsed_minutes,
+        )
+        days_advanced = ending_day_offset - player_day_offset
         day_advanced = days_advanced > 0
-        ending_day_offset = world_day_offset + days_advanced
-        ending_minute_of_day = total_minutes % (24 * 60)
+        self._set_player_clock(player_data, ending_day_offset, ending_minute_of_day)
+        result.state_snapshot = dict(player_data)
+        self._save_current_player_data(user_dir, player_data)
+        high_water_day = ending_day_offset
+        high_water_minute = ending_minute_of_day
+        for linked_user_id in dict.fromkeys(linked_user_ids or []):
+            safe_linked_id = str(linked_user_id or "").strip()
+            if not safe_linked_id or safe_linked_id == str(user_id):
+                continue
+            linked_dir = self.get_user_dir(group_id, safe_linked_id)
+            linked_data = self._load_current_player_data(linked_dir)
+            try:
+                linked_day, linked_minute = self._player_clock(linked_data)
+            except ValueError as exc:
+                logger.warning(f"跳过联动玩家时间推进: {safe_linked_id} {exc}")
+                continue
+            linked_end_day, linked_end_minute = self._advanced_clock(
+                linked_day, linked_minute, elapsed_minutes
+            )
+            self._set_player_clock(linked_data, linked_end_day, linked_end_minute)
+            linked_data["updated_at"] = _now_date_str()
+            self._save_current_player_data(linked_dir, linked_data)
+            if self._clock_total_minutes(
+                linked_end_day, linked_end_minute
+            ) > self._clock_total_minutes(high_water_day, high_water_minute):
+                high_water_day, high_water_minute = linked_end_day, linked_end_minute
         ending_world_time = self.format_world_datetime(
             ending_day_offset,
             ending_minute_of_day,
@@ -668,11 +732,11 @@ class PlayerSaveRepository:
                 "title": result.title,
                 "phase": result.phase,
                 "date_label": world_time,
-                "world_day_offset": world_day_offset,
+                "world_day_offset": player_day_offset,
                 "world_date": world_date,
                 "world_time": world_time,
                 "world_time_end": ending_world_time,
-                "world_minute_of_day": world_minute_of_day,
+                "world_minute_of_day": player_minute_of_day,
                 "world_minute_of_day_end": ending_minute_of_day,
                 "time_advanced": elapsed_label,
                 "time_advanced_minutes": elapsed_minutes,
@@ -695,10 +759,9 @@ class PlayerSaveRepository:
         )
         self.commit_action_turn_clock(
             group_id,
-            expected_day_offset=world_day_offset,
-            expected_minute_of_day=world_minute_of_day,
             expected_conversation_no=conversation_no,
-            minutes_to_advance=elapsed_minutes,
+            high_water_day_offset=high_water_day,
+            high_water_minute_of_day=high_water_minute,
         )
         return player_data
 
@@ -867,11 +930,13 @@ class PlayerSaveRepository:
             "/schema_version",
             "/group_id",
             "/user_id",
+            "/player_clock",
             "/created_at",
             "/updated_at",
             "/nickname",
             "/avatar_url",
             "/世界/日期",
+            "/主角/时间信息/成为魔法少女时间",
         }
         if any(path == prefix or path.startswith(prefix + "/") for prefix in readonly_prefixes):
             raise ValueError(f"禁止修改只读字段: {path}")
@@ -1647,7 +1712,19 @@ class PlayerSaveRepository:
         player_data = self._read_json(player_data_path)
         if not player_data:
             raise ValueError("玩家存档不存在或无法读取")
-
+        current = self._load_current_player_data(user_dir)
+        transformation_time = self._get_nested(
+            current,
+            ["主角", "时间信息", "成为魔法少女时间"],
+            "",
+        )
+        world_day = self.get_current_world_day_offset(group_id)
+        world_minute = self.get_current_world_minute_of_day(group_id)
+        self._set_player_clock(player_data, world_day, world_minute)
+        if transformation_time:
+            player_data.setdefault("主角", {}).setdefault("时间信息", {})[
+                "成为魔法少女时间"
+            ] = transformation_time
         self._atomic_write_json(user_dir / "player_data_update.json", player_data)
 
     def delete_player_save(self, group_id: str, user_id: str) -> bool:
