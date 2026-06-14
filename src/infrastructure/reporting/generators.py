@@ -224,6 +224,11 @@ class ReportGenerator(ICardGenerator):
             if options
             else ""
         )
+        current_time_html = (
+            f'<div class="story-time">当前时间：{html_lib.escape(result.date_label)}</div>'
+            if str(result.date_label or "").strip()
+            else ""
+        )
         story_html = self._highlight_action_quotes(result.story_text)
         return f"""<!doctype html>
 <html lang="zh-CN">
@@ -386,6 +391,12 @@ h1 {{
   border-radius: 8px;
   background: rgba(255, 253, 247, .82);
 }}
+.story-time {{
+  margin-bottom: 10px;
+  color: #8a6076;
+  font-size: 18px;
+  font-weight: 700;
+}}
 .quote {{
   color: #e46a24;
   font-weight: 700;
@@ -463,7 +474,7 @@ h1 {{
       <span class="meta-label">玩家行动</span>
       <span class="meta-value">{html_lib.escape(player_action)}</span>
     </div>
-    <section class="story">{story_html}</section>
+    <section class="story">{current_time_html}{story_html}</section>
     {options_section}
     {patch_section}
     <div class="footer">{html_lib.escape(result.footer or "行动记录已写入存档。")}</div>
@@ -626,6 +637,8 @@ h1 {{
 
     @staticmethod
     def _should_display_action_patch(item: dict[str, Any]) -> bool:
+        if str(item.get("path") or "") == "/世界/时间":
+            return False
         return not (
             item.get("op") == "insert"
             and item.get("value") in ({}, [])

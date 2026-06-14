@@ -198,7 +198,8 @@ class ActionTurnAnalyzer(BattleDiaryAnalyzer):
                     "2. <行动选项>...</行动选项>\n"
                     "3. <UpdateVariable><Analysis>...</Analysis>"
                     "<JSONPatch>[...]</JSONPatch></UpdateVariable>\n"
-                    "如果本轮没有需要变更的变量，<JSONPatch> 也必须输出合法的空数组 []。"
+                    "<JSONPatch> 必须包含且只包含一个 /世界/时间 delta；"
+                    "其他变量没有变化时，也不能省略该时间补丁。"
                 ),
             ]
         )
@@ -277,6 +278,7 @@ class ActionTurnAnalyzer(BattleDiaryAnalyzer):
         if not patch_text:
             raise ValueError("缺少 <JSONPatch> 块")
         patch = cls._parse_json_patch(patch_text)
+        cls._validate_world_time_patch(patch)
         story = raw
         for tag in ("行动选项", "UpdateVariable"):
             match = re.search(rf"<{tag}>.*?</{tag}>", story, flags=re.S)
@@ -309,6 +311,25 @@ class ActionTurnAnalyzer(BattleDiaryAnalyzer):
         if not isinstance(parsed, list):
             raise ValueError("JSONPatch 必须是数组")
         return [item for item in parsed if isinstance(item, dict)]
+
+    @staticmethod
+    def _validate_world_time_patch(patch: list[dict[str, Any]]) -> None:
+        if any(str(item.get("path") or "") == "/世界/日期" for item in patch):
+            raise ValueError("/世界/日期 已停用，请使用 /世界/时间")
+        time_patches = [
+            item for item in patch if str(item.get("path") or "") == "/世界/时间"
+        ]
+        if len(time_patches) != 1:
+            raise ValueError("每轮必须且只能输出一个 /世界/时间 delta")
+        item = time_patches[0]
+        if str(item.get("op") or "").strip() != "delta":
+            raise ValueError("/世界/时间 只允许使用 delta")
+        value = item.get("value")
+        if not isinstance(value, str) or not re.fullmatch(
+            r"(0|[1-9]\d*):[0-5]\d",
+            value.strip(),
+        ):
+            raise ValueError("/世界/时间 的 delta 必须是 H:MM，分钟范围为 00-59")
 
     @staticmethod
     def _current_phase(player_data: dict) -> str:
@@ -433,7 +454,7 @@ variable_api:
     - /进程/当前事件/selected_participants
     - /进程/当前事件/selected_targets
     - /进程/当前事件/turn_count
-    - /世界/日期
+    - /世界/时间
     - /世界/世界观备注
     - /记录
     - /名声/知名度
@@ -451,10 +472,10 @@ variable_api:
   rules:
     - 只根据本轮正文更新变量。
     - 不要把系统数据写进正文。
-    - delta 只用于数字。
-    - 每轮必须且只能输出一个 /世界/日期 delta；同一天内使用 0，跨日时使用实际经过的完整天数。
-    - /世界/日期 只允许使用非负整数 delta；不要使用 replace，也不要倒退日期。
-    - 睡到次日、明确的次日或多日转场、长途旅行、休养和持续多日的任务必须推进日期；不要让连续剧情不合理地永远停在同一天。
+    - 普通状态字段的 delta 只用于数字；/世界/时间 是专用的 H:MM 字符串增量。
+    - 每轮必须且只能输出一个 /世界/时间 delta，值为本轮正文实际增加的 H:MM 字符串。
+    - 小时可以超过 23，分钟必须为 00-59；例如短对话 0:10、训练 1:30、睡眠 8:00、两天 48:00、没有时间流逝 0:00。
+    - 只输出增加量，不输出绝对时间，也不要自行判断最终日期；代码会累加时间并处理跨日。
     - 完成待处理事件后 remove 对应事件 Key。
     - 只有持续剧情才使用当前事件；普通日常、自由行动、训练和社交不要创建当前事件。
     - 当前剧情事件继续时保留或更新当前事件；剧情自然完成后可以移除当前事件或离开事件阶段。
@@ -473,6 +494,11 @@ variable_api:
         if isinstance(process, dict) and "当前事件" in process:
             visible["进程"] = deepcopy(process)
             visible["进程"].pop("当前事件", None)
+        world = visible.get("世界")
+        if isinstance(world, dict) and any(key in world for key in ("日期", "时间")):
+            visible["世界"] = deepcopy(world)
+            visible["世界"].pop("日期", None)
+            visible["世界"].pop("时间", None)
         return visible
 
     @staticmethod
@@ -501,7 +527,8 @@ examples_library:
         </Analysis>
         <JSONPatch>[
           { "op": "insert", "path": "/主角/道具栏/便签", "value": "写着今天的线索" },
-          { "op": "replace", "path": "/主角/生理状态/当前生理动态", "value": "呼吸平稳" }
+          { "op": "replace", "path": "/主角/生理状态/当前生理动态", "value": "呼吸平稳" },
+          { "op": "delta", "path": "/世界/时间", "value": "0:10" }
         ]</JSONPatch>
       </UpdateVariable>
   - scenario: "战斗损耗"
@@ -517,7 +544,8 @@ examples_library:
           { "op": "delta", "path": "/主角/核心状态/体力值/当前", "value": -8 },
           { "op": "replace", "path": "/主角/身体部位状况/手臂", "value": "轻微擦伤" },
           { "op": "delta", "path": "/主角/技能/闪避/进度", "value": 5 },
-          { "op": "replace", "path": "/进程/阶段", "value": "日常" }
+          { "op": "replace", "path": "/进程/阶段", "value": "日常" },
+          { "op": "delta", "path": "/世界/时间", "value": "0:20" }
         ]</JSONPatch>
       </UpdateVariable>
   - scenario: "事件清理"
@@ -530,7 +558,8 @@ examples_library:
           - 长期记忆：已将旧线索整理完成，因此移除事件触发器，避免重复执行。
         </Analysis>
         <JSONPatch>[
-          { "op": "remove", "path": "/系统状态/待处理事件/线索整理事件" }
+          { "op": "remove", "path": "/系统状态/待处理事件/线索整理事件" },
+          { "op": "delta", "path": "/世界/时间", "value": "0:05" }
         ]</JSONPatch>
       </UpdateVariable>
   - scenario: "世界观备注"
@@ -543,7 +572,8 @@ examples_library:
           - 长期记忆：旧校舍夜间魔力反应会影响后续剧情，因此登记为世界观备注。
         </Analysis>
         <JSONPatch>[
-          { "op": "insert", "path": "/世界/世界观备注/地点_旧校舍", "value": "夜间会出现微弱魔力反应。" }
+          { "op": "insert", "path": "/世界/世界观备注/地点_旧校舍", "value": "夜间会出现微弱魔力反应。" },
+          { "op": "delta", "path": "/世界/时间", "value": "0:15" }
         ]</JSONPatch>
       </UpdateVariable>
 """.strip()

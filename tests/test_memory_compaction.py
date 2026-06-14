@@ -244,6 +244,7 @@ class MemoryCompactionTests(unittest.TestCase):
         result = ActionTurnResult(
             story_text="完整正文",
             memory_text="当前玩家的短事件记忆",
+            json_patch=[{"op": "delta", "path": "/世界/时间", "value": "0:10"}],
         )
 
         self.repo.save_action_turn_result(

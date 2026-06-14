@@ -532,11 +532,26 @@ class EventSaveTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def _save(self, patch, *, runtime=None, battle_odds=None):
+    def _save(
+        self,
+        patch,
+        *,
+        runtime=None,
+        battle_odds=None,
+        ensure_time=True,
+        world_minute_of_day=None,
+    ):
+        patch = list(patch)
+        if ensure_time and not any(
+            isinstance(item, dict) and str(item.get("path") or "").startswith("/世界/")
+            for item in patch
+        ):
+            patch.append({"op": "delta", "path": "/世界/时间", "value": "0:00"})
         return self.repo.save_action_turn_result(
             group_id="g1",
             user_id="u1",
             result=ActionTurnResult(story_text="测试正文", json_patch=patch),
+            world_minute_of_day=world_minute_of_day,
             event_runtime=runtime,
             battle_odds=battle_odds,
         )
@@ -642,7 +657,7 @@ class EventSaveTests(unittest.TestCase):
 
     def test_active_event_can_advance_multiple_days_without_ending(self):
         state = self._save(
-            [{"op": "delta", "path": "/世界/日期", "value": 3}],
+            [{"op": "delta", "path": "/世界/时间", "value": "72:00"}],
             runtime=_runtime(turn_count=0),
         )
 
@@ -658,15 +673,18 @@ class EventSaveTests(unittest.TestCase):
         self.assertEqual(log["days_advanced"], 3)
         self.assertEqual(
             log["json_patch"][-1],
-            {"op": "delta", "path": "/世界/日期", "value": 3},
+            {"op": "delta", "path": "/世界/时间", "value": "72:00"},
         )
+        self.assertEqual(log["time_advanced_minutes"], 72 * 60)
+        self.assertEqual(log["world_time"], "公元2020年4月1日 8:00")
+        self.assertEqual(log["world_time_end"], "公元2020年4月4日 8:00")
         self.assertNotIn("日期", state.get("世界", {}))
 
     def test_event_end_uses_explicit_day_advance_without_extra_day(self):
         self._save([], runtime=_runtime(turn_count=0))
         self._save(
             [
-                {"op": "delta", "path": "/世界/日期", "value": 3},
+                {"op": "delta", "path": "/世界/时间", "value": "72:00"},
                 {"op": "remove", "path": "/进程/当前事件"},
             ]
         )
@@ -679,9 +697,9 @@ class EventSaveTests(unittest.TestCase):
         self.assertTrue(log["event_ended"])
         self.assertEqual(log["days_advanced"], 3)
 
-    def test_zero_world_date_delta_keeps_date_and_saves_turn(self):
+    def test_zero_world_time_delta_keeps_clock_and_saves_turn(self):
         self._save(
-            [{"op": "delta", "path": "/世界/日期", "value": 0}],
+            [{"op": "delta", "path": "/世界/时间", "value": "0:00"}],
             runtime=_runtime(turn_count=0),
         )
 
@@ -693,26 +711,76 @@ class EventSaveTests(unittest.TestCase):
         )[0]
         self.assertFalse(log["day_advanced"])
         self.assertEqual(log["days_advanced"], 0)
-        self.assertNotIn(
-            {"op": "delta", "path": "/世界/日期", "value": 0},
+        self.assertIn(
+            {"op": "delta", "path": "/世界/时间", "value": "0:00"},
             log["json_patch"],
         )
+        self.assertEqual(log["world_time_end"], "公元2020年4月1日 8:00")
 
-    def test_invalid_world_date_patch_does_not_consume_conversation(self):
+    def test_invalid_world_time_patch_does_not_consume_conversation(self):
         invalid_patches = [
             [{"op": "replace", "path": "/世界/日期", "value": "2020-04-02"}],
-            [{"op": "delta", "path": "/世界/日期", "value": -1}],
-            [{"op": "delta", "path": "/世界/日期", "value": 1.5}],
+            [{"op": "replace", "path": "/世界/时间", "value": "1:00"}],
+            [{"op": "delta", "path": "/世界/时间", "value": "-1:00"}],
+            [{"op": "delta", "path": "/世界/时间", "value": "1:60"}],
+            [{"op": "delta", "path": "/世界/时间", "value": 90}],
+            [],
+            [
+                {"op": "delta", "path": "/世界/时间", "value": "1:00"},
+                {"op": "delta", "path": "/世界/时间", "value": "0:30"},
+            ],
         ]
         for invalid_patch in invalid_patches:
             with self.subTest(patch=invalid_patch):
                 with self.assertRaises(ValueError):
-                    self._save(invalid_patch, runtime=_runtime(turn_count=0))
+                    self._save(
+                        invalid_patch,
+                        runtime=_runtime(turn_count=0),
+                        ensure_time=False,
+                    )
                 self.assertEqual(self.repo.get_current_conversation_no("g1"), 1)
                 self.assertEqual(self.repo.get_current_world_day_offset("g1"), 0)
                 self.assertFalse(
                     (self.repo.get_user_dir("g1", "u1") / "daily_memory.jsonl").exists()
                 )
+
+    def test_world_time_crosses_midnight_and_keeps_remainder(self):
+        self.repo._atomic_write_json(
+            self.repo._world_clock_path("g1"),
+            {
+                "schema_version": 3,
+                "next_day_offset": 0,
+                "next_minute_of_day": 23 * 60,
+                "next_conversation_no": 1,
+            },
+        )
+        self._save(
+            [{"op": "delta", "path": "/世界/时间", "value": "1:30"}],
+            world_minute_of_day=23 * 60,
+        )
+
+        clock = self.repo._read_json(self.repo._world_clock_path("g1"))
+        self.assertEqual(clock["next_day_offset"], 1)
+        self.assertEqual(clock["next_minute_of_day"], 30)
+        self.assertEqual(self.repo.get_current_world_datetime("g1"), "公元2020年4月2日 0:30")
+
+    def test_world_time_advances_more_than_two_days(self):
+        self._save([{"op": "delta", "path": "/世界/时间", "value": "49:30"}])
+
+        self.assertEqual(self.repo.get_current_world_day_offset("g1"), 2)
+        self.assertEqual(self.repo.get_current_world_minute_of_day("g1"), 9 * 60 + 30)
+        self.assertEqual(self.repo.get_current_world_datetime("g1"), "公元2020年4月3日 9:30")
+
+    def test_stale_world_minute_does_not_consume_conversation(self):
+        self.repo.get_current_world_datetime("g1")
+
+        with self.assertRaisesRegex(ValueError, "群世界时刻已变化"):
+            self._save(
+                [{"op": "delta", "path": "/世界/时间", "value": "0:10"}],
+                world_minute_of_day=9 * 60,
+            )
+
+        self.assertEqual(self.repo.get_current_conversation_no("g1"), 1)
 
     def test_multiple_players_share_one_conversation_sequence(self):
         second_user_dir = self.repo.get_user_dir("g1", "u2")
@@ -726,7 +794,10 @@ class EventSaveTests(unittest.TestCase):
         self.repo.save_action_turn_result(
             group_id="g1",
             user_id="u2",
-            result=ActionTurnResult(story_text="第二名玩家", json_patch=[]),
+            result=ActionTurnResult(
+                story_text="第二名玩家",
+                json_patch=[{"op": "delta", "path": "/世界/时间", "value": "0:00"}],
+            ),
             event_runtime=_runtime(turn_count=0),
         )
         self._save([])
@@ -868,6 +939,10 @@ class ConversationSequenceMigrationTests(unittest.TestCase):
         self.assertEqual(self.repo.get_current_conversation_no("g1"), 4)
         self.assertEqual(self.repo.get_current_conversation_no("g1"), 4)
         self.assertEqual(self.repo.get_current_world_day_offset("g1"), 4)
+        self.assertEqual(self.repo.get_current_world_minute_of_day("g1"), 8 * 60)
+        migrated_clock = self.repo._read_json(group_dir / "world_clock.json")
+        self.assertEqual(migrated_clock["schema_version"], 3)
+        self.assertEqual(migrated_clock["next_minute_of_day"], 8 * 60)
 
         u1_logs = self.repo._read_recent_logs(
             group_dir / "users" / "u1" / "daily_memory.jsonl",
@@ -940,6 +1015,12 @@ class _ActiveEventRepository:
     def format_world_date(self, offset):
         return "公元2020年4月1日"
 
+    def get_current_world_minute_of_day(self, group_id):
+        return 8 * 60
+
+    def format_world_datetime(self, offset, minute_of_day):
+        return "公元2020年4月1日 8:00"
+
     def build_city_teammate_candidates(self, *args, **kwargs):
         return []
 
@@ -983,7 +1064,10 @@ class _ActiveEventAnalyzer:
     async def analyze_action_turn(self, **kwargs):
         self.selection_context = kwargs["selection_context"]
         return SimpleNamespace(
-            result=ActionTurnResult(story_text="继续事件", json_patch=[]),
+            result=ActionTurnResult(
+                story_text="继续事件",
+                json_patch=[{"op": "delta", "path": "/世界/时间", "value": "0:10"}],
+            ),
             raw_response="继续事件",
         )
 
@@ -1074,6 +1158,16 @@ class BattleOutcomeTests(unittest.TestCase):
 
 
 class ActionTurnCardTests(unittest.TestCase):
+    def test_action_text_places_current_time_before_story(self):
+        result = ActionTurnResult(
+            story_text="测试正文",
+            date_label="公元2020年4月1日 8:00",
+        )
+
+        text = result.to_text()
+
+        self.assertTrue(text.startswith("当前时间：公元2020年4月1日 8:00\n测试正文"))
+
     def test_action_card_uses_selected_targets_and_player_action_row(self):
         generator = ReportGenerator.__new__(ReportGenerator)
         result = ActionTurnResult(
@@ -1084,7 +1178,7 @@ class ActionTurnCardTests(unittest.TestCase):
                 {"target_name": "小夏", "magical_girl_name": "夏光"},
             ],
             phase="事件",
-            date_label="2020年4月1日",
+            date_label="公元2020年4月1日 8:00",
             state_snapshot={
                 "主角": {
                     "个人信息": {
@@ -1104,6 +1198,11 @@ class ActionTurnCardTests(unittest.TestCase):
         self.assertIn(">玩家行动</span>", html)
         self.assertIn(">尝试逃跑</span>", html)
         self.assertNotIn(">时间</span>", html)
+        self.assertIn("当前时间：公元2020年4月1日 8:00", html)
+        self.assertLess(
+            html.index("当前时间：公元2020年4月1日 8:00"),
+            html.index("测试正文"),
+        )
         self.assertIn("max-width: 900px", html)
         self.assertIn("font-size: 21px", html)
         self.assertIn("font-size: 17px", html)
@@ -1298,19 +1397,49 @@ class ActionTurnCardTests(unittest.TestCase):
             "<行动选项>继续观察</行动选项>\n"
             "<UpdateVariable><Analysis>测试</Analysis><JSONPatch>"
             + json.dumps(
-                [{"op": "replace", "path": "/主角/标签", "value": value}],
+                [
+                    {"op": "replace", "path": "/主角/标签", "value": value},
+                    {"op": "delta", "path": "/世界/时间", "value": "0:05"},
+                ],
                 ensure_ascii=False,
             )
             + "</JSONPatch></UpdateVariable>"
         )
 
         result = ActionTurnAnalyzer.parse_action_turn_response(response)
-
-        applied = repo.apply_json_patch(state, result.json_patch)
+        state_patch, elapsed_minutes, elapsed_label = repo._extract_world_time_advance(
+            result.json_patch
+        )
+        applied = repo.apply_json_patch(state, state_patch)
 
         self.assertEqual(state["主角"]["标签"], value)
         self.assertNotIn("旧字段", state["主角"]["标签"])
         self.assertEqual(applied[0]["value"], value)
+        self.assertEqual((elapsed_minutes, elapsed_label), (5, "0:05"))
+
+    def test_parser_rejects_missing_world_time_patch(self):
+        response = (
+            "测试正文\n"
+            "<行动选项>继续观察</行动选项>\n"
+            "<UpdateVariable><Analysis>测试</Analysis>"
+            "<JSONPatch>[]</JSONPatch></UpdateVariable>"
+        )
+
+        with self.assertRaisesRegex(ValueError, "必须且只能输出一个 /世界/时间"):
+            ActionTurnAnalyzer.parse_action_turn_response(response)
+
+    def test_visible_variables_hide_legacy_world_clock_fields(self):
+        visible = ActionTurnAnalyzer._visible_current_variables(
+            {
+                "世界": {
+                    "日期": "旧日期",
+                    "时间": "旧时间",
+                    "世界观备注": {"地点": "保留"},
+                }
+            }
+        )
+
+        self.assertEqual(visible["世界"], {"世界观备注": {"地点": "保留"}})
 
 
 if __name__ == "__main__":

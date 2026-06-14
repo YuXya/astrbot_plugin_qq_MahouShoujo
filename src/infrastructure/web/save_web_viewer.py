@@ -3991,6 +3991,9 @@ class SaveWebViewer:
 
     @staticmethod
     def _world_date_display(item: dict[str, Any]) -> str:
+        world_time = str(item.get("world_time") or "").strip()
+        if world_time:
+            return world_time
         start = str(item.get("world_date_from") or "").strip()
         end = str(item.get("world_date_to") or "").strip()
         if start and end:

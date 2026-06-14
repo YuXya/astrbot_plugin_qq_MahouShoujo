@@ -48,7 +48,11 @@ class ActionTurnApplicationService:
                 )
 
             world_day_offset = self.save_repository.get_current_world_day_offset(group_id)
-            current_world_date = self.save_repository.format_world_date(world_day_offset)
+            world_minute_of_day = self.save_repository.get_current_world_minute_of_day(group_id)
+            current_world_date = self.save_repository.format_world_datetime(
+                world_day_offset,
+                world_minute_of_day,
+            )
             player_data = save_data.get("player_data", {})
             stored_phase = str(
                 (player_data.get("进程") or {}).get("阶段") or "日常"
@@ -162,6 +166,7 @@ class ActionTurnApplicationService:
                 user_id=user_id,
                 result=result,
                 world_day_offset=world_day_offset,
+                world_minute_of_day=world_minute_of_day,
                 event_runtime=current_event if event_started else None,
                 battle_odds=selection_context.get("battle_odds"),
             )

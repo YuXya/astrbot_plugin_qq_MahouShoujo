@@ -783,6 +783,9 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
 
     @staticmethod
     def _world_diary_title(item: dict) -> str:
+        world_time = str(item.get("world_time") or "").strip()
+        if world_time:
+            return f"{world_time}的日记"
         world_date = str(item.get("world_date") or "").strip()
         world_date_from = str(item.get("world_date_from") or "").strip()
         world_date_to = str(item.get("world_date_to") or "").strip()

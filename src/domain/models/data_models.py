@@ -184,7 +184,10 @@ class ActionTurnResult:
     avatar_url: str = ""
 
     def to_text(self) -> str:
-        parts = [self.story_text.strip()]
+        parts = []
+        if self.date_label:
+            parts.append(f"当前时间：{self.date_label}")
+        parts.append(self.story_text.strip())
         if self.action_options:
             parts.extend(["", "【行动选项】", *self.action_options])
         if self.footer:

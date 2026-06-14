@@ -50,6 +50,7 @@ class PlayerSaveRepository:
         "daily_memory.jsonl",
     }
     WORLD_ERA_START = date(2020, 4, 1)
+    DEFAULT_WORLD_MINUTE_OF_DAY = 8 * 60
 
     def __init__(
         self,
@@ -66,12 +67,34 @@ class PlayerSaveRepository:
         value = cls.WORLD_ERA_START + timedelta(days=max(0, int(day_offset)))
         return f"公元{value.year}年{value.month}月{value.day}日"
 
+    @classmethod
+    def format_world_datetime(cls, day_offset: int, minute_of_day: int) -> str:
+        minute = max(0, int(minute_of_day)) % (24 * 60)
+        return f"{cls.format_world_date(day_offset)} {minute // 60}:{minute % 60:02d}"
+
     def get_current_world_day_offset(self, group_id: str) -> int:
         clock = self._load_world_clock(group_id)
         return max(0, int(clock.get("next_day_offset", 0) or 0))
 
+    def get_current_world_minute_of_day(self, group_id: str) -> int:
+        clock = self._load_world_clock(group_id)
+        return max(
+            0,
+            min(
+                24 * 60 - 1,
+                int(clock.get("next_minute_of_day", self.DEFAULT_WORLD_MINUTE_OF_DAY)),
+            ),
+        )
+
     def get_current_world_date(self, group_id: str) -> str:
         return self.format_world_date(self.get_current_world_day_offset(group_id))
+
+    def get_current_world_datetime(self, group_id: str) -> str:
+        clock = self._load_world_clock(group_id)
+        return self.format_world_datetime(
+            int(clock.get("next_day_offset", 0) or 0),
+            int(clock.get("next_minute_of_day", self.DEFAULT_WORLD_MINUTE_OF_DAY)),
+        )
 
     def get_current_conversation_no(self, group_id: str) -> int:
         clock = self._load_world_clock(group_id)
@@ -84,9 +107,17 @@ class PlayerSaveRepository:
             clock = self._migrate_world_clock(group_id)
             self._atomic_write_json(clock_path, clock)
             return clock
+        changed = False
         if "next_conversation_no" not in clock:
             clock["next_conversation_no"] = self._migrate_conversation_sequence(group_id)
-            clock["schema_version"] = max(2, int(clock.get("schema_version", 1) or 1))
+            changed = True
+        if "next_minute_of_day" not in clock:
+            clock["next_minute_of_day"] = self.DEFAULT_WORLD_MINUTE_OF_DAY
+            changed = True
+        if int(clock.get("schema_version", 1) or 1) < 3:
+            clock["schema_version"] = 3
+            changed = True
+        if changed:
             clock["updated_at"] = self._now_ms()
             self._atomic_write_json(clock_path, clock)
         return clock
@@ -96,21 +127,33 @@ class PlayerSaveRepository:
         group_id: str,
         *,
         expected_day_offset: int,
+        expected_minute_of_day: int,
         expected_conversation_no: int,
-        days_to_advance: int,
+        minutes_to_advance: int,
     ) -> None:
         clock_path = self._world_clock_path(group_id)
         clock = self._load_world_clock(group_id)
         self._validate_action_turn_clock(
             clock,
             expected_day_offset=expected_day_offset,
+            expected_minute_of_day=expected_minute_of_day,
             expected_conversation_no=expected_conversation_no,
         )
         current_day = max(0, int(clock.get("next_day_offset", 0) or 0))
+        current_minute = max(
+            0,
+            min(
+                24 * 60 - 1,
+                int(clock.get("next_minute_of_day", self.DEFAULT_WORLD_MINUTE_OF_DAY)),
+            ),
+        )
         current_conversation = max(1, int(clock.get("next_conversation_no", 1) or 1))
+        elapsed = max(0, int(minutes_to_advance))
+        total_minutes = current_minute + elapsed
         clock["next_conversation_no"] = current_conversation + 1
-        clock["next_day_offset"] = current_day + max(0, int(days_to_advance))
-        clock["schema_version"] = max(2, int(clock.get("schema_version", 1) or 1))
+        clock["next_day_offset"] = current_day + total_minutes // (24 * 60)
+        clock["next_minute_of_day"] = total_minutes % (24 * 60)
+        clock["schema_version"] = 3
         clock["updated_at"] = self._now_ms()
         self._atomic_write_json(clock_path, clock)
 
@@ -119,13 +162,26 @@ class PlayerSaveRepository:
         clock: dict[str, Any],
         *,
         expected_day_offset: int,
+        expected_minute_of_day: int,
         expected_conversation_no: int,
     ) -> None:
         current_day = max(0, int(clock.get("next_day_offset", 0) or 0))
+        current_minute = max(
+            0,
+            min(
+                24 * 60 - 1,
+                int(clock.get("next_minute_of_day", PlayerSaveRepository.DEFAULT_WORLD_MINUTE_OF_DAY)),
+            ),
+        )
         current_conversation = max(1, int(clock.get("next_conversation_no", 1) or 1))
         if current_day != int(expected_day_offset):
             raise ValueError(
                 f"群世界时间已变化: expected={expected_day_offset}, actual={current_day}"
+            )
+        if current_minute != int(expected_minute_of_day):
+            raise ValueError(
+                "群世界时刻已变化: "
+                f"expected={expected_minute_of_day}, actual={current_minute}"
             )
         if current_conversation != int(expected_conversation_no):
             raise ValueError(
@@ -175,8 +231,9 @@ class PlayerSaveRepository:
             self._write_jsonl_lines(path, lines)
         self._migrate_cameo_world_dates(group_id)
         return {
-            "schema_version": 2,
+            "schema_version": 3,
             "next_day_offset": next_day_offset,
+            "next_minute_of_day": self.DEFAULT_WORLD_MINUTE_OF_DAY,
             "next_conversation_no": self._migrate_conversation_sequence(group_id),
             "updated_at": self._now_ms(),
         }
@@ -500,6 +557,7 @@ class PlayerSaveRepository:
         user_id: str,
         result: ActionTurnResult,
         world_day_offset: int | None = None,
+        world_minute_of_day: int | None = None,
         event_runtime: dict[str, Any] | None = None,
         battle_odds: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
@@ -509,14 +567,19 @@ class PlayerSaveRepository:
         if world_day_offset is None:
             world_day_offset = self.get_current_world_day_offset(group_id)
         world_day_offset = max(0, int(world_day_offset))
+        if world_minute_of_day is None:
+            world_minute_of_day = self.get_current_world_minute_of_day(group_id)
+        world_minute_of_day = max(0, min(24 * 60 - 1, int(world_minute_of_day)))
         conversation_no = self.get_current_conversation_no(group_id)
         self._validate_action_turn_clock(
             self._load_world_clock(group_id),
             expected_day_offset=world_day_offset,
+            expected_minute_of_day=world_minute_of_day,
             expected_conversation_no=conversation_no,
         )
         world_date = self.format_world_date(world_day_offset)
-        result.date_label = world_date
+        world_time = self.format_world_datetime(world_day_offset, world_minute_of_day)
+        result.date_label = world_time
         result.conversation_no = conversation_no
 
         player_data = self._load_current_player_data(user_dir)
@@ -532,16 +595,17 @@ class PlayerSaveRepository:
         previous_event = deepcopy(self._current_story_event(player_data))
         normalized_patch = self._normalize_story_event_patch(player_data, result.json_patch)
         result.json_patch = normalized_patch
-        state_patch, requested_day_advance = self._extract_world_day_advance(normalized_patch)
+        state_patch, elapsed_minutes, elapsed_label = self._extract_world_time_advance(
+            normalized_patch
+        )
         applied_patch = self.apply_json_patch(player_data, state_patch)
-        if requested_day_advance:
-            applied_patch.append(
-                {
-                    "op": "delta",
-                    "path": "/世界/日期",
-                    "value": requested_day_advance,
-                }
-            )
+        applied_patch.append(
+            {
+                "op": "delta",
+                "path": "/世界/时间",
+                "value": elapsed_label,
+            }
+        )
         current_event = self._current_story_event(player_data)
         self._validate_story_event_state(previous_event, player_data)
         previous_event_id = self._story_event_id(previous_event)
@@ -586,8 +650,15 @@ class PlayerSaveRepository:
             event_outcome = self._event_outcome_from_runtime(previous_event or current_event)
         event_started = bool(event_runtime and previous_event)
         event_ended = bool(previous_event and not current_event)
-        days_advanced = requested_day_advance
+        total_minutes = world_minute_of_day + elapsed_minutes
+        days_advanced = total_minutes // (24 * 60)
         day_advanced = days_advanced > 0
+        ending_day_offset = world_day_offset + days_advanced
+        ending_minute_of_day = total_minutes % (24 * 60)
+        ending_world_time = self.format_world_datetime(
+            ending_day_offset,
+            ending_minute_of_day,
+        )
         self.append_log(
             group_id,
             user_id,
@@ -596,9 +667,15 @@ class PlayerSaveRepository:
                 "created_at": now,
                 "title": result.title,
                 "phase": result.phase,
-                "date_label": world_date,
+                "date_label": world_time,
                 "world_day_offset": world_day_offset,
                 "world_date": world_date,
+                "world_time": world_time,
+                "world_time_end": ending_world_time,
+                "world_minute_of_day": world_minute_of_day,
+                "world_minute_of_day_end": ending_minute_of_day,
+                "time_advanced": elapsed_label,
+                "time_advanced_minutes": elapsed_minutes,
                 "conversation_no": conversation_no,
                 "action": result.action,
                 "story_text": result.story_text,
@@ -619,34 +696,44 @@ class PlayerSaveRepository:
         self.commit_action_turn_clock(
             group_id,
             expected_day_offset=world_day_offset,
+            expected_minute_of_day=world_minute_of_day,
             expected_conversation_no=conversation_no,
-            days_to_advance=days_advanced,
+            minutes_to_advance=elapsed_minutes,
         )
         return player_data
 
     @staticmethod
-    def _extract_world_day_advance(
+    def _extract_world_time_advance(
         patch: list[dict[str, Any]],
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], int, str]:
         state_patch: list[dict[str, Any]] = []
-        days_to_advance = 0
+        time_patches: list[dict[str, Any]] = []
         for item in patch or []:
-            if not isinstance(item, dict) or str(item.get("path") or "") != "/世界/日期":
+            if not isinstance(item, dict):
                 state_patch.append(item)
                 continue
-            if str(item.get("op") or "").strip() != "delta":
-                raise ValueError("/世界/日期 只允许使用 delta 增加天数")
-            value = item.get("value")
-            if isinstance(value, bool):
-                raise ValueError("/世界/日期 的 delta 必须是非负整数")
-            try:
-                numeric = float(value)
-            except (TypeError, ValueError):
-                raise ValueError("/世界/日期 的 delta 必须是非负整数") from None
-            if not numeric.is_integer() or numeric < 0:
-                raise ValueError("/世界/日期 的 delta 必须是非负整数")
-            days_to_advance += int(numeric)
-        return state_patch, days_to_advance
+            path = str(item.get("path") or "")
+            if path == "/世界/日期":
+                raise ValueError("/世界/日期 已停用，请使用 /世界/时间")
+            if path == "/世界/时间":
+                time_patches.append(item)
+                continue
+            state_patch.append(item)
+        if len(time_patches) != 1:
+            raise ValueError("每轮必须且只能输出一个 /世界/时间 delta")
+        item = time_patches[0]
+        if str(item.get("op") or "").strip() != "delta":
+            raise ValueError("/世界/时间 只允许使用 delta")
+        value = item.get("value")
+        if not isinstance(value, str):
+            raise ValueError("/世界/时间 的 delta 必须是 H:MM 字符串")
+        match = re.fullmatch(r"(0|[1-9]\d*):([0-5]\d)", value.strip())
+        if not match:
+            raise ValueError("/世界/时间 的 delta 必须是 H:MM，分钟范围为 00-59")
+        hours = int(match.group(1))
+        minutes = int(match.group(2))
+        normalized = f"{hours}:{minutes:02d}"
+        return state_patch, hours * 60 + minutes, normalized
 
     @staticmethod
     def _current_story_event(state: dict[str, Any]) -> dict[str, Any] | None:
