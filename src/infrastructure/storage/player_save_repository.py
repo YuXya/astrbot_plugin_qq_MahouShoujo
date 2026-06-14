@@ -51,6 +51,7 @@ class PlayerSaveRepository:
     }
     WORLD_ERA_START = date(2020, 4, 1)
     DEFAULT_WORLD_MINUTE_OF_DAY = 8 * 60
+    WEEKDAY_NAMES = ("星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日")
 
     def __init__(
         self,
@@ -71,6 +72,19 @@ class PlayerSaveRepository:
     def format_world_datetime(cls, day_offset: int, minute_of_day: int) -> str:
         minute = max(0, int(minute_of_day)) % (24 * 60)
         return f"{cls.format_world_date(day_offset)} {minute // 60}:{minute % 60:02d}"
+
+    @classmethod
+    def format_world_datetime_for_display(
+        cls,
+        day_offset: int,
+        minute_of_day: int,
+    ) -> str:
+        value = cls.WORLD_ERA_START + timedelta(days=max(0, int(day_offset)))
+        minute = max(0, int(minute_of_day)) % (24 * 60)
+        return (
+            f"{cls.format_world_date(day_offset)} {cls.WEEKDAY_NAMES[value.weekday()]} "
+            f"{minute // 60}:{minute % 60:02d}"
+        )
 
     def get_current_world_day_offset(self, group_id: str) -> int:
         clock = self._load_world_clock(group_id)

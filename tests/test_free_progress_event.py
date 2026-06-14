@@ -1197,6 +1197,9 @@ class _ActiveEventRepository:
     def format_world_datetime(self, offset, minute_of_day):
         return "公元2020年4月1日 8:00"
 
+    def format_world_datetime_for_display(self, offset, minute_of_day):
+        return "display-time-with-weekday"
+
     def build_city_teammate_candidates(self, *args, **kwargs):
         return []
 
@@ -1239,6 +1242,7 @@ class _ActiveEventAnalyzer:
 
     async def analyze_action_turn(self, **kwargs):
         self.selection_context = kwargs["selection_context"]
+        self.current_world_date = kwargs["current_world_date"]
         return SimpleNamespace(
             result=ActionTurnResult(
                 story_text="继续事件",
@@ -1268,6 +1272,8 @@ class ActiveEventFlowTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertTrue(result.success)
+        self.assertEqual(service.llm_analyzer.current_world_date, "display-time-with-weekday")
+        self.assertEqual(result.result.date_label, "display-time-with-weekday")
         self.assertEqual(
             service.llm_analyzer.selection_input["current_event"]["scene_event"]["id"],
             "capture",
@@ -1331,6 +1337,22 @@ class BattleOutcomeTests(unittest.TestCase):
         self.assertEqual(randint.call_count, 2)
         self.assertEqual(first["battle_odds"]["outcome"], "player_win")
         self.assertEqual(second["battle_odds"]["outcome"], "player_lose")
+
+
+class WorldTimeDisplayTests(unittest.TestCase):
+    def test_display_time_includes_calculated_weekday_without_changing_storage_format(self):
+        self.assertEqual(
+            PlayerSaveRepository.format_world_datetime_for_display(0, 8 * 60),
+            "公元2020年4月1日 星期三 8:00",
+        )
+        self.assertEqual(
+            PlayerSaveRepository.format_world_datetime_for_display(3, 9 * 60 + 5),
+            "公元2020年4月4日 星期六 9:05",
+        )
+        self.assertEqual(
+            PlayerSaveRepository.format_world_datetime(0, 8 * 60),
+            "公元2020年4月1日 8:00",
+        )
 
 
 class ActionTurnCardTests(unittest.TestCase):

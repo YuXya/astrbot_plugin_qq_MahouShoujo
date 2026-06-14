@@ -50,9 +50,17 @@ class ActionTurnApplicationService:
             world_day_offset, world_minute_of_day = self.save_repository.get_player_clock(
                 group_id, user_id
             )
-            current_world_date = self.save_repository.format_world_datetime(
+            stored_world_time = self.save_repository.format_world_datetime(
                 world_day_offset,
                 world_minute_of_day,
+            )
+            display_formatter = getattr(
+                self.save_repository, "format_world_datetime_for_display", None
+            )
+            current_world_date = (
+                display_formatter(world_day_offset, world_minute_of_day)
+                if callable(display_formatter)
+                else stored_world_time
             )
             player_data = save_data.get("player_data", {})
             stored_phase = str(
@@ -90,13 +98,13 @@ class ActionTurnApplicationService:
                 selection_context = self._active_event_selection_context(
                     current_event,
                     selection_candidate,
-                    current_world_date=current_world_date,
+                    current_world_date=stored_world_time,
                 )
             else:
                 selection_context = selection_candidate
                 current_event = self._build_event_runtime(
                     selection_context,
-                    current_world_date=current_world_date,
+                    current_world_date=stored_world_time,
                 )
                 event_started = current_event is not None
                 if current_event:
@@ -176,6 +184,7 @@ class ActionTurnApplicationService:
                 event_runtime=current_event if event_started else None,
                 battle_odds=selection_context.get("battle_odds"),
             )
+            result.date_label = current_world_date
             result.state_snapshot = updated_state
             affected_users = await self._append_interaction_memories(
                 group_id=group_id,
@@ -185,7 +194,7 @@ class ActionTurnApplicationService:
                 participants=nearby_players,
                 interactions=interaction_result.get("interactions", []),
                 world_day_offset=world_day_offset,
-                world_date=current_world_date,
+                world_date=stored_world_time,
             )
             await self._compact_affected_memories(
                 group_id=group_id,

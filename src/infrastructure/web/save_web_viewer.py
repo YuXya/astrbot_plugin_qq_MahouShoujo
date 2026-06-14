@@ -2671,7 +2671,10 @@ class SaveWebViewer:
         updated_at = player_data.get("updated_at", "")
         try:
             player_day, player_minute = self.repository._player_clock(player_data)
-            player_time = self.repository.format_world_datetime(player_day, player_minute)
+            player_time = self.repository.format_world_datetime_for_display(
+                player_day,
+                player_minute,
+            )
         except ValueError:
             player_time = "未初始化"
         transformation_time = self._get_nested(
