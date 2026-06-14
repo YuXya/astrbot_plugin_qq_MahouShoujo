@@ -386,10 +386,10 @@ class ActionTurnAnalyzer(BattleDiaryAnalyzer):
             ),
             "事件": (
                 "event_protocol:\n"
-                "  objective: \"根据玩家指令自由推进当前剧情事件，可以自然转场、改变目标或结束。\"\n"
+                "  objective: \"根据玩家的尝试和已有事实独立裁决并推进当前剧情事件，可以自然转场、改变目标或结束。\"\n"
                 "  continuation: \"魔物、追击、调查、救援、决斗等当前目标仍存在时，必须保留 /进程/当前事件。\"\n"
                 "  completion: \"只有当前目标已解决或彻底消失时，才移除 /进程/当前事件并把阶段改为日常。\"\n"
-                "  failure: \"被拘束、被抓走、逃跑失败或危机仍在继续通常不是事件结束。\"\n"
+                "  failure: \"失败可以结束事件，也可以形成被拘束、被抓走、被改造或继续受困的新处境；只按正文事实决定。\"\n"
             ),
         }
         return protocols.get(phase, protocols["日常"])

@@ -362,13 +362,14 @@ class EditableResourceManager:
                 "{{supplement_text}}（世界书+状态书+事件书命中的补充设定，未命中时为空）。"
             ),
             self.PROMPT_FILES["action_context_selection_prompt"]: (
-                "用于 /魔法少女行动 正文生成前的统一上下文判断。使用子任务 LLM Provider，"
-                "判断 action_target、is_continuous_event、参与者、目标、场景事件和胜率。"
-                "普通日常不创建持续事件，胜率固定为 50。"
+                "用于 /魔法少女行动 正文生成前的统一上下文筛选。使用子任务 LLM Provider，"
+                "只选择 action_target、is_continuous_event、参与者、目标和场景事件，"
+                "不判断行动结果或事件胜负。"
             ),
             self.PROMPT_FILES["action_turn_prompt"]: (
                 "用于 /魔法少女行动 的酒馆式完整回合 Prompt。发给 AI 的 user message "
-                "按历史上下文、阶段协议、变量快照、行动选项、变量 API、后台事件、示例库和 master_protocol 拼接。"
+                "按历史上下文、行动结果原则、阶段协议、变量快照、行动选项、变量 API、后台事件、"
+                "示例库和 master_protocol 拼接；正文主 LLM 根据已有事实决定实际发展。"
             ),
             self.PROMPT_FILES["relationship_summary_prompt"]: (
                 "用于多人 /魔法少女行动 结束后的后台人物关系总结。发给 AI 的 user message 就是这个模板渲染后的结果。"

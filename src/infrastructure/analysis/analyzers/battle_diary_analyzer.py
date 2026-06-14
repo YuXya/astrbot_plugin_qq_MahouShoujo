@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 
 from ....domain.models.data_models import BattleDiaryCard, TokenUsage
-from ....domain.services.battle_outcome_service import resolve_battle_outcome
 from ....domain.services.battle_diary_domain_service import BattleDiaryDomainService
 from ....utils.logger import logger
 from ...change_books import ChangeBookEngine
@@ -141,30 +140,6 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
             "selected_participants": participants,
             "selected_targets": selected_targets,
             "scene_event": scene_event,
-            "ai_win_rate": self._clamp_percent(parsed.get("ai_win_rate")),
-            "desire_win_rate": self._clamp_percent(parsed.get("desire_win_rate")),
-        }
-        if not is_continuous_event:
-            context["ai_win_rate"] = 50
-            context["desire_win_rate"] = 50
-            return context
-
-        context["battle_odds"] = self._build_battle_odds_context(
-            player_data=player_data,
-            teammate_data=participants,
-            enemy_data=selected_targets,
-            battle_kind="free_progress_event",
-            ai_win_rate=context["ai_win_rate"],
-            desire_win_rate=context["desire_win_rate"],
-        )
-        outcome = str(context["battle_odds"].get("outcome") or "")
-        context["event_outcome"] = {
-            "result": "success" if outcome == "player_win" else "obstacle",
-            "battle_result": outcome,
-            "guidance": scene_event.get(
-                "success_ending" if outcome == "player_win" else "obstacle_ending",
-                "",
-            ),
         }
         return context
 
@@ -382,56 +357,8 @@ class BattleDiaryAnalyzer(BaseAnalyzer[BattleDiaryCard]):
                 "target_magical_girl_json": self._json_dump(
                     self._prompt_protagonist_profile(first_magical)
                 ),
-                "battle_odds_json": self._json_dump(
-                    (selection_context or {}).get("battle_odds")
-                ),
             },
         )
-
-    def _build_battle_odds_context(
-        self,
-        *,
-        player_data: dict,
-        battle_kind: str,
-        opponent_data: dict | None = None,
-        ai_win_rate: object = None,
-        desire_win_rate: object = None,
-        force_lose: bool = False,
-        force_reason: str = "",
-        teammate_data: list[dict] | None = None,
-        enemy_data: list[dict] | None = None,
-    ) -> dict[str, object]:
-        """Build randomized battle odds used by the diary prompt."""
-        odds = resolve_battle_outcome(
-            ai_win_rate,
-            desire_win_rate,
-            force_lose=force_lose,
-        )
-        final_rate = int(odds["player_win_rate"])
-
-        closeness = 50 - abs(final_rate - 50)
-        if final_rate in {0, 100}:
-            tempo = "一边倒，战斗干脆利落"
-        elif closeness >= 35:
-            tempo = "难解难分，双方反复交换优势"
-        elif closeness >= 20:
-            tempo = "有来有回，但胜负逐渐清晰"
-        else:
-            tempo = "优势明显，收束较快"
-
-        return {
-            **odds,
-            "battle_kind": battle_kind,
-            "tempo": tempo,
-            "force_reason": force_reason,
-        }
-
-    @staticmethod
-    def _clamp_percent(value: object, *, default: int = 50) -> int:
-        try:
-            return max(0, min(100, int(float(value))))
-        except Exception:
-            return default
 
     @staticmethod
     def _prompt_scene_event_candidates(candidates: list[dict]) -> list[dict]:

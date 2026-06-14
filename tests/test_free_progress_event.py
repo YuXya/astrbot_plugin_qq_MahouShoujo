@@ -36,9 +36,6 @@ from src.domain.models.data_models import (  # noqa: E402
     BattleDiaryCard,
     ReincarnationCard,
 )
-from src.domain.services.battle_outcome_service import (  # noqa: E402
-    resolve_battle_outcome,
-)
 from src.infrastructure.event_book.engine import EventBookEngine  # noqa: E402
 from src.infrastructure.analysis.analyzers.battle_diary_analyzer import (  # noqa: E402
     BattleDiaryAnalyzer,
@@ -52,13 +49,11 @@ from src.infrastructure.storage.player_save_repository import (  # noqa: E402
 )
 
 
-def _runtime(*, ai: int = 50, desire: int = 50, turn_count: int = 1) -> dict:
+def _runtime(*, turn_count: int = 1) -> dict:
     return {
         "scene_event": {"id": "capture", "title": "抓捕事件", "reason": "测试"},
         "selected_participants": [],
         "selected_targets": [{"id": "monster", "name": "测试魔物"}],
-        "ai_win_rate": ai,
-        "desire_win_rate": desire,
         "started_at": "公元2020年4月1日",
         "turn_count": turn_count,
     }
@@ -283,9 +278,10 @@ class PureLlmSelectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(context["scene_event"])
         self.assertEqual(context["selected_targets"], [])
         self.assertEqual(context["action_target"]["type"], "daily_life")
-        self.assertEqual(context["ai_win_rate"], 50)
-        self.assertEqual(context["desire_win_rate"], 50)
+        self.assertNotIn("ai_win_rate", context)
+        self.assertNotIn("desire_win_rate", context)
         self.assertNotIn("battle_odds", context)
+        self.assertNotIn("event_outcome", context)
 
     async def test_daily_explicit_llm_selection_resolves_candidates(self):
         analyzer = self._analyzer([{"id": "shopping", "title": "逛街事件"}])
@@ -320,10 +316,11 @@ class PureLlmSelectionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(context["scene_event"]["id"], "shopping")
         self.assertEqual(context["selected_targets"][0]["id"], "monster")
-        self.assertEqual(context["ai_win_rate"], 50)
+        self.assertNotIn("ai_win_rate", context)
+        self.assertNotIn("desire_win_rate", context)
         self.assertNotIn("battle_odds", context)
 
-    async def test_continuous_event_builds_battle_odds(self):
+    async def test_continuous_event_only_selects_context(self):
         analyzer = self._analyzer([{"id": "capture", "title": "抓捕事件"}])
         response = SimpleNamespace(
             completion_text=json.dumps(
@@ -344,22 +341,19 @@ class PureLlmSelectionTests(unittest.IsolatedAsyncioTestCase):
             "src.infrastructure.analysis.analyzers.battle_diary_analyzer.call_provider_with_retry",
             new=AsyncMock(return_value=response),
         ):
-            with patch(
-                "src.domain.services.battle_outcome_service.random.randint",
-                return_value=50,
-            ):
-                context = await analyzer.select_action_context(
-                    action_text="追击魔物",
-                    player_data={},
-                    logs=[],
-                    cameo_memories=[],
-                    participant_candidates=[],
-                    magical_girl_candidates=[],
-                    monster_candidates=[{"id": "monster", "name": "测试魔物"}],
-                )
+            context = await analyzer.select_action_context(
+                action_text="追击魔物",
+                player_data={},
+                logs=[],
+                cameo_memories=[],
+                participant_candidates=[],
+                magical_girl_candidates=[],
+                monster_candidates=[{"id": "monster", "name": "测试魔物"}],
+            )
 
         self.assertTrue(context["is_continuous_event"])
-        self.assertEqual(context["battle_odds"]["player_win_rate"], 75)
+        for key in ("ai_win_rate", "desire_win_rate", "battle_odds", "event_outcome"):
+            self.assertNotIn(key, context)
 
     async def test_invalid_json_falls_back_to_daily_without_roll(self):
         analyzer = self._analyzer([])
@@ -400,20 +394,14 @@ class EventContextTests(unittest.TestCase):
         )
         return service
 
-    def test_dice_equal_to_rate_is_success_and_higher_dice_is_obstacle(self):
-        success = self._service()._active_event_context(
-            _runtime(ai=70, desire=70),
-            battle_odds={"dice_roll": 70},
-        )
-        obstacle = self._service()._active_event_context(
-            _runtime(ai=70, desire=70),
-            battle_odds={"dice_roll": 71},
-        )
-        self.assertEqual(success["event_outcome"]["result"], "success")
-        self.assertEqual(obstacle["event_outcome"]["result"], "obstacle")
-        self.assertEqual(success["battle_odds"]["dice_roll"], 70)
-        self.assertEqual(obstacle["battle_odds"]["dice_roll"], 71)
-        self.assertEqual(success["scene_event"]["content"], "最新版正文")
+    def test_active_context_exposes_event_references_without_prejudging_result(self):
+        context = self._service()._active_event_context(_runtime())
+
+        self.assertEqual(context["scene_event"]["content"], "最新版正文")
+        self.assertEqual(context["scene_event"]["success_ending"], "成功")
+        self.assertEqual(context["scene_event"]["obstacle_ending"], "受阻")
+        for key in ("ai_win_rate", "desire_win_rate", "battle_odds", "event_outcome"):
+            self.assertNotIn(key, context)
 
     def test_active_context_only_exposes_full_target_once(self):
         runtime = _runtime(turn_count=3)
@@ -438,6 +426,32 @@ class EventContextTests(unittest.TestCase):
 
 
 class ActionPromptProjectionTests(unittest.TestCase):
+    def test_action_prompt_treats_player_input_as_an_attempt(self):
+        prompt = (
+            Path(__file__).resolve().parents[1]
+            / "prompts"
+            / "magical_girl"
+            / "action_turn_prompt.txt"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("不要因为角色由玩家操控就偏袒她", prompt)
+        self.assertIn("玩家输入只描述她想做什么和如何尝试", prompt)
+        self.assertIn("根据已有事实自然决定结果", prompt)
+        self.assertNotIn("dice_roll", prompt)
+        self.assertNotIn("battle_odds", prompt)
+
+    def test_selection_prompt_only_selects_context(self):
+        prompt = (
+            Path(__file__).resolve().parents[1]
+            / "prompts"
+            / "magical_girl"
+            / "action_context_selection_prompt.txt"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("只负责筛选本轮相关资料", prompt)
+        self.assertNotIn("ai_win_rate", prompt)
+        self.assertNotIn("desire_win_rate", prompt)
+
     def test_current_event_is_hidden_from_prompt_snapshot_without_mutating_save(self):
         player_data = {
             "进程": {"阶段": "事件", "当前事件": _runtime()},
@@ -548,7 +562,6 @@ class EventSaveTests(unittest.TestCase):
         patch,
         *,
         runtime=None,
-        battle_odds=None,
         ensure_time=True,
         player_minute_of_day=None,
     ):
@@ -564,7 +577,6 @@ class EventSaveTests(unittest.TestCase):
             result=ActionTurnResult(story_text="测试正文", json_patch=patch),
             player_minute_of_day=player_minute_of_day,
             event_runtime=runtime,
-            battle_odds=battle_odds,
         )
 
     @staticmethod
@@ -960,7 +972,8 @@ class EventSaveTests(unittest.TestCase):
             ]
         )
         self.assertEqual(changed["进程"]["当前事件"]["scene_event"]["id"], "other")
-        self.assertEqual(changed["进程"]["当前事件"]["ai_win_rate"], 100)
+        self.assertNotIn("ai_win_rate", changed["进程"]["当前事件"])
+        self.assertNotIn("desire_win_rate", changed["进程"]["当前事件"])
         self.assertEqual(changed["进程"]["当前事件"]["turn_count"], 1)
         self.assertEqual(
             changed["进程"]["当前事件"]["selected_targets"],
@@ -985,22 +998,58 @@ class EventSaveTests(unittest.TestCase):
         self.assertEqual(ended["进程"]["阶段"], "日常")
         self.assertNotIn("当前事件", ended["进程"])
 
-    def test_log_uses_supplied_battle_odds(self):
-        odds = {
-            "player_win_rate": 70,
-            "dice_roll": 71,
-            "outcome": "player_lose",
-        }
+    def test_log_does_not_record_structured_outcome(self):
         with patch.object(self.repo, "append_log") as append_log:
-            self._save([], runtime=_runtime(turn_count=0), battle_odds=odds)
+            self._save([], runtime=_runtime(turn_count=0))
 
         log_entry = append_log.call_args.args[2]
-        self.assertEqual(log_entry["event_win_rate"], 70)
-        self.assertEqual(log_entry["event_dice_roll"], 71)
-        self.assertEqual(log_entry["event_outcome"], "obstacle")
+        self.assertNotIn("event_win_rate", log_entry)
+        self.assertNotIn("event_dice_roll", log_entry)
+        self.assertNotIn("event_outcome", log_entry)
         self.assertEqual(log_entry["conversation_no"], 1)
         self.assertTrue(log_entry["event_started"])
         self.assertFalse(log_entry["day_advanced"])
+
+    def test_legacy_outcome_fields_are_removed_on_next_save(self):
+        legacy_runtime = {
+            **_runtime(turn_count=3),
+            "ai_win_rate": 80,
+            "desire_win_rate": 100,
+            "battle_odds": {"dice_roll": 20},
+            "event_outcome": {"result": "success"},
+        }
+        user_dir = self.repo.get_user_dir("g1", "u1")
+        player_data = self.repo._load_current_player_data(user_dir)
+        player_data["进程"] = {"阶段": "事件", "当前事件": legacy_runtime}
+        self.repo._save_current_player_data(user_dir, player_data)
+
+        state = self._save([])
+
+        for key in ("ai_win_rate", "desire_win_rate", "battle_odds", "event_outcome"):
+            self.assertNotIn(key, state["进程"]["当前事件"])
+        self.assertEqual(state["进程"]["当前事件"]["turn_count"], 4)
+
+    def test_main_llm_event_patch_controls_success_failure_and_continuation(self):
+        for label, patch, should_continue in (
+            ("成功结束", [{"op": "remove", "path": "/进程/当前事件"}], False),
+            ("失败结束", [{"op": "remove", "path": "/进程/当前事件"}], False),
+            ("受挫继续", [], True),
+            (
+                "被捕继续",
+                [
+                    {
+                        "op": "replace",
+                        "path": "/主角/核心状态/当前状态",
+                        "value": "被捕",
+                    }
+                ],
+                True,
+            ),
+        ):
+            with self.subTest(label=label):
+                self.setUp()
+                state = self._save(patch, runtime=_runtime(turn_count=0))
+                self.assertEqual("当前事件" in state["进程"], should_continue)
 
 
 class ConversationSequenceMigrationTests(unittest.TestCase):
@@ -1158,13 +1207,14 @@ class EventFallbackTests(unittest.TestCase):
             {
                 "is_continuous_event": True,
                 "scene_event": {"id": "capture", "title": "抓捕事件"},
-                "battle_odds": {"ai_win_rate": 60, "desire_win_rate": 70},
             },
             current_world_date="公元2020年4月1日",
         )
 
         self.assertIsNone(daily)
         self.assertEqual(continuous["scene_event"]["id"], "capture")
+        self.assertNotIn("ai_win_rate", continuous)
+        self.assertNotIn("desire_win_rate", continuous)
 
     def test_legacy_free_action_event_is_detected_for_cleanup(self):
         self.assertTrue(
@@ -1182,10 +1232,17 @@ class _ActiveEventRepository:
         self.saved = None
 
     def load_player_save(self, group_id, user_id):
+        legacy_runtime = {
+            **_runtime(),
+            "ai_win_rate": 90,
+            "desire_win_rate": 100,
+            "battle_odds": {"dice_roll": 20},
+            "event_outcome": {"result": "success"},
+        }
         return {
             "player_data": {
                 "player_clock": {"day_offset": 0, "minute_of_day": 8 * 60},
-                "进程": {"阶段": "事件", "当前事件": _runtime()},
+                "进程": {"阶段": "事件", "当前事件": legacy_runtime},
             },
             "logs": [],
             "cameo_memories": [],
@@ -1226,18 +1283,6 @@ class _ActiveEventAnalyzer:
             "scene_event": {"id": "tentacle_event", "title": "触手怪事件"},
             "selected_participants": [],
             "selected_targets": [{"id": "tentacle", "name": "触手怪"}],
-            "battle_odds": {
-                "ai_win_rate": 10,
-                "desire_win_rate": 100,
-                "player_win_rate": 55,
-                "dice_roll": 70,
-                "outcome": "player_lose",
-            },
-            "event_outcome": {
-                "result": "obstacle",
-                "battle_result": "player_lose",
-                "guidance": "未能脱离",
-            },
         }
 
     async def analyze_action_turn(self, **kwargs):
@@ -1282,61 +1327,17 @@ class ActiveEventFlowTests(unittest.IsolatedAsyncioTestCase):
             service.llm_analyzer.selection_context["current_event"]["scene_event"]["id"],
             "capture",
         )
+        for key in ("battle_odds", "event_outcome", "ai_win_rate", "desire_win_rate"):
+            self.assertNotIn(key, service.llm_analyzer.selection_input["current_event"])
+            self.assertNotIn(key, service.llm_analyzer.selection_context["current_event"])
         self.assertEqual(
             service.llm_analyzer.selection_context["proposed_event"]["scene_event"]["id"],
             "tentacle_event",
         )
         self.assertEqual(result.result.selected_targets[0]["name"], "触手怪")
-        self.assertIs(
-            service.save_repository.saved["battle_odds"],
-            service.llm_analyzer.selection_context["battle_odds"],
-        )
-
-
-class BattleOutcomeTests(unittest.TestCase):
-    def test_roll_boundaries_and_upset_results(self):
-        with patch(
-            "src.domain.services.battle_outcome_service.random.randint",
-            side_effect=[20, 80],
-        ) as randint:
-            low_rate_win = resolve_battle_outcome(30, 30)
-            high_rate_loss = resolve_battle_outcome(70, 70)
-
-        self.assertEqual(randint.call_args_list[0].args, (20, 80))
-        self.assertEqual(low_rate_win["dice_roll"], 20)
-        self.assertEqual(low_rate_win["outcome"], "player_win")
-        self.assertEqual(high_rate_loss["dice_roll"], 80)
-        self.assertEqual(high_rate_loss["outcome"], "player_lose")
-
-    def test_force_lose_ignores_favorable_roll(self):
-        odds = resolve_battle_outcome(100, 100, dice_roll=20, force_lose=True)
-
-        self.assertEqual(odds["player_win_rate"], 100)
-        self.assertEqual(odds["dice_roll"], 20)
-        self.assertEqual(odds["outcome"], "player_lose")
-
-    def test_first_event_context_preserves_forced_loss(self):
-        service = EventContextTests()._service()
-        context = service._active_event_context(
-            _runtime(ai=100, desire=100),
-            battle_odds={"dice_roll": 20, "outcome": "player_lose"},
-        )
-
-        self.assertEqual(context["battle_odds"]["dice_roll"], 20)
-        self.assertEqual(context["event_outcome"]["result"], "obstacle")
-
-    def test_active_event_rerolls_once_per_context(self):
-        service = EventContextTests()._service()
-        with patch(
-            "src.domain.services.battle_outcome_service.random.randint",
-            side_effect=[20, 80],
-        ) as randint:
-            first = service._active_event_context(_runtime(ai=50, desire=50))
-            second = service._active_event_context(_runtime(ai=50, desire=50))
-
-        self.assertEqual(randint.call_count, 2)
-        self.assertEqual(first["battle_odds"]["outcome"], "player_win")
-        self.assertEqual(second["battle_odds"]["outcome"], "player_lose")
+        for key in ("battle_odds", "event_outcome", "ai_win_rate", "desire_win_rate"):
+            self.assertNotIn(key, service.llm_analyzer.selection_context)
+        self.assertNotIn("battle_odds", service.save_repository.saved)
 
 
 class WorldTimeDisplayTests(unittest.TestCase):

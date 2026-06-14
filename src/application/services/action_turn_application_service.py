@@ -3,7 +3,6 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from ...domain.services.battle_outcome_service import resolve_battle_outcome
 from ...infrastructure.event_book import EventBookEngine
 
 from ...domain.models.data_models import ActionTurnExecutionResult
@@ -67,7 +66,11 @@ class ActionTurnApplicationService:
                 (player_data.get("进程") or {}).get("阶段") or "日常"
             ).strip() if isinstance(player_data, dict) else "日常"
             phase = self._current_phase(player_data)
-            current_event = self._current_event(player_data)
+            stored_event = self._current_event(player_data)
+            current_event = self._clean_event_runtime(stored_event)
+            if stored_event != current_event and current_event is not None:
+                player_data = deepcopy(player_data)
+                player_data.setdefault("进程", {})["当前事件"] = deepcopy(current_event)
             legacy_event_cleanup = self._is_legacy_free_action_event(current_event)
             phase_cleanup = current_event is None and stored_phase != "日常"
             if legacy_event_cleanup or phase_cleanup:
@@ -112,10 +115,7 @@ class ActionTurnApplicationService:
                     player_data.setdefault("进程", {})["阶段"] = "事件"
                     player_data["进程"]["当前事件"] = deepcopy(current_event)
                     phase = "事件"
-                    selection_context = self._active_event_context(
-                        current_event,
-                        battle_odds=selection_context.get("battle_odds"),
-                    )
+                    selection_context = self._active_event_context(current_event)
                 else:
                     phase = "日常"
             participant_names = self._participant_names(
@@ -182,7 +182,6 @@ class ActionTurnApplicationService:
                 player_minute_of_day=world_minute_of_day,
                 linked_user_ids=linked_user_ids,
                 event_runtime=current_event if event_started else None,
-                battle_odds=selection_context.get("battle_odds"),
             )
             result.date_label = current_world_date
             result.state_snapshot = updated_state
@@ -440,8 +439,6 @@ class ActionTurnApplicationService:
                 if has_proposed_event
                 else current_event.get("selected_targets")
             ),
-            "battle_odds": proposed.get("battle_odds"),
-            "event_outcome": proposed.get("event_outcome"),
             "event_runtime": {
                 "started_at": str(current_event.get("started_at") or "").strip(),
                 "turn_count": max(0, int(current_event.get("turn_count", 0) or 0)),
@@ -452,10 +449,6 @@ class ActionTurnApplicationService:
                     current_event.get("selected_participants")
                 ),
                 "selected_targets": self._dict_list(current_event.get("selected_targets")),
-                "ai_win_rate": self._clamp_percent(current_event.get("ai_win_rate")),
-                "desire_win_rate": self._clamp_percent(
-                    current_event.get("desire_win_rate")
-                ),
                 "started_at": str(current_event.get("started_at") or "").strip(),
                 "turn_count": max(0, int(current_event.get("turn_count", 0) or 0)),
             },
@@ -469,7 +462,6 @@ class ActionTurnApplicationService:
                 "selected_targets": self._dict_list(proposed.get("selected_targets")),
                 "runtime": proposed_runtime,
             },
-            "proposed_battle_odds": proposed.get("battle_odds"),
         }
 
     def _expanded_event_runtime(
@@ -513,8 +505,6 @@ class ActionTurnApplicationService:
     def _active_event_context(
         self,
         current_event: dict[str, object],
-        *,
-        battle_odds: object = None,
     ) -> dict[str, object]:
         stored_scene = current_event.get("scene_event")
         event_id = str(stored_scene.get("id") or "").strip() if isinstance(stored_scene, dict) else ""
@@ -522,33 +512,14 @@ class ActionTurnApplicationService:
         scene_event = dict(latest_scene or stored_scene or {})
         if isinstance(stored_scene, dict):
             scene_event["reason"] = str(stored_scene.get("reason") or "").strip()
-        previous_odds = battle_odds if isinstance(battle_odds, dict) else {}
-        odds = resolve_battle_outcome(
-            current_event.get("ai_win_rate"),
-            current_event.get("desire_win_rate"),
-            dice_roll=previous_odds.get("dice_roll"),
-        )
-        previous_outcome = str(previous_odds.get("outcome") or "").strip()
-        if previous_outcome in {"player_win", "player_lose"}:
-            odds["outcome"] = previous_outcome
-        outcome = str(odds["outcome"])
         return {
             "battle_type": "event",
             "scene_event": scene_event,
             "selected_participants": self._dict_list(current_event.get("selected_participants")),
             "selected_targets": self._dict_list(current_event.get("selected_targets")),
-            "battle_odds": {**odds, "battle_kind": "free_progress_event"},
             "event_runtime": {
                 "started_at": str(current_event.get("started_at") or "").strip(),
                 "turn_count": max(0, int(current_event.get("turn_count", 0) or 0)),
-            },
-            "event_outcome": {
-                "result": "success" if outcome == "player_win" else "obstacle",
-                "battle_result": outcome,
-                "guidance": scene_event.get(
-                    "success_ending" if outcome == "player_win" else "obstacle_ending",
-                    "",
-                ),
             },
         }
 
@@ -566,8 +537,6 @@ class ActionTurnApplicationService:
         event_id = str(scene.get("id") or "").strip() if isinstance(scene, dict) else ""
         if not event_id:
             return None
-        odds = selection_context.get("battle_odds")
-        odds = odds if isinstance(odds, dict) else {}
         return {
             "scene_event": {
                 "id": event_id,
@@ -576,8 +545,6 @@ class ActionTurnApplicationService:
             },
             "selected_participants": self._dict_list(selection_context.get("selected_participants")),
             "selected_targets": self._dict_list(selection_context.get("selected_targets")),
-            "ai_win_rate": self._clamp_percent(odds.get("ai_win_rate")),
-            "desire_win_rate": self._clamp_percent(odds.get("desire_win_rate")),
             "started_at": current_world_date,
             "turn_count": 0,
         }
@@ -589,11 +556,20 @@ class ActionTurnApplicationService:
         return [dict(item) for item in value if isinstance(item, dict)]
 
     @staticmethod
-    def _clamp_percent(value: object) -> int:
-        try:
-            return max(0, min(100, int(float(value))))
-        except Exception:
-            return 50
+    def _clean_event_runtime(
+        current_event: dict[str, object] | None,
+    ) -> dict[str, object] | None:
+        if not isinstance(current_event, dict):
+            return None
+        cleaned = deepcopy(current_event)
+        for key in (
+            "ai_win_rate",
+            "desire_win_rate",
+            "battle_odds",
+            "event_outcome",
+        ):
+            cleaned.pop(key, None)
+        return cleaned
 
     @staticmethod
     def _selected_participants(selection_context: dict[str, object]) -> list[dict]:

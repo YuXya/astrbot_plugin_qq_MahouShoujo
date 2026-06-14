@@ -608,7 +608,6 @@ class PlayerSaveRepository:
         player_minute_of_day: int | None = None,
         linked_user_ids: list[str] | None = None,
         event_runtime: dict[str, Any] | None = None,
-        battle_odds: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         user_dir = self.get_user_dir(group_id, user_id)
         user_dir.mkdir(parents=True, exist_ok=True)
@@ -641,9 +640,12 @@ class PlayerSaveRepository:
         if event_runtime and not self._current_story_event(player_data):
             process = player_data.setdefault("进程", {})
             process["阶段"] = "事件"
-            process["当前事件"] = deepcopy(event_runtime)
+            process["当前事件"] = self._clean_story_event_runtime(event_runtime)
         elif self._current_story_event(player_data):
             player_data.setdefault("进程", {})["阶段"] = "事件"
+            self._remove_legacy_event_outcome_fields(
+                self._current_story_event(player_data)
+            )
         previous_event = deepcopy(self._current_story_event(player_data))
         normalized_patch = self._normalize_story_event_patch(player_data, result.json_patch)
         result.json_patch = normalized_patch
@@ -659,6 +661,7 @@ class PlayerSaveRepository:
             }
         )
         current_event = self._current_story_event(player_data)
+        self._remove_legacy_event_outcome_fields(current_event)
         self._validate_story_event_state(previous_event, player_data)
         previous_event_id = self._story_event_id(previous_event)
         current_event_id = self._story_event_id(current_event)
@@ -689,15 +692,6 @@ class PlayerSaveRepository:
         event_id = current_event_id if event_switched else self._story_event_id(
             previous_event or current_event
         )
-        event_win_rate = self._battle_odds_int(battle_odds, "player_win_rate")
-        event_dice_roll = self._battle_odds_int(battle_odds, "dice_roll")
-        outcome = str((battle_odds or {}).get("outcome") or "").strip()
-        if outcome == "player_win":
-            event_outcome = "success"
-        elif outcome == "player_lose":
-            event_outcome = "obstacle"
-        else:
-            event_outcome = self._event_outcome_from_runtime(previous_event or current_event)
         event_started = bool(event_runtime and previous_event)
         event_ended = bool(previous_event and not current_event)
         ending_day_offset, ending_minute_of_day = self._advanced_clock(
@@ -762,9 +756,6 @@ class PlayerSaveRepository:
                 "analysis": result.analysis,
                 "json_patch": applied_patch,
                 "event_id": event_id,
-                "event_outcome": event_outcome,
-                "event_win_rate": event_win_rate,
-                "event_dice_roll": event_dice_roll,
                 "event_started": event_started,
                 "event_ended": event_ended,
                 "day_advanced": day_advanced,
@@ -830,9 +821,18 @@ class PlayerSaveRepository:
         patch: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         current = cls._current_story_event(state)
-        if not current or not isinstance(patch, list):
+        if not isinstance(patch, list):
             return patch
-        normalized = [dict(item) if isinstance(item, dict) else item for item in patch]
+        normalized = [
+            dict(item) if isinstance(item, dict) else item
+            for item in patch
+            if not (
+                isinstance(item, dict)
+                and cls._is_legacy_event_outcome_patch_path(
+                    str(item.get("path") or "")
+                )
+            )
+        ]
         removes_event = False
         leaves_event_phase = False
         for raw_op in normalized:
@@ -840,13 +840,19 @@ class PlayerSaveRepository:
                 continue
             op = str(raw_op.get("op") or "").strip()
             path = str(raw_op.get("path") or "").strip()
+            if (
+                path == "/进程/当前事件"
+                and op in {"replace", "insert"}
+                and isinstance(raw_op.get("value"), dict)
+            ):
+                raw_op["value"] = cls._clean_story_event_runtime(raw_op["value"])
             if op == "remove" and path == "/进程/当前事件":
                 removes_event = True
             if path == "/进程/阶段" and op in {"replace", "insert"}:
                 leaves_event_phase = str(raw_op.get("value") or "").strip() != "事件"
-        if removes_event and not leaves_event_phase:
+        if current and removes_event and not leaves_event_phase:
             normalized.append({"op": "replace", "path": "/进程/阶段", "value": "日常"})
-        elif leaves_event_phase and not removes_event:
+        elif current and leaves_event_phase and not removes_event:
             normalized.append({"op": "remove", "path": "/进程/当前事件"})
         return normalized
 
@@ -883,24 +889,37 @@ class PlayerSaveRepository:
         )
 
     @staticmethod
-    def _event_outcome_from_runtime(current_event: dict[str, Any] | None) -> str:
-        if not isinstance(current_event, dict):
-            return ""
-        try:
-            ai_rate = max(0, min(100, int(float(current_event.get("ai_win_rate", 50)))))
-            desire_rate = max(0, min(100, int(float(current_event.get("desire_win_rate", 50)))))
-        except Exception:
-            ai_rate = desire_rate = 50
-        return "success" if round(ai_rate * 0.5 + desire_rate * 0.5) >= 50 else "obstacle"
+    def _clean_story_event_runtime(current_event: dict[str, Any]) -> dict[str, Any]:
+        cleaned = deepcopy(current_event)
+        PlayerSaveRepository._remove_legacy_event_outcome_fields(cleaned)
+        return cleaned
 
     @staticmethod
-    def _battle_odds_int(battle_odds: dict[str, Any] | None, key: str) -> int | None:
-        if not isinstance(battle_odds, dict) or battle_odds.get(key) is None:
-            return None
-        try:
-            return int(float(battle_odds[key]))
-        except Exception:
-            return None
+    def _remove_legacy_event_outcome_fields(
+        current_event: dict[str, Any] | None,
+    ) -> None:
+        if not isinstance(current_event, dict):
+            return
+        for key in (
+            "ai_win_rate",
+            "desire_win_rate",
+            "battle_odds",
+            "event_outcome",
+        ):
+            current_event.pop(key, None)
+
+    @staticmethod
+    def _is_legacy_event_outcome_patch_path(path: str) -> bool:
+        return any(
+            path == f"/进程/当前事件/{key}"
+            or path.startswith(f"/进程/当前事件/{key}/")
+            for key in (
+                "ai_win_rate",
+                "desire_win_rate",
+                "battle_odds",
+                "event_outcome",
+            )
+        )
 
     def apply_json_patch(
         self,
