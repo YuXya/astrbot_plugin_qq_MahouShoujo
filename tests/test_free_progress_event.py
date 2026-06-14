@@ -1489,7 +1489,7 @@ class ActionTurnCardTests(unittest.TestCase):
         self.assertIn("等级：10", html)
         self.assertNotIn("进度：10", html)
 
-    def test_action_card_displays_all_skill_and_fetish_ranks_as_patch_chips(self):
+    def test_action_card_displays_skills_fetishes_and_inventory_in_order(self):
         generator = ReportGenerator.__new__(ReportGenerator)
         skills = {
             f"技能{index}": {"进度": progress}
@@ -1511,15 +1511,28 @@ class ActionTurnCardTests(unittest.TestCase):
                             "恶堕": {"进度": 18},
                         },
                     },
+                    "道具栏": {
+                        "药水": 1,
+                        "空药瓶": 0,
+                        "半瓶药剂": 1.5,
+                        "便签": "写着今天的线索",
+                        "护符": True,
+                        "失效护符": False,
+                        "空盒": None,
+                        "工具箱": {
+                            "状态": "损坏",
+                            "零件": ["扳手"],
+                        },
+                    },
                 },
             },
         )
 
         html = generator._render_action_turn_html(result)
 
-        self.assertIn('<div class="section-title">技能&amp;性癖</div>', html)
-        self.assertLess(html.index("状态变化"), html.index("技能&amp;性癖"))
-        self.assertLess(html.index("技能&amp;性癖"), html.index("行动记录已写入存档。"))
+        self.assertIn('<div class="section-title">技能&amp;性癖&amp;道具</div>', html)
+        self.assertLess(html.index("状态变化"), html.index("技能&amp;性癖&amp;道具"))
+        self.assertLess(html.index("技能&amp;性癖&amp;道具"), html.index("行动记录已写入存档。"))
         self.assertIn('<span class="patch-chip">技能1：入门</span>', html)
         self.assertIn('<span class="patch-chip">技能2：入门</span>', html)
         self.assertIn('<span class="patch-chip">技能3：熟练</span>', html)
@@ -1532,10 +1545,24 @@ class ActionTurnCardTests(unittest.TestCase):
         self.assertIn('<span class="patch-chip">技能10：大师</span>', html)
         self.assertIn('<span class="patch-chip">技能13：大师</span>', html)
         self.assertIn('<span class="patch-chip">恶堕：入门</span>', html)
+        self.assertIn('<span class="patch-chip">1个药水</span>', html)
+        self.assertIn('<span class="patch-chip">0个空药瓶</span>', html)
+        self.assertIn('<span class="patch-chip">1.5个半瓶药剂</span>', html)
+        self.assertIn('<span class="patch-chip">便签：写着今天的线索</span>', html)
+        self.assertIn('<span class="patch-chip">护符：是</span>', html)
+        self.assertIn('<span class="patch-chip">失效护符：否</span>', html)
+        self.assertIn('<span class="patch-chip">空盒：无</span>', html)
+        self.assertIn(
+            '<span class="patch-chip">工具箱：{&quot;状态&quot;:&quot;损坏&quot;,'
+            '&quot;零件&quot;:[&quot;扳手&quot;]}</span>',
+            html,
+        )
+        self.assertLess(html.index("技能13：大师"), html.index("恶堕：入门"))
+        self.assertLess(html.index("恶堕：入门"), html.index("1个药水"))
         self.assertNotIn("技能1：0", html)
         self.assertNotIn("恶堕：18", html)
 
-    def test_action_card_hides_skill_and_fetish_section_when_empty(self):
+    def test_action_card_hides_collection_section_when_empty(self):
         generator = ReportGenerator.__new__(ReportGenerator)
         result = ActionTurnResult(
             story_text="测试正文",
@@ -1543,13 +1570,32 @@ class ActionTurnCardTests(unittest.TestCase):
                 "主角": {
                     "技能": {},
                     "快感状态": {"性癖": {}},
+                    "道具栏": {},
                 },
             },
         )
 
         html = generator._render_action_turn_html(result)
 
-        self.assertNotIn('<div class="section-title">技能&amp;性癖</div>', html)
+        self.assertNotIn('<div class="section-title">技能&amp;性癖&amp;道具</div>', html)
+
+    def test_action_card_displays_collection_section_with_inventory_only(self):
+        generator = ReportGenerator.__new__(ReportGenerator)
+        result = ActionTurnResult(
+            story_text="测试正文",
+            state_snapshot={
+                "主角": {
+                    "技能": {},
+                    "快感状态": {"性癖": {}},
+                    "道具栏": {"钥匙": 2},
+                },
+            },
+        )
+
+        html = generator._render_action_turn_html(result)
+
+        self.assertIn('<div class="section-title">技能&amp;性癖&amp;道具</div>', html)
+        self.assertIn('<span class="patch-chip">2个钥匙</span>', html)
 
     def test_action_card_only_displays_current_event_reason(self):
         generator = ReportGenerator.__new__(ReportGenerator)

@@ -215,18 +215,17 @@ class ReportGenerator(ICardGenerator):
             if patch_items
             else ""
         )
-        progress_items = "".join(
-            f'<span class="patch-chip">{html_lib.escape(item.label)}：'
-            f'{html_lib.escape(self._action_progress_rank(item.percent))}</span>'
-            for item in self._action_progress_items(result.state_snapshot)
+        collection_items = "".join(
+            f'<span class="patch-chip">{html_lib.escape(item)}</span>'
+            for item in self._action_collection_display_items(result.state_snapshot)
         )
-        progress_section = (
+        collection_section = (
             f"""
     <section class="section">
-      <div class="section-title">技能&amp;性癖</div>
-      <div class="patch-grid">{progress_items}</div>
+      <div class="section-title">技能&amp;性癖&amp;道具</div>
+      <div class="patch-grid">{collection_items}</div>
     </section>"""
-            if progress_items
+            if collection_items
             else ""
         )
         options_section = (
@@ -491,21 +490,48 @@ h1 {{
     <section class="story">{current_time_html}{story_html}</section>
     {options_section}
     {patch_section}
-    {progress_section}
+    {collection_section}
     <div class="footer">{html_lib.escape(result.footer or "行动记录已写入存档。")}</div>
   </article>
 </body>
 </html>"""
 
-    @staticmethod
-    def _action_progress_items(state: dict[str, Any]) -> list[Any]:
+    @classmethod
+    def _action_collection_display_items(cls, state: dict[str, Any]) -> list[str]:
         sections = build_progress_sections(
             state,
             "/主角/技能/",
             "/主角/快感状态/性癖/",
             limit=10_000,
         )
-        return [*sections.skill_items, *sections.status_items]
+        progress_items = [
+            f"{item.label}：{cls._action_progress_rank(item.percent)}"
+            for item in [*sections.skill_items, *sections.status_items]
+        ]
+        protagonist = state.get("主角", {}) if isinstance(state, dict) else {}
+        inventory = protagonist.get("道具栏", {}) if isinstance(protagonist, dict) else {}
+        inventory_items = (
+            [
+                cls._action_inventory_display_item(str(label), value)
+                for label, value in inventory.items()
+            ]
+            if isinstance(inventory, dict)
+            else []
+        )
+        return [*progress_items, *inventory_items]
+
+    @staticmethod
+    def _action_inventory_display_item(label: str, value: Any) -> str:
+        if isinstance(value, bool):
+            return f"{label}：{'是' if value else '否'}"
+        if isinstance(value, (int, float)):
+            quantity = int(value) if isinstance(value, float) and value.is_integer() else value
+            return f"{quantity}个{label}"
+        if value is None:
+            return f"{label}：无"
+        if isinstance(value, str):
+            return f"{label}：{value}"
+        return f"{label}：{json.dumps(value, ensure_ascii=False, separators=(',', ':'), default=str)}"
 
     @staticmethod
     def _action_progress_rank(percent: int) -> str:
