@@ -91,16 +91,6 @@ class PlayerSaveRepository:
             self._atomic_write_json(clock_path, clock)
         return clock
 
-    def advance_world_clock(self, group_id: str, *, expected_day_offset: int) -> None:
-        clock_path = self._world_clock_path(group_id)
-        clock = self._load_world_clock(group_id)
-        current = max(0, int(clock.get("next_day_offset", 0) or 0))
-        if current != int(expected_day_offset):
-            raise ValueError(f"群世界时间已变化: expected={expected_day_offset}, actual={current}")
-        clock["next_day_offset"] = current + 1
-        clock["updated_at"] = self._now_ms()
-        self._atomic_write_json(clock_path, clock)
-
     def commit_action_turn_clock(
         self,
         group_id: str,
@@ -431,9 +421,6 @@ class PlayerSaveRepository:
 
         player_data = self._load_current_player_data(user_dir)
         if not player_data:
-            player_data = self._create_default_player_data(group_id, user_id)
-
-            self.advance_world_clock(group_id, expected_day_offset=world_day_offset)
             return
 
         protagonist = player_data.setdefault("主角", {})
@@ -472,7 +459,6 @@ class PlayerSaveRepository:
             world_day_offset=world_day_offset,
             world_date=world_date,
         )
-        self.advance_world_clock(group_id, expected_day_offset=world_day_offset)
 
     def _append_battle_result_log(
         self,
@@ -652,13 +638,13 @@ class PlayerSaveRepository:
                 raise ValueError("/世界/日期 只允许使用 delta 增加天数")
             value = item.get("value")
             if isinstance(value, bool):
-                raise ValueError("/世界/日期 的 delta 必须是正整数")
+                raise ValueError("/世界/日期 的 delta 必须是非负整数")
             try:
                 numeric = float(value)
             except (TypeError, ValueError):
-                raise ValueError("/世界/日期 的 delta 必须是正整数") from None
-            if not numeric.is_integer() or numeric <= 0:
-                raise ValueError("/世界/日期 的 delta 必须是正整数")
+                raise ValueError("/世界/日期 的 delta 必须是非负整数") from None
+            if not numeric.is_integer() or numeric < 0:
+                raise ValueError("/世界/日期 的 delta 必须是非负整数")
             days_to_advance += int(numeric)
         return state_patch, days_to_advance
 

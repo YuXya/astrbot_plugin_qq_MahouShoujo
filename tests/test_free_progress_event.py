@@ -31,7 +31,7 @@ sys.modules.setdefault("astrbot.api.star", astrbot_star)
 from src.application.services.action_turn_application_service import (  # noqa: E402
     ActionTurnApplicationService,
 )
-from src.domain.models.data_models import ActionTurnResult  # noqa: E402
+from src.domain.models.data_models import ActionTurnResult, BattleDiaryCard  # noqa: E402
 from src.domain.services.battle_outcome_service import (  # noqa: E402
     resolve_battle_outcome,
 )
@@ -541,6 +541,41 @@ class EventSaveTests(unittest.TestCase):
             battle_odds=battle_odds,
         )
 
+    @staticmethod
+    def _battle_card() -> BattleDiaryCard:
+        return BattleDiaryCard(
+            title="测试战斗",
+            subtitle="",
+            target_name="测试角色",
+            action="测试行动",
+            date_label="",
+            diary="测试日记",
+            encounter="测试遭遇",
+            result="测试结果",
+        )
+
+    def test_legacy_battle_save_does_not_advance_world_date(self):
+        self.repo.save_battle_result("g1", "u1", self._battle_card())
+
+        self.assertEqual(self.repo.get_current_world_day_offset("g1"), 0)
+        logs = self.repo._read_recent_logs(
+            self.repo.get_user_dir("g1", "u1") / "daily_memory.jsonl",
+            limit=0,
+        )
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0]["world_day_offset"], 0)
+
+    def test_legacy_battle_save_without_player_data_does_not_advance_world_date(self):
+        card = self._battle_card()
+
+        self.repo.save_battle_result("g1", "missing", card)
+
+        self.assertEqual(self.repo.get_current_world_day_offset("g1"), 0)
+        self.assertEqual(card.date_label, "公元2020年4月1日")
+        self.assertFalse(
+            (self.repo.get_user_dir("g1", "missing") / "daily_memory.jsonl").exists()
+        )
+
     def test_start_continue_and_end_event(self):
         started = self._save([], runtime=_runtime(turn_count=0))
         self.assertEqual(started["进程"]["阶段"], "事件")
@@ -644,10 +679,28 @@ class EventSaveTests(unittest.TestCase):
         self.assertTrue(log["event_ended"])
         self.assertEqual(log["days_advanced"], 3)
 
+    def test_zero_world_date_delta_keeps_date_and_saves_turn(self):
+        self._save(
+            [{"op": "delta", "path": "/世界/日期", "value": 0}],
+            runtime=_runtime(turn_count=0),
+        )
+
+        self.assertEqual(self.repo.get_current_world_day_offset("g1"), 0)
+        self.assertEqual(self.repo.get_current_conversation_no("g1"), 2)
+        log = self.repo._read_recent_logs(
+            self.repo.get_user_dir("g1", "u1") / "daily_memory.jsonl",
+            limit=1,
+        )[0]
+        self.assertFalse(log["day_advanced"])
+        self.assertEqual(log["days_advanced"], 0)
+        self.assertNotIn(
+            {"op": "delta", "path": "/世界/日期", "value": 0},
+            log["json_patch"],
+        )
+
     def test_invalid_world_date_patch_does_not_consume_conversation(self):
         invalid_patches = [
             [{"op": "replace", "path": "/世界/日期", "value": "2020-04-02"}],
-            [{"op": "delta", "path": "/世界/日期", "value": 0}],
             [{"op": "delta", "path": "/世界/日期", "value": -1}],
             [{"op": "delta", "path": "/世界/日期", "value": 1.5}],
         ]
