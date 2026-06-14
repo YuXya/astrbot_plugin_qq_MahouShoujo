@@ -145,14 +145,29 @@ class LLMMessageRecordingTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(recorder.records[0]["prompt"], prompt)
 
-    def test_action_persona_messages_are_unchanged(self):
+    def test_action_persona_messages_wrap_runtime_prompt_once(self):
         messages = ActionTurnAnalyzer._build_action_messages("运行时 Prompt", "系统规则")
 
         self.assertEqual(
             [message["role"] for message in messages],
-            ["system", "user", "assistant", "user", "assistant", "user"],
+            [
+                "system",
+                "user",
+                "assistant",
+                "user",
+                "assistant",
+                "user",
+                "assistant",
+                "user",
+                "assistant",
+                "user",
+            ],
         )
         self.assertEqual(messages[-1]["content"], "运行时 Prompt")
+        self.assertEqual(
+            sum(message["content"].count("运行时 Prompt") for message in messages),
+            1,
+        )
 
 
 if __name__ == "__main__":

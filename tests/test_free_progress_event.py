@@ -434,11 +434,25 @@ class ActionPromptProjectionTests(unittest.TestCase):
             / "action_turn_prompt.txt"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("不要因为角色由玩家操控就偏袒她", prompt)
+        self.assertIn("本喵也不会偏袒她", prompt)
         self.assertIn("玩家输入只描述她想做什么和如何尝试", prompt)
-        self.assertIn("根据已有事实自然决定结果", prompt)
+        self.assertIn("本喵会根据已有事实自然决定结果", prompt)
+        self.assertIn("本喵的爪子一次只按住一件当前事件", prompt)
+        self.assertIn("每轮过去了多久也要给本喵算清楚", prompt)
         self.assertNotIn("dice_roll", prompt)
         self.assertNotIn("battle_odds", prompt)
+
+    def test_action_prompt_uses_cat_god_voice_naturally(self):
+        prompt = (
+            Path(__file__).resolve().parents[1]
+            / "prompts"
+            / "magical_girl"
+            / "action_turn_prompt.txt"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("本喵只在故事外主持", prompt)
+        self.assertIn("本喵只认刚才正文里真正发生的变化", prompt)
+        self.assertIn("<JSONPatch> 也给本喵写得干干净净", prompt)
 
     def test_selection_prompt_only_selects_context(self):
         prompt = (
@@ -466,13 +480,24 @@ class ActionPromptProjectionTests(unittest.TestCase):
             "monster",
         )
 
-    def test_action_messages_establish_cat_god_dm_before_runtime_prompt(self):
+    def test_action_messages_establish_cat_god_without_repeating_runtime_rules(self):
         prompt = "完整运行时 Prompt"
         messages = ActionTurnAnalyzer._build_action_messages(prompt, "系统规则")
 
         self.assertEqual(
             [message["role"] for message in messages],
-            ["system", "user", "assistant", "user", "assistant", "user"],
+            [
+                "system",
+                "user",
+                "assistant",
+                "user",
+                "assistant",
+                "user",
+                "assistant",
+                "user",
+                "assistant",
+                "user",
+            ],
         )
         assistant_history = "\n".join(
             message["content"]
@@ -480,10 +505,18 @@ class ActionPromptProjectionTests(unittest.TestCase):
             if message["role"] == "assistant"
         )
         self.assertIn("小猫之神", messages[1]["content"])
-        self.assertIn("小猫之神", assistant_history)
+        self.assertIn("货真价实的神", assistant_history)
         self.assertIn("小鱼干", assistant_history)
+        self.assertIn("分魂", assistant_history)
         self.assertIn("DM", assistant_history)
-        self.assertIn("第三人称", assistant_history)
+        self.assertNotIn("第三人称", assistant_history)
+        self.assertNotIn("不偏袒", assistant_history)
+        for item in ("时间", "状态", "物品", "关系", "JSONPatch"):
+            self.assertNotIn(item, assistant_history)
+        self.assertEqual(
+            sum(message["content"].count(prompt) for message in messages),
+            1,
+        )
         self.assertEqual(messages[-1], {"role": "user", "content": prompt})
 
     def test_action_messages_without_prompt_do_not_create_persona_history(self):
