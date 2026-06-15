@@ -167,6 +167,7 @@ class QQMahouShoujo(Star):
                     "",
                     "/魔法少女转生：创建魔法少女角色档案。",
                     "/魔法少女行动：进行一次酒馆式行动回合，可追加行动。",
+                    "/魔法少女上一次行动：重新发送最近一次成功输出的图片。",
                     "/魔法少女存档删除 确认：删除当前群自己的存档。",
                     "",
                     f"角色档案面板：{self._build_player_profile_panel_url()}",
@@ -355,7 +356,7 @@ class QQMahouShoujo(Star):
 
         yield await self.message_sender.send_image_or_text(
             event,
-            result.image_path,
+            self._persist_last_output_image(group_id, user_id, result.image_path),
             result.card,
             fallback_text=result.text,
         )
@@ -426,9 +427,46 @@ class QQMahouShoujo(Star):
 
         yield await self.message_sender.send_image_or_text(
             event,
-            result.image_path,
+            self._persist_last_output_image(group_id, user_id, result.image_path),
             None,
             fallback_text=result.text,
+        )
+
+    @filter.command("魔法少女上一次行动")
+    async def last_mahoushoujo_action(
+        self,
+        event: AstrMessageEvent,
+    ) -> AsyncGenerator:
+        """重新发送最近一次成功输出的图片。用法：/魔法少女上一次行动"""
+        event.should_call_llm(False)
+
+        if not self._is_group_event_allowed(event):
+            return
+
+        group_id = self._get_group_id_from_event(event)
+        if not group_id:
+            yield event.plain_result("请在群聊中使用 /魔法少女上一次行动。")
+            return
+
+        user_id = self._get_sender_id_from_event(event)
+        if not user_id:
+            yield event.plain_result("没有拿到你的 QQ 号，暂时不能读取玩家存档。")
+            return
+
+        if not self.save_repository.load_player_save(group_id, user_id):
+            yield event.plain_result("还没有你的魔法少女转生存档，请先使用 /魔法少女转生 建档。")
+            return
+
+        image_path = self.save_repository.get_last_output_image(group_id, user_id)
+        if not image_path:
+            yield event.plain_result("你的存档中还没有可重新发送的图片。")
+            return
+
+        yield await self.message_sender.send_image_or_text(
+            event,
+            image_path,
+            None,
+            fallback_text="上一次输出图片发送失败，请稍后再试。",
         )
 
     @filter.permission_type(filter.PermissionType.ADMIN)
@@ -443,6 +481,19 @@ class QQMahouShoujo(Star):
     async def stop_mahoushoujo_web(self, event: AstrMessageEvent) -> AsyncGenerator:
         await self.web_viewer.stop()
         yield event.plain_result("魔法少女存档网页已关闭，当前网页登录态已失效。")
+
+    def _persist_last_output_image(
+        self,
+        group_id: str,
+        user_id: str,
+        image_path: str | None,
+    ) -> str | None:
+        if not image_path:
+            return None
+        return (
+            self.save_repository.save_last_output_image(group_id, user_id, image_path)
+            or image_path
+        )
 
     async def terminate(self) -> None:
         await self.web_viewer.stop()

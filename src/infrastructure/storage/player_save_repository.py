@@ -1194,6 +1194,48 @@ class PlayerSaveRepository:
         safe_user = self._safe_id(user_id)
         return self.root_dir / "groups" / safe_group / "users" / safe_user
 
+    def save_last_output_image(
+        self,
+        group_id: str,
+        user_id: str,
+        image_path: str | Path,
+    ) -> str | None:
+        source = Path(image_path)
+        if not source.is_file():
+            logger.warning(f"最近输出图片不存在，跳过保存: {source}")
+            return None
+
+        suffix = ".jpg" if source.suffix.lower() in {".jpg", ".jpeg"} else ".png"
+        user_dir = self.get_user_dir(group_id, user_id)
+        user_dir.mkdir(parents=True, exist_ok=True)
+        target = user_dir / f"last_output{suffix}"
+        temporary = user_dir / f".{target.name}.{time.time_ns()}.tmp"
+
+        try:
+            shutil.copyfile(source, temporary)
+            temporary.replace(target)
+            other = user_dir / ("last_output.png" if suffix == ".jpg" else "last_output.jpg")
+            if other.exists():
+                other.unlink()
+            return str(target)
+        except Exception as exc:
+            logger.warning(f"保存最近输出图片失败，保留原图片: {exc}")
+            return None
+        finally:
+            try:
+                if temporary.exists():
+                    temporary.unlink()
+            except OSError:
+                pass
+
+    def get_last_output_image(self, group_id: str, user_id: str) -> str | None:
+        user_dir = self.get_user_dir(group_id, user_id)
+        for file_name in ("last_output.png", "last_output.jpg"):
+            path = user_dir / file_name
+            if path.is_file():
+                return str(path)
+        return None
+
     def list_cities(self) -> list[dict[str, Any]]:
         groups_dir = self.root_dir / "groups"
         if not groups_dir.exists():
